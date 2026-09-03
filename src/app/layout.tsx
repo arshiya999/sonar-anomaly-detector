@@ -23,6 +23,7 @@ export const metadata: Metadata = {
   title: "ABYSS · NIOT PS 26057 marine debris sonar AI",
   description:
     "Hackathon-ready ops console: trained YOLO11n on real side-scan sonar, shadow fusion, geotagged cleanup reports.",
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

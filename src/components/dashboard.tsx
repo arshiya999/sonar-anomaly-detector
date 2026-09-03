@@ -77,6 +77,8 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
   const [log, setLog] = useState<ScanLogEntry[]>([]);
   const [pipeStep, setPipeStep] = useState(0);
   const [clock, setClock] = useState("");
+  const [demoHint, setDemoHint] = useState("");
+  const booted = useRef(false);
 
   const refreshLog = () =>
     fetch("/api/log", { cache: "no-store" })
@@ -215,6 +217,12 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     [meta, runDetect],
   );
 
+  useEffect(() => {
+    if (booted.current || !health?.ok || !samples[0]) return;
+    booted.current = true;
+    void loadSample(samples[0]);
+  }, [health, samples, loadSample]);
+
   const onFile = async (next: File) => {
     setFile(next);
     setPreview(URL.createObjectURL(next));
@@ -230,9 +238,14 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     }
     setDemo(true);
     try {
-      for (const item of samples.slice(0, 3)) {
+      const pack = samples.slice(0, 3);
+      let i = 0;
+      for (const item of pack) {
+        i += 1;
+        setDemoHint(`Judge demo ${i} / ${pack.length} · ${item.file}`);
         await loadSample(item);
       }
+      setDemoHint("Demo stacked — map, pie, and cleanup order are live");
       toast.success("Judge demo complete — pie, map pins, and reports are live");
     } finally {
       setDemo(false);
@@ -273,6 +286,23 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
       new Blob([[headers.join(","), ...rows].join("\n")], { type: "text/csv" }),
       "anomaly-report.csv",
     );
+  };
+
+  const downloadBriefing = () => {
+    if (!report) return;
+    const rows = report.detections
+      .map(
+        (d) =>
+          `<tr><td>${d.id}</td><td>${CLASS_LABEL[d.class] ?? d.class}</td><td>${d.confidence.toFixed(0)}%</td><td>${d.hazard_score}</td><td>${d.latitude ?? "—"}, ${d.longitude ?? "—"}</td></tr>`,
+      )
+      .join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>ABYSS briefing</title>
+<style>body{font-family:ui-sans-serif,system-ui;background:#041821;color:#ecfeff;padding:32px}h1{color:#67e8f9}table{border-collapse:collapse;width:100%}td,th{border:1px solid #164e63;padding:8px;text-align:left}</style>
+</head><body><p>MoES · NIOT · PS 26057</p><h1>ABYSS cleanup briefing</h1>
+<p>${report.survey_id} · ${report.model} · ${report.inference_ms} ms · ${report.count} contacts</p>
+<table><thead><tr><th>ID</th><th>Class</th><th>Conf</th><th>Hazard</th><th>Lat, Lon</th></tr></thead><tbody>${rows}</tbody></table>
+<p>Trained YOLO11n mAP@50 74.9% on SCTD + Marine Debris FLS + SeabedObjects-KLSG.</p></body></html>`;
+    triggerDownload(new Blob([html], { type: "text/html" }), "abyss-briefing.html");
   };
 
   const mapped = useMemo(() => {
@@ -350,7 +380,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               disabled={busy || demo}
             >
               {demo || busy ? <Loader2 className="animate-spin" /> : <Play />}
-              Run judge demo
+              {demo ? "Demo running" : "Run judge demo"}
             </Button>
           </div>
         </div>
@@ -373,7 +403,27 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
       </header>
 
       <main className="mx-auto max-w-[1440px] space-y-5 px-4 py-5">
-        <PipelineStrip active={pipeStep} complete={Boolean(report) && !busy} />
+        <PipelineStrip
+          active={pipeStep}
+          complete={Boolean(report) && !busy}
+          hint={demoHint || (busy ? "Pipeline live" : report ? "Last ping fused and geotagged" : "Standing by for first ping")}
+        />
+
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[
+            ["Real sonar, not COCO", "SCTD wrecks, ARIS FLS debris, KLSG seabed objects — 576 labelled pings."],
+            ["Shadow-aware confidence", "YOLO × local contrast × acoustic-shadow penalty rejects rock streaks."],
+            ["Cleanup-ready output", "Lat/lon, size in metres, hazard rank, JSON/CSV/HTML briefing."],
+          ].map(([t, d]) => (
+            <div
+              key={t}
+              className="rounded-xl border border-cyan-400/20 bg-black/25 px-3 py-2.5 backdrop-blur-sm"
+            >
+              <p className="text-sm font-medium text-cyan-100">{t}</p>
+              <p className="mt-1 text-xs leading-relaxed text-sky-200/75">{d}</p>
+            </div>
+          ))}
+        </div>
 
         <div className="grid gap-5 xl:grid-cols-[300px_1fr]">
           <aside className="flex flex-col gap-4">
@@ -477,7 +527,11 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                       key={s.file}
                       type="button"
                       onClick={() => void loadSample(s)}
-                      className="overflow-hidden rounded-lg border border-cyan-400/20 text-left transition hover:border-amber-300 hover:shadow-[0_0_16px_rgba(251,191,36,0.25)]"
+                      className={`overflow-hidden rounded-lg border text-left transition hover:border-amber-300 hover:shadow-[0_0_16px_rgba(251,191,36,0.25)] ${
+                        file?.name === s.file
+                          ? "border-amber-300 ring-2 ring-amber-300/40"
+                          : "border-cyan-400/20"
+                      }`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -502,6 +556,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               busy={busy}
               error={error}
               report={report}
+              filename={file?.name}
             />
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_1fr]">
@@ -562,6 +617,9 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                       </Button>
                       <Button size="sm" variant="outline" onClick={downloadCsv} disabled={!report}>
                         <Download /> CSV
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={downloadBriefing} disabled={!report}>
+                        <Download /> Briefing
                       </Button>
                     </div>
                   </CardHeader>
@@ -642,6 +700,10 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
             </Tabs>
           </section>
         </div>
+        <footer className="border-t border-cyan-400/15 pb-8 pt-4 text-center text-[11px] text-sky-200/60">
+          Trained on SCTD 1.0 · Marine Debris FLS watertank · SeabedObjects-KLSG · YOLO11n {MODEL_METRICS.params} ·
+          mAP@50 {MODEL_METRICS.map50} · NIOT Bay of Bengal default origin
+        </footer>
       </main>
     </div>
   );
