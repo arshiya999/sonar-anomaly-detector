@@ -132,15 +132,16 @@ def annotate(image: np.ndarray, report: dict[str, Any]) -> np.ndarray:
     vis = image.copy()
     if vis.ndim == 2:
         vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
+    # BGR, matched to dashboard CLASS_COLOR hex
     palette = {
-        "ghost_net": (46, 163, 255),
-        "debris": (80, 220, 180),
-        "shipwreck": (90, 110, 255),
-        "aircraft": (180, 120, 255),
-        "propeller": (40, 200, 255),
-        "tire": (70, 180, 120),
-        "cylinder": (200, 200, 80),
-        "diver": (80, 80, 255),
+        "ghost_net": (248, 189, 56),
+        "debris": (212, 234, 94),
+        "shipwreck": (113, 113, 248),
+        "aircraft": (253, 181, 196),
+        "propeller": (36, 191, 251),
+        "tire": (153, 211, 52),
+        "cylinder": (21, 204, 250),
+        "diver": (133, 113, 251),
     }
     for det in report["detections"]:
         x1, y1, x2, y2 = [int(v) for v in det["bbox_xyxy"]]
