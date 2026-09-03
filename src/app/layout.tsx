@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Syne } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -13,10 +13,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const syne = Syne({
+  variable: "--font-syne",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+});
+
 export const metadata: Metadata = {
-  title: "ABYSS · NIOT marine debris sonar detector",
+  title: "ABYSS · NIOT PS 26057 marine debris sonar AI",
   description:
-    "AI pipeline for side-scan sonar: debris detection, shadow filtering, and geotagged anomaly reports.",
+    "Hackathon-ready ops console: trained YOLO11n on real side-scan sonar, shadow fusion, geotagged cleanup reports.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -24,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`dark ${geistSans.variable} ${geistMono.variable} ${syne.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}
