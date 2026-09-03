@@ -2,12 +2,20 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
-import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import { CLASS_COLOR, CLASS_LABEL } from "@/lib/labels";
 import type { Detection } from "@/lib/types";
 import "leaflet/dist/leaflet.css";
 
 type Mapped = Detection & { source?: string };
+
+const TRANSECT: [number, number][] = [
+  [13.055, 80.305],
+  [13.068, 80.338],
+  [13.0827, 80.3708],
+  [13.096, 80.402],
+  [13.112, 80.438],
+];
 
 function FitOnce({ points }: { points: [number, number][] }) {
   const map = useMap();
@@ -35,12 +43,16 @@ export function SonarMap({ detections }: { detections: Mapped[] }) {
     <MapContainer
       center={center}
       zoom={11}
-      className="h-full min-h-[480px] w-full rounded-xl"
+      className="h-full min-h-[280px] w-full"
       scrollWheelZoom
     >
       <TileLayer
         attribution="Tiles © Esri"
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      />
+      <Polyline
+        positions={TRANSECT}
+        pathOptions={{ color: "#22d3ee", weight: 3, dashArray: "10 8", opacity: 0.85 }}
       />
       <FitOnce points={points} />
       {detections.map((d) =>
@@ -48,11 +60,11 @@ export function SonarMap({ detections }: { detections: Mapped[] }) {
           <CircleMarker
             key={d.id}
             center={[d.latitude, d.longitude]}
-            radius={11}
+            radius={12}
             pathOptions={{
               color: "#ffffff",
               fillColor: CLASS_COLOR[d.class] ?? "#22d3ee",
-              fillOpacity: 0.92,
+              fillOpacity: 0.95,
               weight: 2,
             }}
           >
@@ -63,8 +75,6 @@ export function SonarMap({ detections }: { detections: Mapped[] }) {
                 {d.source ? <span>{d.source}</span> : null}
                 <br />
                 {d.latitude.toFixed(5)}, {d.longitude.toFixed(5)}
-                <br />
-                Zoom in — this pin stays on the map.
               </div>
             </Popup>
           </CircleMarker>
