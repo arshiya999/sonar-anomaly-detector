@@ -1,0 +1,27 @@
+# NIOT / MoES marine debris detector — unified taxonomy
+names:
+  0: ghost_net
+  1: debris
+  2: shipwreck
+  3: aircraft
+  4: propeller
+  5: tire
+  6: cylinder
+  7: diver
+
+# Source label mapping
+map:
+  chain: ghost_net
+  hook: ghost_net
+  bottle: debris
+  can: debris
+  drink-carton: debris
+  shampoo-bottle: debris
+  standing-bottle: debris
+  ship: shipwreck
+  aircraft: aircraft
+  airplane: aircraft
+  propeller: propeller
+  tire: tire
+  valve: cylinder
+  human: diver

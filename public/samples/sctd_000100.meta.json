@@ -1,0 +1,12 @@
+{
+  "image": "sctd_000100.jpg",
+  "sensor": "side-scan-sonar",
+  "platform": "AUV-demo",
+  "latitude": 13.0851,
+  "longitude": 80.3744,
+  "heading_deg": 48.0,
+  "meters_per_pixel_x": 0.08,
+  "meters_per_pixel_y": 0.05,
+  "nadir_pixel_x": null,
+  "survey": "NIOT Bay of Bengal demo transect"
+}

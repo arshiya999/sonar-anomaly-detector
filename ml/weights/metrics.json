@@ -1,0 +1,13 @@
+{
+  "model": "yolo11n",
+  "imgsz": 320,
+  "epochs": 12,
+  "device": "cpu",
+  "train_images": 576,
+  "val_images": 126,
+  "mAP50": 0.749,
+  "mAP50_95": 0.463,
+  "precision": 0.794,
+  "recall": 0.604,
+  "datasets": ["SCTD 1.0", "Marine Debris FLS watertank", "SeabedObjects-KLSG"]
+}
