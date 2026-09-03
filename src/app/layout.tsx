@@ -20,9 +20,9 @@ const syne = Syne({
 });
 
 export const metadata: Metadata = {
-  title: "Aua Vision · marine debris sonar intelligence",
+  title: "Aqua Vision · marine debris sonar intelligence",
   description:
-    "Aua Vision detects ghost gear, wrecks, and man-made debris in side-scan sonar and issues geotagged cleanup reports.",
+    "Aqua Vision detects ghost gear, wrecks, and man-made debris in side-scan sonar and issues geotagged cleanup reports.",
   icons: { icon: "/favicon.svg" },
 };
 

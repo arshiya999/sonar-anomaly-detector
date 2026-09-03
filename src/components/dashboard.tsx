@@ -300,9 +300,9 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
           `<tr><td>${d.id}</td><td>${CLASS_LABEL[d.class] ?? d.class}</td><td>${d.confidence.toFixed(0)}%</td><td>${d.hazard_score}</td><td>${d.latitude ?? "—"}, ${d.longitude ?? "—"}</td></tr>`,
       )
       .join("");
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Aua Vision briefing</title>
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Aqua Vision briefing</title>
 <style>body{font-family:ui-sans-serif,system-ui;background:#0b1220;color:#f4f1ea;padding:32px}h1{color:#c9a227}table{border-collapse:collapse;width:100%}td,th{border:1px solid #2a3348;padding:8px;text-align:left}</style>
-</head><body><p>MoES · NIOT · PS 26057</p><h1>Aua Vision cleanup briefing</h1>
+</head><body><p>MoES · NIOT · PS 26057</p><h1>Aqua Vision cleanup briefing</h1>
 <p>${report.survey_id} · ${report.model} · ${report.inference_ms} ms · ${report.count} contacts</p>
 <table><thead><tr><th>ID</th><th>Class</th><th>Conf</th><th>Hazard</th><th>Lat, Lon</th></tr></thead><tbody>${rows}</tbody></table>
 <p>Trained YOLO11n mAP@50 74.9% on SCTD + Marine Debris FLS + SeabedObjects-KLSG.</p></body></html>`;
@@ -349,7 +349,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                 {MODEL_METRICS.org} · {MODEL_METRICS.problem}
               </p>
               <h1 className="font-heading text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-                Aua Vision
+                Aqua Vision
               </h1>
               <p className="mt-1 max-w-xl text-sm text-white/70">
                 Professional sonar intelligence for ghost gear, wrecks, and seabed debris.
@@ -709,7 +709,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
         </Tabs>
 
         <footer className="mt-8 border-t border-white/10 pb-8 pt-4 text-center text-[11px] text-white/45">
-          Aua Vision · SCTD 1.0 · Marine Debris FLS · SeabedObjects-KLSG · YOLO11n {MODEL_METRICS.params} ·
+          Aqua Vision · SCTD 1.0 · Marine Debris FLS · SeabedObjects-KLSG · YOLO11n {MODEL_METRICS.params} ·
           mAP@50 {MODEL_METRICS.map50}
         </footer>
       </main>

@@ -1,4 +1,4 @@
-# Aua Vision
+# Aqua Vision
 
 End-to-end detector for **MoES / NIOT problem statement 26057**: ingest side-scan (and FLS) sonar imagery, separate man-made debris from seafloor clutter, and emit geotagged JSON/CSV reports for cleanup operations.
 
