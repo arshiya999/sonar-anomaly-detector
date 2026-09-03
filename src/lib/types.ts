@@ -38,3 +38,15 @@ export type SampleItem = {
   meta: string;
   example_class: string;
 };
+
+export type ScanLogEntry = {
+  id: string;
+  at: string;
+  filename: string;
+  survey: string;
+  count: number;
+  inference_ms: number;
+  threshold: number;
+  detections: Detection[];
+};
+

@@ -18,7 +18,7 @@ Taxonomy used at inference: `ghost_net`, `debris`, `shipwreck`, `aircraft`, `pro
 2. **YOLO11n detector** — ~2.6M params, CPU / edge friendly, ONNX export after training.
 3. **Confidence fusion** — YOLO score × local contrast × acoustic-shadow penalty (rejects long dark streaks from rocks/shadows).
 4. **Geotag engine** — pixel → lat/lon from ping header fields (origin, heading, metres/pixel).
-5. **Dashboard** — upload a waterfall, overlay boxes, map pins, download JSON/CSV.
+5. **Dashboard** — upload a waterfall, overlay boxes, map pins (stay on zoom), charts, and an image intake log.
 
 ## Open it on your laptop
 

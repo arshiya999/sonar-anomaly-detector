@@ -1,34 +1,34 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
-import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
+import { CLASS_COLOR, CLASS_LABEL } from "@/lib/labels";
 import type { Detection } from "@/lib/types";
 import "leaflet/dist/leaflet.css";
 
-const icon = L.divIcon({
-  className: "",
-  html: `<span style="display:block;width:14px;height:14px;border-radius:999px;background:#5eead4;border:2px solid #042f2e;box-shadow:0 0 0 4px rgba(45,212,191,.35)"></span>`,
-  iconSize: [14, 14],
-  iconAnchor: [7, 7],
-});
+type Mapped = Detection & { source?: string };
 
-function Fit({ points }: { points: [number, number][] }) {
+function FitOnce({ points }: { points: [number, number][] }) {
   const map = useMap();
+  const done = useRef(false);
   useEffect(() => {
-    if (points.length === 1) {
-      map.setView(points[0], 14);
-    } else if (points.length > 1) {
-      map.fitBounds(points, { padding: [28, 28] });
-    }
+    if (done.current || points.length === 0) return;
+    if (points.length === 1) map.setView(points[0], 14);
+    else map.fitBounds(L.latLngBounds(points), { padding: [36, 36], maxZoom: 15 });
+    done.current = true;
   }, [map, points]);
   return null;
 }
 
-export function SonarMap({ detections }: { detections: Detection[] }) {
-  const points = detections
-    .filter((d) => d.latitude != null && d.longitude != null)
-    .map((d) => [d.latitude as number, d.longitude as number] as [number, number]);
+export function SonarMap({ detections }: { detections: Mapped[] }) {
+  const points = useMemo(
+    () =>
+      detections
+        .filter((d) => d.latitude != null && d.longitude != null)
+        .map((d) => [d.latitude as number, d.longitude as number] as [number, number]),
+    [detections],
+  );
   const center = points[0] ?? ([13.0827, 80.3708] as [number, number]);
 
   return (
@@ -42,20 +42,34 @@ export function SonarMap({ detections }: { detections: Detection[] }) {
         attribution="&copy; OpenStreetMap, &copy; CARTO"
         url="https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
       />
-      <Fit points={points} />
+      <FitOnce points={points} />
       {detections.map((d) =>
         d.latitude != null && d.longitude != null ? (
-          <Marker key={d.id} position={[d.latitude, d.longitude]} icon={icon}>
+          <CircleMarker
+            key={d.id}
+            center={[d.latitude, d.longitude]}
+            radius={10}
+            pathOptions={{
+              color: CLASS_COLOR[d.class] ?? "#5eead4",
+              fillColor: CLASS_COLOR[d.class] ?? "#5eead4",
+              fillOpacity: 0.85,
+              weight: 2,
+            }}
+          >
             <Popup>
               <div className="text-sm">
-                <strong>{d.class}</strong> · {d.confidence.toFixed(0)}%
+                <strong>{CLASS_LABEL[d.class] ?? d.class}</strong> · {d.confidence.toFixed(0)}%
+                <br />
+                {d.source ? <span>{d.source}</span> : null}
                 <br />
                 {d.id}
                 <br />
                 {d.latitude.toFixed(5)}, {d.longitude.toFixed(5)}
+                <br />
+                <span className="text-xs">Zoom in — this pin stays on the chart.</span>
               </div>
             </Popup>
-          </Marker>
+          </CircleMarker>
         ) : null,
       )}
     </MapContainer>
