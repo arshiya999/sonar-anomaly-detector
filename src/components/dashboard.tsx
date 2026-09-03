@@ -536,55 +536,16 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               </Card>
             </TabsContent>
             <TabsContent value="charts">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Survey charts</CardTitle>
+              <Card className="border-primary/15 bg-gradient-to-b from-primary/5 to-transparent">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Operations intelligence</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Live graphs from every sonar image entered this session. Toggle views, then
+                    zoom the map — logged pins stay on the chart.
+                  </p>
                 </CardHeader>
                 <CardContent>
                   <SurveyCharts entries={log} />
-                </CardContent>
-              </Card>
-              <Card className="mt-4">
-                <CardHeader>
-                  <CardTitle className="text-base">Image intake log</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {log.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Every upload or sample click is recorded here.
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>When</TableHead>
-                            <TableHead>Image</TableHead>
-                            <TableHead>Hits</TableHead>
-                            <TableHead>ms</TableHead>
-                            <TableHead>Survey</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {log.slice(0, 40).map((e) => (
-                            <TableRow key={e.id}>
-                              <TableCell className="font-mono text-xs">
-                                {e.at.replace("T", " ").slice(0, 19)}
-                              </TableCell>
-                              <TableCell className="max-w-[180px] truncate text-xs">
-                                {e.filename}
-                              </TableCell>
-                              <TableCell>{e.count}</TableCell>
-                              <TableCell className="font-mono text-xs">{e.inference_ms}</TableCell>
-                              <TableCell className="max-w-[160px] truncate text-xs">
-                                {e.survey}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             </TabsContent>
