@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 47281",
-    "dev:all": "bash scripts/dev.sh",
+    "dev:ml": "python -m uvicorn --app-dir ml server:app --host 0.0.0.0 --port 8765",
+    "dev:all": "node scripts/start.cjs",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 47281",
     "lint": "eslint",
