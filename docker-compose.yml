@@ -1,0 +1,31 @@
+services:
+  ml:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    ports:
+      - "8765:8765"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health')",
+        ]
+      interval: 15s
+      timeout: 8s
+      retries: 20
+      start_period: 40s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "47281:47281"
+    environment:
+      ML_API_URL: http://ml:8765
+    depends_on:
+      ml:
+        condition: service_healthy

@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+artifacts
+ml/raw
+ml/data
+ml/runs
+ml/**/__pycache__
+data/survey-log.json
+*.pyc
+.venv
+agent-tools
