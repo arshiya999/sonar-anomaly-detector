@@ -1,0 +1,42 @@
+[
+  {
+    "file": "sctd_000238.jpg",
+    "meta": "sctd_000238.meta.json",
+    "example_class": "shipwreck"
+  },
+  {
+    "file": "sctd_000086.jpg",
+    "meta": "sctd_000086.meta.json",
+    "example_class": "aircraft"
+  },
+  {
+    "file": "sctd_000100.jpg",
+    "meta": "sctd_000100.meta.json",
+    "example_class": "diver"
+  },
+  {
+    "file": "wt_marine-debris-aris3k-643.png",
+    "meta": "wt_marine-debris-aris3k-643.meta.json",
+    "example_class": "propeller"
+  },
+  {
+    "file": "wt_marine-debris-aris3k-1001.png",
+    "meta": "wt_marine-debris-aris3k-1001.meta.json",
+    "example_class": "cylinder"
+  },
+  {
+    "file": "wt_marine-debris-aris3k-474.png",
+    "meta": "wt_marine-debris-aris3k-474.meta.json",
+    "example_class": "tire"
+  },
+  {
+    "file": "wt_marine-debris-aris3k-1024.png",
+    "meta": "wt_marine-debris-aris3k-1024.meta.json",
+    "example_class": "debris"
+  },
+  {
+    "file": "wt_marine-debris-aris3k-1208.png",
+    "meta": "wt_marine-debris-aris3k-1208.meta.json",
+    "example_class": "ghost_net"
+  }
+]

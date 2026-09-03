@@ -1,0 +1,12 @@
+{
+  "image": "wt_marine-debris-aris3k-474.png",
+  "sensor": "side-scan-sonar",
+  "platform": "AUV-demo",
+  "latitude": 13.0887,
+  "longitude": 80.3798,
+  "heading_deg": 57.0,
+  "meters_per_pixel_x": 0.08,
+  "meters_per_pixel_y": 0.05,
+  "nadir_pixel_x": null,
+  "survey": "NIOT Bay of Bengal demo transect"
+}
