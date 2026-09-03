@@ -39,8 +39,8 @@ export function SonarMap({ detections }: { detections: Detection[] }) {
       scrollWheelZoom
     >
       <TileLayer
-        attribution='&copy; OpenStreetMap'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        attribution="&copy; OpenStreetMap, &copy; CARTO"
+        url="https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
       />
       <Fit points={points} />
       {detections.map((d) =>
