@@ -8,6 +8,7 @@
     "dev:all": "node scripts/start.cjs",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 47281",
+    "start:site": "node scripts/serve.cjs",
     "lint": "eslint",
     "test:ml": "python3 -m unittest discover -s ml/tests -v"
   },

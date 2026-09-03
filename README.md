@@ -20,7 +20,20 @@ Taxonomy used at inference: `ghost_net`, `debris`, `shipwreck`, `aircraft`, `pro
 4. **Geotag engine** — pixel → lat/lon from ping header fields (origin, heading, metres/pixel).
 5. **Dashboard** — upload a waterfall, overlay boxes, map pins (stay on zoom), charts, and an image intake log.
 
-## Run on any machine
+## Share a website link (anyone’s phone or laptop)
+
+`127.0.0.1` only works on the computer that is running ABYSS. To send **one HTTPS link** (judges, WhatsApp, etc.):
+
+1. Click **Create repo** so this project is on GitHub.
+2. Open [Render](https://render.com) (free account) → **New** → **Blueprint** → connect that GitHub repo. It uses `render.yaml` + `Dockerfile` (dashboard and detector in one service).
+3. Wait for the first build (PyTorch, several minutes). Render gives a URL like `https://abyss.onrender.com`.
+4. Send that URL. Free instances sleep after idle; the first click can take a minute to wake.
+
+Same idea on [Railway](https://railway.app) or [Fly.io](https://fly.io): deploy the root `Dockerfile`, set `PORT` as the public port, keep `ML_API_URL=http://127.0.0.1:8765`.
+
+This cannot be a static Vercel site by itself — the YOLO detector is Python and must run next to the web app.
+
+## Run on your own computer
 
 Two processes must be up: the **Next.js dashboard** (port **47281**) and the **Python detector** (port **8765**). Trained weights ship in `ml/weights/`.
 
