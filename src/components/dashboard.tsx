@@ -61,7 +61,7 @@ const DEFAULT_META: MetaForm = {
   survey: "NIOT Bay of Bengal transect",
 };
 
-export function Dashboard() {
+export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem[] }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -70,19 +70,29 @@ export function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(22);
-  const [samples, setSamples] = useState<SampleItem[]>([]);
-  const [health, setHealth] = useState<{ ok: boolean; trained?: boolean; weights?: string } | null>(null);
+  const [samples, setSamples] = useState<SampleItem[]>(initialSamples);
+  const [health, setHealth] = useState<{
+    ok: boolean;
+    trained?: boolean;
+    weights?: string;
+  } | null>(null);
   const [meta, setMeta] = useState<MetaForm>(DEFAULT_META);
 
   useEffect(() => {
-    fetch("/samples/manifest.json")
+    fetch("/api/samples", { cache: "no-store" })
       .then((r) => r.json())
-      .then(setSamples)
-      .catch(() => setSamples([]));
-    fetch("/api/health")
-      .then((r) => r.json())
-      .then(setHealth)
-      .catch(() => setHealth({ ok: false }));
+      .then((data) => {
+        if (Array.isArray(data) && data.length) setSamples(data);
+      })
+      .catch(() => undefined);
+    const ping = () =>
+      fetch("/api/health", { cache: "no-store" })
+        .then((r) => r.json())
+        .then(setHealth)
+        .catch(() => setHealth({ ok: false }));
+    void ping();
+    const id = setInterval(ping, 8000);
+    return () => clearInterval(id);
   }, []);
 
   const runDetect = useCallback(
@@ -229,12 +239,17 @@ export function Dashboard() {
               </p>
             </div>
           </div>
-          <Badge variant={health?.ok ? "secondary" : "destructive"} className="w-fit">
-            {health?.ok
-              ? health.trained
-                ? "Trained sonar weights online"
-                : "Detector online (base weights)"
-              : "Inference offline"}
+          <Badge
+            variant={health == null ? "outline" : health.ok ? "secondary" : "destructive"}
+            className="w-fit"
+          >
+            {health == null
+              ? "Checking detector…"
+              : health.ok
+                ? health.trained
+                  ? "Trained sonar weights online"
+                  : "Detector online (base weights)"
+                : "Inference offline"}
           </Badge>
         </div>
       </header>
