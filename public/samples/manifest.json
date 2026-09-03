@@ -15,28 +15,28 @@
     "example_class": "diver"
   },
   {
-    "file": "wt_marine-debris-aris3k-643.png",
-    "meta": "wt_marine-debris-aris3k-643.meta.json",
+    "file": "wt_marine-debris-aris3k-237.png",
+    "meta": "wt_marine-debris-aris3k-237.meta.json",
     "example_class": "propeller"
   },
   {
-    "file": "wt_marine-debris-aris3k-1001.png",
-    "meta": "wt_marine-debris-aris3k-1001.meta.json",
-    "example_class": "cylinder"
-  },
-  {
-    "file": "wt_marine-debris-aris3k-474.png",
-    "meta": "wt_marine-debris-aris3k-474.meta.json",
-    "example_class": "tire"
-  },
-  {
-    "file": "wt_marine-debris-aris3k-1024.png",
-    "meta": "wt_marine-debris-aris3k-1024.meta.json",
+    "file": "wt_marine-debris-aris3k-1597.png",
+    "meta": "wt_marine-debris-aris3k-1597.meta.json",
     "example_class": "debris"
   },
   {
-    "file": "wt_marine-debris-aris3k-1208.png",
-    "meta": "wt_marine-debris-aris3k-1208.meta.json",
+    "file": "wt_marine-debris-aris3k-262.png",
+    "meta": "wt_marine-debris-aris3k-262.meta.json",
+    "example_class": "cylinder"
+  },
+  {
+    "file": "wt_marine-debris-aris3k-530.png",
+    "meta": "wt_marine-debris-aris3k-530.meta.json",
     "example_class": "ghost_net"
+  },
+  {
+    "file": "wt_marine-debris-aris3k-645.png",
+    "meta": "wt_marine-debris-aris3k-645.meta.json",
+    "example_class": "tire"
   }
 ]
