@@ -20,14 +20,36 @@ Taxonomy used at inference: `ghost_net`, `debris`, `shipwreck`, `aircraft`, `pro
 4. **Geotag engine** — pixel → lat/lon from ping header fields (origin, heading, metres/pixel).
 5. **Dashboard** — upload a waterfall, overlay boxes, map pins, download JSON/CSV.
 
-## Run locally
+## Open it on your laptop
 
-Requires Python 3.11+ and Node 20+.
+This app does **not** appear automatically on your PC. `127.0.0.1` in the cloud session is a different computer. Run it locally:
+
+1. In the Cursor agent view, click **Create repo** so the project exists on GitHub (this started as a new project without a repository).
+2. On your laptop, install [Python 3.11+](https://www.python.org/downloads/) (tick **Add Python to PATH**) and [Node.js 20+](https://nodejs.org/).
+3. Clone, install, start:
+
+```bash
+git clone <YOUR_REPO_URL>
+cd <YOUR_REPO_FOLDER>
+python -m pip install -r ml/requirements.txt
+npm install
+npm run dev:all
+```
+
+4. Open Chrome/Edge and go to **http://127.0.0.1:47281**
+
+You should see the ABYSS dashboard. Click a sonar thumbnail on the left to run the trained model.
+
+Windows PowerShell uses the same commands (`python` and `npm`). First-time pip install of PyTorch/Ultralytics can take several minutes.
+
+If `python` is not found, try `py -m pip install -r ml/requirements.txt` then set `PYTHON=py` before `npm run dev:all`.
+
+## Run locally (macOS / Linux)
 
 ```bash
 python3 -m pip install -r ml/requirements.txt
 npm install
-bash scripts/dev.sh
+npm run dev:all
 ```
 
 Open [http://127.0.0.1:47281](http://127.0.0.1:47281). The inference API listens on port **8765**.
