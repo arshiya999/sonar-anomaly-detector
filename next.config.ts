@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     "localhost",
     "*.cursor.sh",
     "*.cursorusercontent.com",
+    "*.local",
   ],
 };
 
