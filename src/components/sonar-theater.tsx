@@ -23,15 +23,15 @@ export function SonarTheater({
   const src = preview ?? overlay;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-amber-400/40 bg-[#140c10] shadow-[0_0_80px_rgba(251,113,133,0.18)]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-400/25 bg-gradient-to-r from-rose-500/20 via-amber-400/15 to-emerald-400/20 px-4 py-2">
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1526]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-2">
         <div className="flex items-center gap-2">
           <span className="relative flex size-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-amber-300" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#c9a227] opacity-75" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-[#c9a227]" />
           </span>
-          <p className="font-mono text-[11px] tracking-[0.2em] text-amber-100 uppercase">
-            SSS waterfall · live HUD
+          <p className="font-mono text-[11px] tracking-[0.2em] text-[#e8d5a3] uppercase">
+            Side-scan waterfall
           </p>
         </div>
         <p className="font-mono text-[11px] text-amber-200/90">
@@ -56,11 +56,11 @@ export function SonarTheater({
           {!src && !busy ? (
             <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 p-8 text-center">
               <div className="sonar-logo">
-                <Radar className="size-12 text-amber-300" />
+                <Radar className="size-12 text-[#c9a227]" />
               </div>
-              <p className="max-w-sm text-sm text-stone-100/85">
+              <p className="max-w-sm text-sm text-white/70">
                 First ping is arming automatically. Or press{" "}
-                <span className="text-amber-300">Run judge demo</span> to stack three real logs.
+                <span className="text-[#c9a227]">Run live demo</span> to stack three real logs.
               </p>
             </div>
           ) : (

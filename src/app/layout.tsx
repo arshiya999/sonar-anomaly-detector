@@ -20,9 +20,9 @@ const syne = Syne({
 });
 
 export const metadata: Metadata = {
-  title: "ABYSS · NIOT PS 26057 marine debris sonar AI",
+  title: "Aua Vision · marine debris sonar intelligence",
   description:
-    "Hackathon-ready ops console: trained YOLO11n on real side-scan sonar, shadow fusion, geotagged cleanup reports.",
+    "Aua Vision detects ghost gear, wrecks, and man-made debris in side-scan sonar and issues geotagged cleanup reports.",
   icons: { icon: "/favicon.svg" },
 };
 
@@ -33,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`dark ${geistSans.variable} ${geistMono.variable} ${syne.variable} h-full antialiased`}
     >
-        <body className="min-h-full flex flex-col bg-[#1c1014] text-foreground">
+        <body className="min-h-full flex flex-col bg-[#0b1220] text-foreground">
         {children}
         <Toaster />
       </body>
