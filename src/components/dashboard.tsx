@@ -4,10 +4,14 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  BarChart3,
   Download,
+  FileSpreadsheet,
   Loader2,
+  Map as MapIcon,
   Play,
   Radar,
+  ScanLine,
   Sparkles,
   Upload,
   Waves,
@@ -36,7 +40,7 @@ import { SonarTheater } from "@/components/sonar-theater";
 
 const SonarMap = dynamic(
   () => import("@/components/sonar-map").then((m) => m.SonarMap),
-  { ssr: false, loading: () => <div className="h-full animate-pulse bg-amber-950/40" /> },
+  { ssr: false, loading: () => <div className="h-full animate-pulse bg-white/5" /> },
 );
 
 type MetaForm = {
@@ -246,7 +250,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
         await loadSample(item);
       }
       setDemoHint("Demo stacked — map, pie, and cleanup order are live");
-      toast.success("Judge demo complete — pie, map pins, and reports are live");
+      toast.success("Demo complete — open Map, Analytics, and Reports");
     } finally {
       setDemo(false);
     }
@@ -296,9 +300,9 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
           `<tr><td>${d.id}</td><td>${CLASS_LABEL[d.class] ?? d.class}</td><td>${d.confidence.toFixed(0)}%</td><td>${d.hazard_score}</td><td>${d.latitude ?? "—"}, ${d.longitude ?? "—"}</td></tr>`,
       )
       .join("");
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>ABYSS briefing</title>
-<style>body{font-family:ui-sans-serif,system-ui;background:#041821;color:#ecfeff;padding:32px}h1{color:#67e8f9}table{border-collapse:collapse;width:100%}td,th{border:1px solid #164e63;padding:8px;text-align:left}</style>
-</head><body><p>MoES · NIOT · PS 26057</p><h1>ABYSS cleanup briefing</h1>
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Aua Vision briefing</title>
+<style>body{font-family:ui-sans-serif,system-ui;background:#0b1220;color:#f4f1ea;padding:32px}h1{color:#c9a227}table{border-collapse:collapse;width:100%}td,th{border:1px solid #2a3348;padding:8px;text-align:left}</style>
+</head><body><p>MoES · NIOT · PS 26057</p><h1>Aua Vision cleanup briefing</h1>
 <p>${report.survey_id} · ${report.model} · ${report.inference_ms} ms · ${report.count} contacts</p>
 <table><thead><tr><th>ID</th><th>Class</th><th>Conf</th><th>Hazard</th><th>Lat, Lon</th></tr></thead><tbody>${rows}</tbody></table>
 <p>Trained YOLO11n mAP@50 74.9% on SCTD + Marine Debris FLS + SeabedObjects-KLSG.</p></body></html>`;
@@ -334,375 +338,379 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
 
   return (
     <div className="abyss-bg min-h-screen">
-      <header className="border-b border-amber-400/30 bg-gradient-to-r from-rose-500/30 via-amber-400/25 to-emerald-400/30 backdrop-blur-md">
+      <header className="border-b border-white/10 bg-[#0b1220]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-xl bg-amber-400 p-2.5 text-stone-950 shadow-[0_0_32px_rgba(251,191,36,0.65)]">
+            <div className="mt-0.5 rounded-lg bg-[#c9a227] p-2.5 text-[#0b1220]">
               <Radar className="size-6" />
             </div>
             <div>
-              <p className="font-mono text-[11px] tracking-[0.28em] text-rose-300 uppercase">
+              <p className="font-mono text-[11px] tracking-[0.22em] text-[#c9a227] uppercase">
                 {MODEL_METRICS.org} · {MODEL_METRICS.problem}
               </p>
               <h1 className="font-heading text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-                ABYSS
-                <span className="ml-2 text-lg font-normal text-amber-200/90 sm:text-xl">
-                  benthic sonar intelligence
-                </span>
+                Aua Vision
               </h1>
-              <p className="mt-1 max-w-2xl text-sm text-stone-100/90">
-                Ghost nets, wrecks, and man-made debris — found in side-scan waterfalls, scored
-                against acoustic shadow, and dropped as geotagged cleanup orders.
+              <p className="mt-1 max-w-xl text-sm text-white/70">
+                Professional sonar intelligence for ghost gear, wrecks, and seabed debris.
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-xs text-amber-100">{clock ? `${clock} IST` : "IST"}</span>
+            <span className="font-mono text-xs text-white/60">{clock ? `${clock} IST` : "IST"}</span>
             <Badge
               className={
                 health?.ok
-                  ? "border-emerald-400/60 bg-emerald-400/20 text-emerald-50"
-                  : "border-rose-400/50 bg-rose-500/20"
+                  ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-100"
+                  : "border-red-500/40 bg-red-500/15"
               }
             >
               {health == null
                 ? "Linking detector…"
                 : health.ok
                   ? health.trained
-                    ? "Trained weights · online"
+                    ? "Detector online"
                     : "Detector online"
                   : "Inference offline"}
             </Badge>
             <Button
               size="lg"
-              className="h-10 gap-2 bg-amber-400 px-4 text-stone-950 hover:bg-amber-300"
+              className="h-10 gap-2 bg-[#c9a227] px-4 text-[#0b1220] hover:bg-[#ddb84a]"
               onClick={() => void runJudgeDemo()}
               disabled={busy || demo}
             >
               {demo || busy ? <Loader2 className="animate-spin" /> : <Play />}
-              {demo ? "Demo running" : "Run judge demo"}
+              {demo ? "Demo running" : "Run live demo"}
             </Button>
           </div>
         </div>
-        <div className="mx-auto grid max-w-[1440px] grid-cols-2 gap-2 border-t border-white/10 p-3 sm:grid-cols-3 lg:grid-cols-6">
-          {[
-            ["mAP@50", MODEL_METRICS.map50, "held-out sonar val", "bg-rose-500/25 border-rose-400/50"],
-            ["Precision", MODEL_METRICS.precision, "real SSS + FLS", "bg-amber-400/25 border-amber-400/50"],
-            ["Train set", String(MODEL_METRICS.trainImages), `${MODEL_METRICS.valImages} val images`, "bg-emerald-400/25 border-emerald-400/50"],
-            ["Model", MODEL_METRICS.model, `${MODEL_METRICS.params} · ${MODEL_METRICS.imgsz}px`, "bg-violet-400/25 border-violet-400/50"],
-            ["Runtime", MODEL_METRICS.device, report ? `${report.inference_ms} ms this ping` : "edge nano", "bg-orange-400/25 border-orange-400/50"],
-            ["Contacts", report ? String(report.count) : "—", `${mapped.length} map pins`, "bg-lime-400/25 border-lime-400/50"],
-          ].map(([k, v, d, tone]) => (
-            <div key={k} className={`rounded-xl border px-3 py-2.5 ${tone}`}>
-              <p className="font-mono text-[10px] tracking-widest text-white/70 uppercase">{k}</p>
-              <p className="font-heading text-lg font-semibold text-white">{v}</p>
-              <p className="truncate text-[11px] text-white/70">{d}</p>
-            </div>
-          ))}
-        </div>
       </header>
 
-      <main className="mx-auto max-w-[1440px] space-y-5 px-4 py-5">
-        <PipelineStrip
-          active={pipeStep}
-          complete={Boolean(report) && !busy}
-          hint={demoHint || (busy ? "Pipeline live" : report ? "Last ping fused and geotagged" : "Standing by for first ping")}
-        />
+      <main className="mx-auto max-w-[1440px] px-4 py-5">
+        <Tabs defaultValue="scan" className="gap-5">
+          <TabsList
+            variant="line"
+            className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b border-white/10 bg-transparent p-0"
+          >
+            <TabsTrigger value="scan" className="rounded-none px-4 py-3">
+              <ScanLine /> Scan
+            </TabsTrigger>
+            <TabsTrigger value="map" className="rounded-none px-4 py-3">
+              <MapIcon /> Map
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="rounded-none px-4 py-3">
+              <BarChart3 /> Analytics
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="rounded-none px-4 py-3">
+              <FileSpreadsheet /> Reports
+            </TabsTrigger>
+            <TabsTrigger value="model" className="rounded-none px-4 py-3">
+              <Sparkles /> Model
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="grid gap-2 sm:grid-cols-3">
-          {[
-            ["Real sonar, not COCO", "SCTD wrecks, ARIS FLS debris, KLSG seabed objects — 576 labelled pings."],
-            ["Shadow-aware confidence", "YOLO × local contrast × acoustic-shadow penalty rejects rock streaks."],
-            ["Cleanup-ready output", "Lat/lon, size in metres, hazard rank, JSON/CSV/HTML briefing."],
-          ].map(([t, d]) => (
-            <div
-              key={t}
-              className="rounded-xl border border-amber-400/30 bg-black/20 px-3 py-2.5 backdrop-blur-sm"
-            >
-              <p className="text-sm font-medium text-amber-100">{t}</p>
-              <p className="mt-1 text-xs leading-relaxed text-stone-200/80">{d}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid gap-5 xl:grid-cols-[300px_1fr]">
-          <aside className="flex flex-col gap-4">
-            <Card className="border-amber-400/30 bg-black/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base text-amber-100">
-                  <Sparkles className="size-4 text-amber-300" /> Live pass
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <input
-                  ref={inputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,.tif,.tiff"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void onFile(f);
-                  }}
-                />
-                <Button
-                  className="h-10 w-full bg-fuchsia-400 text-stone-950 hover:bg-fuchsia-300"
-                  onClick={() => inputRef.current?.click()}
-                  disabled={busy}
-                >
-                  <Upload /> Upload sonar image
-                </Button>
-                <div>
-                  <div className="mb-2 flex items-center justify-between text-xs text-stone-100">
-                    <span>Confidence gate</span>
-                    <span className="font-mono text-amber-300">{threshold}%</span>
-                  </div>
-                  <Slider
-                    min={5}
-                    max={80}
-                    value={[threshold]}
-                    onValueChange={(v) => {
-                      const next = Array.isArray(v) ? Number(v[0]) : Number(v);
-                      if (Number.isFinite(next)) setThreshold(next);
-                    }}
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full border-amber-400/50"
-                  disabled={!file || busy}
-                  onClick={() => file && void runDetect(file)}
-                >
-                  {busy ? <Loader2 className="animate-spin" /> : <Waves />}
-                  Re-run at {threshold}%
-                </Button>
-              </CardContent>
-            </Card>
-
-            <details className="rounded-xl border border-white/10 bg-black/25 p-3">
-              <summary className="cursor-pointer text-sm font-medium text-amber-100">
-                Ping / geotag metadata
-              </summary>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {(
-                  [
-                    ["latitude", "Latitude"],
-                    ["longitude", "Longitude"],
-                    ["heading_deg", "Heading °"],
-                    ["meters_per_pixel_x", "m / px across"],
-                    ["meters_per_pixel_y", "m / px along"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <label key={key} className="col-span-1 space-y-1 text-xs text-stone-200/80">
-                    {label}
-                    <Input
-                      value={meta[key]}
-                      onChange={(e) => setMeta({ ...meta, [key]: e.target.value })}
-                      className="h-8"
-                    />
-                  </label>
-                ))}
-                <label className="col-span-2 space-y-1 text-xs text-stone-200/80">
-                  Survey name
-                  <Input
-                    value={meta.survey}
-                    onChange={(e) => setMeta({ ...meta, survey: e.target.value })}
-                    className="h-8"
-                  />
-                </label>
-              </div>
-            </details>
-
-            <Card className="border-violet-400/30 bg-black/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-violet-100">Real sonar gallery</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-2">
-                {samples.length === 0 ? (
-                  <p className="col-span-2 text-sm text-muted-foreground">
-                    Sample gallery is empty. Run <code>python ml/prepare_dataset.py</code>.
-                  </p>
-                ) : (
-                  samples.map((s) => (
-                    <button
-                      key={s.file}
-                      type="button"
-                      onClick={() => void loadSample(s)}
-                      className={`overflow-hidden rounded-lg border text-left transition hover:border-amber-300 hover:shadow-[0_0_16px_rgba(251,191,36,0.25)] ${
-                        file?.name === s.file
-                          ? "border-amber-300 ring-2 ring-amber-300/40"
-                          : "border-fuchsia-400/30"
-                      }`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`/samples/${s.file}`}
-                        alt={s.example_class}
-                        className="h-20 w-full object-cover"
-                      />
-                      <span className="block truncate px-2 py-1 text-[11px] text-stone-100/80">
-                        {CLASS_LABEL[s.example_class] ?? s.example_class}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </aside>
-
-          <section className="flex min-w-0 flex-col gap-4">
-            <SonarTheater
-              preview={preview}
-              overlay={overlay}
-              busy={busy}
-              error={error}
-              report={report}
-              filename={file?.name}
+          <TabsContent value="scan" className="space-y-5">
+            <PipelineStrip
+              active={pipeStep}
+              complete={Boolean(report) && !busy}
+              hint={
+                demoHint ||
+                (busy
+                  ? "Processing sonar log"
+                  : report
+                    ? "Last ping fused and geotagged"
+                    : "Standing by")
+              }
             />
-
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_1fr]">
-              <Card className="overflow-hidden border-fuchsia-400/30 bg-gradient-to-b from-fuchsia-500/15 to-black/40">
-                <CardHeader className="pb-1">
-                  <CardTitle className="text-base text-fuchsia-100">Class mix</CardTitle>
-                  <p className="text-xs text-fuchsia-100/70">
-                    {mixRows.length ? "Live pie from this session" : "Taxonomy colour key"}
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <ClassMixPie rows={mixRows} height={250} />
-                </CardContent>
-              </Card>
-              <Card className="overflow-hidden border-emerald-400/40">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base text-emerald-100">
-                    NIOT survey track · Bay of Bengal
-                  </CardTitle>
-                  <p className="text-xs text-stone-200/75">
-                    Gold dashed line is the planned AUV transect. Coloured pins are model contacts.
-                  </p>
-                </CardHeader>
-                <CardContent className="relative h-[300px] p-0 sm:h-[360px]">
-                  <SonarMap key="overview-map" detections={mapped} />
-                  <div className="pointer-events-none absolute right-3 bottom-3 z-[1000] rounded-lg bg-stone-950/90 px-2 py-1.5 text-[10px] text-amber-100">
-                    {mapped.length ? `${mapped.length} geotagged hazards` : "13.08°N 80.37°E"}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(CLASS_LABEL).map(([cls, label]) => (
-                <span
-                  key={cls}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-[11px] text-stone-50"
-                >
-                  <span className="size-2.5 rounded-full" style={{ background: CLASS_COLOR[cls] }} />
-                  {label}
-                </span>
-              ))}
-            </div>
-
-            <Tabs defaultValue="report">
-              <TabsList className="h-auto flex-wrap bg-stone-900/70">
-                <TabsTrigger value="report">Cleanup report</TabsTrigger>
-                <TabsTrigger value="map">Full map</TabsTrigger>
-                <TabsTrigger value="charts">Ops graphs</TabsTrigger>
-              </TabsList>
-              <TabsContent value="report">
-                <Card className="border-amber-400/20 bg-black/30">
-                  <CardHeader className="flex flex-row items-center justify-between gap-2">
-                    <CardTitle className="text-base text-amber-100">Geotagged anomaly report</CardTitle>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={downloadJson} disabled={!report}>
-                        <Download /> JSON
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={downloadCsv} disabled={!report}>
-                        <Download /> CSV
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={downloadBriefing} disabled={!report}>
-                        <Download /> Briefing
-                      </Button>
-                    </div>
+            <div className="grid gap-5 xl:grid-cols-[300px_1fr]">
+              <aside className="flex flex-col gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Acquire log</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    {!report ? (
-                      <p className="text-sm text-stone-200/70">
-                        Run the judge demo to generate a structured cleanup order (JSON + CSV).
-                      </p>
-                    ) : report.count === 0 ? (
-                      <p className="text-sm text-stone-200/70">
-                        No man-made anomalies above the current confidence gate.
+                  <CardContent className="space-y-3">
+                    <input
+                      ref={inputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,.tif,.tiff"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void onFile(f);
+                      }}
+                    />
+                    <Button
+                      className="h-10 w-full bg-[#c9a227] text-[#0b1220] hover:bg-[#ddb84a]"
+                      onClick={() => inputRef.current?.click()}
+                      disabled={busy}
+                    >
+                      <Upload /> Upload sonar image
+                    </Button>
+                    <div>
+                      <div className="mb-2 flex items-center justify-between text-xs text-white/70">
+                        <span>Confidence gate</span>
+                        <span className="font-mono text-[#c9a227]">{threshold}%</span>
+                      </div>
+                      <Slider
+                        min={5}
+                        max={80}
+                        value={[threshold]}
+                        onValueChange={(v) => {
+                          const next = Array.isArray(v) ? Number(v[0]) : Number(v);
+                          if (Number.isFinite(next)) setThreshold(next);
+                        }}
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      disabled={!file || busy}
+                      onClick={() => file && void runDetect(file)}
+                    >
+                      {busy ? <Loader2 className="animate-spin" /> : <Waves />}
+                      Re-run at {threshold}%
+                    </Button>
+                  </CardContent>
+                </Card>
+                <details className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <summary className="cursor-pointer text-sm font-medium">Ping / geotag metadata</summary>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        ["latitude", "Latitude"],
+                        ["longitude", "Longitude"],
+                        ["heading_deg", "Heading °"],
+                        ["meters_per_pixel_x", "m / px across"],
+                        ["meters_per_pixel_y", "m / px along"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <label key={key} className="col-span-1 space-y-1 text-xs text-white/65">
+                        {label}
+                        <Input
+                          value={meta[key]}
+                          onChange={(e) => setMeta({ ...meta, [key]: e.target.value })}
+                          className="h-8"
+                        />
+                      </label>
+                    ))}
+                    <label className="col-span-2 space-y-1 text-xs text-white/65">
+                      Survey name
+                      <Input
+                        value={meta.survey}
+                        onChange={(e) => setMeta({ ...meta, survey: e.target.value })}
+                        className="h-8"
+                      />
+                    </label>
+                  </div>
+                </details>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Reference gallery</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-2">
+                    {samples.length === 0 ? (
+                      <p className="col-span-2 text-sm text-muted-foreground">
+                        Sample gallery is empty. Run <code>python ml/prepare_dataset.py</code>.
                       </p>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>ID</TableHead>
-                              <TableHead>Class</TableHead>
-                              <TableHead>Conf.</TableHead>
-                              <TableHead>Hazard</TableHead>
-                              <TableHead>Lat / Lon</TableHead>
-                              <TableHead>Size (m)</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {report.detections.map((d) => (
-                              <TableRow key={d.id}>
-                                <TableCell className="font-mono text-xs">{d.id}</TableCell>
-                                <TableCell>
-                                  <span className="inline-flex items-center gap-1.5">
-                                    <span
-                                      className="size-2 rounded-full"
-                                      style={{ background: CLASS_COLOR[d.class] }}
-                                    />
-                                    {CLASS_LABEL[d.class] ?? d.class}
-                                  </span>
-                                </TableCell>
-                                <TableCell>{d.confidence.toFixed(0)}%</TableCell>
-                                <TableCell>{d.hazard_score}</TableCell>
-                                <TableCell className="font-mono text-xs">
-                                  {d.latitude != null && d.longitude != null
-                                    ? `${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}`
-                                    : "—"}
-                                </TableCell>
-                                <TableCell className="text-xs">
-                                  {d.dimensions.width_m} × {d.dimensions.length_m}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      samples.map((s) => (
+                        <button
+                          key={s.file}
+                          type="button"
+                          onClick={() => void loadSample(s)}
+                          className={`overflow-hidden rounded-lg border text-left transition hover:border-[#c9a227] ${
+                            file?.name === s.file
+                              ? "border-[#c9a227] ring-1 ring-[#c9a227]/50"
+                              : "border-white/10"
+                          }`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`/samples/${s.file}`}
+                            alt={s.example_class}
+                            className="h-20 w-full object-cover"
+                          />
+                          <span className="block truncate px-2 py-1 text-[11px] text-white/70">
+                            {CLASS_LABEL[s.example_class] ?? s.example_class}
+                          </span>
+                        </button>
+                      ))
                     )}
                   </CardContent>
                 </Card>
-              </TabsContent>
-              <TabsContent value="map">
-                <Card className="overflow-hidden border-emerald-400/30">
-                  <CardContent className="h-[540px] p-0">
-                    <SonarMap key="full-map" detections={mapped} />
+              </aside>
+              <SonarTheater
+                preview={preview}
+                overlay={overlay}
+                busy={busy}
+                error={error}
+                report={report}
+                filename={file?.name}
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="map">
+            <Card className="overflow-hidden">
+              <CardHeader>
+                <CardTitle>Survey map</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Gold transect is the planned AUV path. Pins are geotagged detections from Scan.
+                </p>
+              </CardHeader>
+              <CardContent className="relative h-[560px] p-0">
+                <SonarMap key="full-map" detections={mapped} />
+                <div className="pointer-events-none absolute right-3 bottom-3 z-[1000] rounded-md bg-[#0b1220]/90 px-2 py-1.5 text-[11px] text-[#e8d5a3]">
+                  {mapped.length ? `${mapped.length} geotagged hazards` : "13.08°N 80.37°E"}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,320px)_1fr]">
+              <Card>
+                <CardHeader className="pb-1">
+                  <CardTitle>Class mix</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    {mixRows.length ? "Live session mix" : "Taxonomy colour key"}
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <ClassMixPie rows={mixRows} height={280} />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle>Operations graphs</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Intake, confidence, latency, and hazard from every scanned image.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <SurveyCharts entries={log} />
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="reports">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
+                <div>
+                  <CardTitle>Cleanup report</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Export JSON, CSV, or an HTML briefing for the operations team.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={downloadJson} disabled={!report}>
+                    <Download /> JSON
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={downloadCsv} disabled={!report}>
+                    <Download /> CSV
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={downloadBriefing} disabled={!report}>
+                    <Download /> Briefing
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!report ? (
+                  <p className="text-sm text-muted-foreground">
+                    Run a scan or the live demo, then return here for the structured order.
+                  </p>
+                ) : report.count === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No man-made anomalies above the current confidence gate.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>ID</TableHead>
+                          <TableHead>Class</TableHead>
+                          <TableHead>Conf.</TableHead>
+                          <TableHead>Hazard</TableHead>
+                          <TableHead>Lat / Lon</TableHead>
+                          <TableHead>Size (m)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {report.detections.map((d) => (
+                          <TableRow key={d.id}>
+                            <TableCell className="font-mono text-xs">{d.id}</TableCell>
+                            <TableCell>
+                              <span className="inline-flex items-center gap-1.5">
+                                <span
+                                  className="size-2 rounded-full"
+                                  style={{ background: CLASS_COLOR[d.class] }}
+                                />
+                                {CLASS_LABEL[d.class] ?? d.class}
+                              </span>
+                            </TableCell>
+                            <TableCell>{d.confidence.toFixed(0)}%</TableCell>
+                            <TableCell>{d.hazard_score}</TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {d.latitude != null && d.longitude != null
+                                ? `${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}`
+                                : "—"}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {d.dimensions.width_m} × {d.dimensions.length_m}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="model">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                ["mAP@50", MODEL_METRICS.map50, "Held-out sonar validation"],
+                ["Precision", MODEL_METRICS.precision, "Real SSS and FLS imagery"],
+                ["Recall", MODEL_METRICS.recall, "After shadow fusion"],
+                ["Train / val", `${MODEL_METRICS.trainImages} / ${MODEL_METRICS.valImages}`, "Public labelled pings"],
+                ["Architecture", MODEL_METRICS.model, `${MODEL_METRICS.params} · ${MODEL_METRICS.imgsz} px`],
+                ["Runtime", MODEL_METRICS.device, report ? `${report.inference_ms} ms this ping` : "Edge nano"],
+              ].map(([k, v, d]) => (
+                <Card key={k}>
+                  <CardContent className="pt-5">
+                    <p className="font-mono text-[10px] tracking-widest text-[#c9a227] uppercase">{k}</p>
+                    <p className="font-heading mt-1 text-2xl font-semibold">{v}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{d}</p>
                   </CardContent>
                 </Card>
-              </TabsContent>
-              <TabsContent value="charts">
-                <Card className="border-fuchsia-400/20 bg-black/25">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Operations intelligence</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Every image entered this session feeds the graphs. Toggle views for the jury.
-                    </p>
+              ))}
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              {[
+                ["Real sonar, not COCO", "SCTD wrecks, ARIS FLS debris, KLSG seabed objects."],
+                ["Shadow-aware scores", "YOLO × contrast × acoustic-shadow penalty."],
+                ["Ops-ready output", "Lat/lon, size in metres, hazard rank, JSON/CSV."],
+              ].map(([t, d]) => (
+                <Card key={t}>
+                  <CardHeader>
+                    <CardTitle className="text-base">{t}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <SurveyCharts entries={log} />
+                    <p className="text-sm text-muted-foreground">{d}</p>
                   </CardContent>
                 </Card>
-              </TabsContent>
-            </Tabs>
-          </section>
-        </div>
-        <footer className="border-t border-amber-400/20 pb-8 pt-4 text-center text-[11px] text-stone-200/70">
-          Trained on SCTD 1.0 · Marine Debris FLS watertank · SeabedObjects-KLSG · YOLO11n {MODEL_METRICS.params} ·
-          mAP@50 {MODEL_METRICS.map50} · NIOT Bay of Bengal default origin
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <footer className="mt-8 border-t border-white/10 pb-8 pt-4 text-center text-[11px] text-white/45">
+          Aua Vision · SCTD 1.0 · Marine Debris FLS · SeabedObjects-KLSG · YOLO11n {MODEL_METRICS.params} ·
+          mAP@50 {MODEL_METRICS.map50}
         </footer>
       </main>
     </div>
