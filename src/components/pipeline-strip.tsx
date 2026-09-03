@@ -2,9 +2,21 @@
 
 import { PIPELINE } from "@/lib/metrics";
 
-export function PipelineStrip({ active, complete }: { active: number; complete: boolean }) {
+export function PipelineStrip({
+  active,
+  complete,
+  hint,
+}: {
+  active: number;
+  complete: boolean;
+  hint?: string;
+}) {
   return (
-    <ol className="grid grid-cols-5 gap-1.5">
+    <div className="space-y-2">
+      {hint ? (
+        <p className="font-mono text-[11px] tracking-wide text-amber-200/90 uppercase">{hint}</p>
+      ) : null}
+      <ol className="grid grid-cols-5 gap-1.5">
       {PIPELINE.map((step, i) => {
         const on = complete || i <= active;
         const current = !complete && i === active;
@@ -25,5 +37,6 @@ export function PipelineStrip({ active, complete }: { active: number; complete: 
         );
       })}
     </ol>
+    </div>
   );
 }

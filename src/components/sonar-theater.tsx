@@ -3,6 +3,7 @@
 import { Loader2, Radar, ShieldAlert } from "lucide-react";
 import { CLASS_COLOR, CLASS_LABEL } from "@/lib/labels";
 import type { DetectReport } from "@/lib/types";
+import { GlowBoxes } from "@/components/glow-boxes";
 
 export function SonarTheater({
   preview,
@@ -10,18 +11,20 @@ export function SonarTheater({
   busy,
   error,
   report,
+  filename,
 }: {
   preview: string | null;
   overlay: string | null;
   busy: boolean;
   error: string | null;
   report: DetectReport | null;
+  filename?: string | null;
 }) {
-  const src = overlay ?? preview;
+  const src = preview ?? overlay;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-cyan-400/30 bg-[#031018] shadow-[0_0_80px_rgba(8,47,73,0.55)]">
-      <div className="flex items-center justify-between border-b border-cyan-400/20 px-4 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cyan-400/20 px-4 py-2">
         <div className="flex items-center gap-2">
           <span className="relative flex size-2.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
@@ -33,6 +36,7 @@ export function SonarTheater({
         </div>
         <p className="font-mono text-[11px] text-amber-200/90">
           {busy ? "PING IN FLIGHT" : report ? `${report.count} CONTACTS` : "STANDBY"}
+          {filename ? ` · ${filename}` : ""}
         </p>
       </div>
       {busy && (
@@ -47,31 +51,23 @@ export function SonarTheater({
           {error}
         </div>
       )}
-      <div className="grid lg:grid-cols-[1fr_240px]">
-        <div className="relative min-h-[320px] bg-black">
+      <div className="grid lg:grid-cols-[1fr_260px]">
+        <div className="relative flex min-h-[320px] items-center justify-center overflow-hidden bg-black">
           {!src && !busy ? (
             <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 p-8 text-center">
-              <div className="relative">
-                <span className="absolute inset-[-18px] animate-ping rounded-full border border-cyan-400/40" />
+              <div className="sonar-logo">
                 <Radar className="size-12 text-cyan-300" />
               </div>
               <p className="max-w-sm text-sm text-sky-100/80">
-                Press <span className="text-cyan-300">Run judge demo</span> or pick a real sonar
-                thumbnail. Boxes, pie slices, and map pins fill from the trained YOLO11n weights.
+                First ping is arming automatically. Or press{" "}
+                <span className="text-amber-300">Run judge demo</span> to stack three real logs.
               </p>
             </div>
           ) : (
             <>
-              {src ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={src}
-                  alt="Sonar detections overlay"
-                  className="max-h-[560px] w-full object-contain"
-                />
-              ) : null}
+              {src ? <GlowBoxes report={busy ? null : report} imageSrc={src} /> : null}
               {busy ? <div className="scanline" /> : null}
-              <div className="pointer-events-none absolute inset-3 border border-cyan-300/25">
+              <div className="pointer-events-none absolute inset-3 border border-cyan-300/20">
                 <span className="absolute top-0 left-0 size-4 border-t-2 border-l-2 border-cyan-300" />
                 <span className="absolute top-0 right-0 size-4 border-t-2 border-r-2 border-cyan-300" />
                 <span className="absolute bottom-0 left-0 size-4 border-b-2 border-l-2 border-cyan-300" />
@@ -85,7 +81,7 @@ export function SonarTheater({
             Contact list
           </p>
           {!report?.detections.length ? (
-            <p className="text-xs text-sky-200/60">No contacts yet. Demo or upload a waterfall.</p>
+            <p className="text-xs text-sky-200/60">Waiting for fused contacts from YOLO × contrast × shadow.</p>
           ) : (
             report.detections.map((d, i) => (
               <div
@@ -108,7 +104,12 @@ export function SonarTheater({
                     }}
                   />
                 </div>
-                <p className="mt-1 font-mono text-[10px] text-sky-200/70">
+                <p className="mt-1.5 font-mono text-[10px] text-sky-200/75">
+                  YOLO {((d.confidence_parts?.yolo ?? 0) * 100).toFixed(0)}% · contrast{" "}
+                  {((d.confidence_parts?.contrast ?? 0) * 100).toFixed(0)}% · shadow{" "}
+                  {((d.confidence_parts?.shadow ?? 0) * 100).toFixed(0)}%
+                </p>
+                <p className="font-mono text-[10px] text-sky-200/70">
                   hazard {d.hazard_score}
                   {d.latitude != null && d.longitude != null
                     ? ` · ${d.latitude.toFixed(4)}°N ${d.longitude.toFixed(4)}°E`

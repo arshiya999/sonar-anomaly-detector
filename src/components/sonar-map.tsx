@@ -55,6 +55,34 @@ export function SonarMap({ detections }: { detections: Mapped[] }) {
         pathOptions={{ color: "#22d3ee", weight: 3, dashArray: "10 8", opacity: 0.85 }}
       />
       <FitOnce points={points} />
+      <CircleMarker
+        center={[13.0827, 80.3708]}
+        radius={7}
+        pathOptions={{ color: "#fde047", fillColor: "#22d3ee", fillOpacity: 1, weight: 2 }}
+      >
+        <Popup>
+          <div className="text-sm text-slate-900">
+            <strong>AUV origin · NIOT transect</strong>
+            <br />
+            13.0827°N, 80.3708°E
+          </div>
+        </Popup>
+      </CircleMarker>
+      {detections.map((d) =>
+        d.latitude != null && d.longitude != null ? (
+          <CircleMarker
+            key={`${d.id}-halo`}
+            center={[d.latitude, d.longitude]}
+            radius={22}
+            pathOptions={{
+              color: CLASS_COLOR[d.class] ?? "#22d3ee",
+              fillColor: CLASS_COLOR[d.class] ?? "#22d3ee",
+              fillOpacity: 0.18,
+              weight: 1,
+            }}
+          />
+        ) : null,
+      )}
       {detections.map((d) =>
         d.latitude != null && d.longitude != null ? (
           <CircleMarker
