@@ -25,9 +25,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CLASS_LABEL } from "@/lib/labels";
+import { CLASS_COLOR, CLASS_LABEL } from "@/lib/labels";
 import type { DetectReport, DetectResponse, SampleItem, ScanLogEntry } from "@/lib/types";
 import { SurveyCharts } from "@/components/survey-charts";
+import { ClassMixPie } from "@/components/class-mix-pie";
 
 const SonarMap = dynamic(
   () => import("@/components/sonar-map").then((m) => m.SonarMap),
@@ -234,22 +235,35 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     return [...fromLog, ...extra];
   }, [log, report, file]);
 
+  const mixRows = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const d of mapped) counts[d.class] = (counts[d.class] ?? 0) + 1;
+    if (report) {
+      for (const d of report.detections) {
+        if (d.latitude == null || d.longitude == null) {
+          counts[d.class] = (counts[d.class] ?? 0) + 1;
+        }
+      }
+    }
+    return Object.entries(counts).map(([cls, count]) => ({ class: cls, count }));
+  }, [mapped, report]);
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(1200px_circle_at_10%_-10%,rgba(45,212,191,0.12),transparent_45%),radial-gradient(900px_circle_at_100%_0%,rgba(56,189,248,0.08),transparent_40%)]">
-      <header className="border-b border-border/80 bg-background/80 backdrop-blur">
+    <div className="min-h-screen bg-[radial-gradient(1100px_circle_at_0%_-20%,rgba(34,211,238,0.28),transparent_42%),radial-gradient(900px_circle_at_100%_0%,rgba(251,191,36,0.18),transparent_38%),radial-gradient(700px_circle_at_50%_100%,rgba(244,114,182,0.12),transparent_40%)]">
+      <header className="border-b border-cyan-400/25 bg-gradient-to-r from-cyan-500/15 via-sky-950/70 to-amber-400/15 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-lg bg-primary/15 p-2 text-primary">
+            <div className="mt-0.5 rounded-lg bg-cyan-400 p-2 text-sky-950 shadow-[0_0_24px_rgba(34,211,238,0.45)]">
               <Radar className="size-5" />
             </div>
             <div>
-              <p className="text-xs tracking-[0.18em] text-primary uppercase">
+              <p className="text-xs tracking-[0.18em] text-cyan-300 uppercase">
                 MoES · NIOT · PS 26057
               </p>
-              <h1 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
+              <h1 className="font-heading text-xl font-semibold tracking-tight text-cyan-50 sm:text-2xl">
                 ABYSS — Automated Benthic Yield Sonar Scanner
               </h1>
-              <p className="max-w-2xl text-sm text-muted-foreground">
+              <p className="max-w-2xl text-sm text-sky-100/80">
                 Detect ghost gear, wrecks, and man-made debris in side-scan sonar logs. Speckle
                 filtering, YOLO detection, acoustic-shadow suppression, and geotagged reports.
               </p>
@@ -257,7 +271,11 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
           </div>
           <Badge
             variant={health == null ? "outline" : health.ok ? "secondary" : "destructive"}
-            className="w-fit"
+            className={
+              health?.ok
+                ? "w-fit border-emerald-400/50 bg-emerald-400/20 text-emerald-100"
+                : "w-fit"
+            }
           >
             {health == null
               ? "Checking detector…"
@@ -395,11 +413,13 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               label="Anomalies"
               value={report ? String(report.count) : "—"}
               hint="This image, after noise filter"
+              tone="cyan"
             />
             <Stat
               label="Inference"
               value={report ? `${report.inference_ms} ms` : "—"}
               hint={report?.model || "edge YOLO11n"}
+              tone="amber"
             />
             <Stat
               label="Highest risk"
@@ -413,18 +433,66 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                   ? `${report.detections[0].confidence.toFixed(0)}% fused confidence`
                   : "Awaiting scan"
               }
+              tone="rose"
             />
             <Stat
               label="Logged images"
               value={String(log.length)}
               hint={`${mapped.length} map pins kept on zoom`}
+              tone="emerald"
             />
           </div>
 
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,280px)_1fr]">
+            <Card className="overflow-hidden border-cyan-400/30 bg-gradient-to-b from-cyan-400/15 to-sky-950/40">
+              <CardHeader className="pb-1">
+                <CardTitle className="text-base text-cyan-100">Debris pie chart</CardTitle>
+                <p className="text-xs text-cyan-100/70">
+                  {mixRows.length
+                    ? "Live class mix from this session"
+                    : "Palette for ghost gear, wrecks, and debris"}
+                </p>
+              </CardHeader>
+              <CardContent>
+                <ClassMixPie rows={mixRows} height={260} />
+              </CardContent>
+            </Card>
+            <Card className="overflow-hidden border-amber-400/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base text-amber-100">Bay of Bengal survey map</CardTitle>
+                <p className="text-xs text-sky-100/70">
+                  {mapped.length
+                    ? `${mapped.length} geotagged hazard${mapped.length === 1 ? "" : "s"} — zoom stays on the pins`
+                    : "Satellite view of the NIOT default transect. Pins appear after a scan with lat/lon."}
+                </p>
+              </CardHeader>
+              <CardContent className="h-[320px] p-0 sm:h-[380px]">
+                <div className="relative h-full min-h-[280px]">
+                  <SonarMap detections={mapped} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(CLASS_LABEL).map(([cls, label]) => (
+              <span
+                key={cls}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[11px] text-sky-50"
+              >
+                <span
+                  className="size-2.5 rounded-full"
+                  style={{ background: CLASS_COLOR[cls] }}
+                />
+                {label}
+              </span>
+            ))}
+          </div>
+
           <Tabs defaultValue="overlay">
-            <TabsList className="h-auto flex-wrap">
+            <TabsList className="h-auto flex-wrap bg-cyan-950/60">
               <TabsTrigger value="overlay">Detections</TabsTrigger>
-              <TabsTrigger value="map">Geotagged map</TabsTrigger>
+              <TabsTrigger value="map">Full map</TabsTrigger>
               <TabsTrigger value="report">Structured report</TabsTrigger>
               <TabsTrigger value="charts">Charts & log</TabsTrigger>
             </TabsList>
@@ -461,22 +529,16 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               </Card>
             </TabsContent>
             <TabsContent value="map">
-              <Card className="overflow-hidden">
+              <Card className="overflow-hidden border-cyan-400/25">
                 <CardContent className="h-[520px] p-0">
-                  {mapped.length === 0 ? (
-                    <div className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground">
-                      No geotagged hits yet. Run a scan with latitude/longitude metadata — pins stay
-                      when you zoom.
-                    </div>
-                  ) : (
-                    <div className="relative h-full">
-                      <p className="pointer-events-none absolute top-3 left-3 z-[1000] rounded-md bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
-                        {mapped.length} recorded hazard{mapped.length === 1 ? "" : "s"} — scroll to
-                        zoom, pins stay put
-                      </p>
-                      <SonarMap detections={mapped} />
-                    </div>
-                  )}
+                  <div className="relative h-full">
+                    <p className="pointer-events-none absolute top-3 left-3 z-[1000] rounded-md bg-sky-950/85 px-2 py-1 text-[11px] text-cyan-100">
+                      {mapped.length
+                        ? `${mapped.length} recorded hazard${mapped.length === 1 ? "" : "s"} — scroll to zoom, pins stay put`
+                        : "NIOT default position (13.08°N, 80.37°E) — run a sample to drop coloured pins"}
+                    </p>
+                    <SonarMap detections={mapped} />
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -556,13 +618,29 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  tone: "cyan" | "amber" | "rose" | "emerald";
+}) {
+  const tones = {
+    cyan: "border-cyan-400/40 bg-cyan-400/10",
+    amber: "border-amber-400/40 bg-amber-400/10",
+    rose: "border-rose-400/40 bg-rose-400/10",
+    emerald: "border-emerald-400/40 bg-emerald-400/10",
+  };
   return (
-    <Card>
+    <Card className={tones[tone]}>
       <CardContent className="pt-4">
-        <p className="text-xs tracking-wide text-muted-foreground uppercase">{label}</p>
-        <p className="mt-1 truncate text-lg font-semibold">{value}</p>
-        <p className="truncate text-xs text-muted-foreground">{hint}</p>
+        <p className="text-xs tracking-wide text-sky-200/80 uppercase">{label}</p>
+        <p className="mt-1 truncate text-lg font-semibold text-white">{value}</p>
+        <p className="truncate text-xs text-sky-100/70">{hint}</p>
       </CardContent>
     </Card>
   );

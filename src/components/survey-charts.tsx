@@ -6,8 +6,7 @@ import {
   BarChart3,
   Clock3,
   Gauge,
-  Layers,
-  PieChart,
+  PieChart as PieIcon,
   ScrollText,
   Shield,
 } from "lucide-react";
@@ -25,8 +24,8 @@ import {
 } from "recharts";
 import { CLASS_COLOR, CLASS_LABEL } from "@/lib/labels";
 import type { ScanLogEntry } from "@/lib/types";
-import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
+import { ClassMixPie } from "@/components/class-mix-pie";
 import {
   Table,
   TableBody,
@@ -39,7 +38,7 @@ import {
 type GraphId = "mix" | "timeline" | "confidence" | "speed" | "risk";
 
 const GRAPHS: { id: GraphId; label: string; hint: string; icon: typeof BarChart3 }[] = [
-  { id: "mix", label: "Class mix", hint: "What the detector found", icon: PieChart },
+  { id: "mix", label: "Pie chart", hint: "Colour mix of debris classes", icon: PieIcon },
   { id: "timeline", label: "Intake", hint: "Images entered over time", icon: Activity },
   { id: "confidence", label: "Confidence", hint: "How sure the model was", icon: Gauge },
   { id: "speed", label: "Latency", hint: "Milliseconds per image", icon: Clock3 },
@@ -113,16 +112,7 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
         </div>
       </div>
 
-      {!entries.length ? (
-        <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-14 text-center">
-          <Layers className="mx-auto mb-3 size-8 text-primary/70" />
-          <p className="font-medium">No survey series yet</p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-            Upload a sonar log or click a gallery sample. Each image is recorded and these graphs
-            fill in live.
-          </p>
-        </div>
-      ) : on.length === 0 ? (
+      {on.length === 0 ? (
         <p className="rounded-xl border border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
           All graphs are hidden. Toggle one above to bring a chart back.
         </p>
@@ -130,27 +120,14 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
         <div className={`grid gap-4 ${on.length === 1 ? "grid-cols-1" : "xl:grid-cols-2"}`}>
           {on.includes("mix") && (
             <ChartCard
-              title="Debris class mix"
-              subtitle="Share of recorded hazards — use this to brief cleanup crews"
+              title="Debris pie chart"
+              subtitle={
+                stats.classRows.length
+                  ? "Colour slices = class share of every logged hazard"
+                  : "Colour key until the first scan lands — then slices match real detections"
+              }
             >
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={stats.classRows} layout="vertical" margin={{ left: 8, right: 12 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.32 0.03 210 / 0.6)" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: "oklch(0.72 0.03 200)", fontSize: 11 }} />
-                  <YAxis
-                    type="category"
-                    dataKey="label"
-                    width={108}
-                    tick={{ fill: "oklch(0.85 0.02 200)", fontSize: 11 }}
-                  />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "oklch(0.78 0.12 195 / 0.08)" }} />
-                  <Bar dataKey="count" radius={[0, 6, 6, 0]} maxBarSize={18}>
-                    {stats.classRows.map((row) => (
-                      <Cell key={row.class} fill={CLASS_COLOR[row.class] ?? "#5eead4"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <ClassMixPie rows={stats.classRows} height={280} />
             </ChartCard>
           )}
           {on.includes("timeline") && (
@@ -265,7 +242,17 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
         </div>
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
           Show table
-          <Switch checked={showLog} onCheckedChange={setShowLog} />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showLog}
+            onClick={() => setShowLog((v) => !v)}
+            className={`relative h-5 w-9 rounded-full transition ${showLog ? "bg-cyan-400" : "bg-slate-600"}`}
+          >
+            <span
+              className={`absolute top-0.5 size-4 rounded-full bg-white transition ${showLog ? "left-4" : "left-0.5"}`}
+            />
+          </button>
         </label>
       </div>
 

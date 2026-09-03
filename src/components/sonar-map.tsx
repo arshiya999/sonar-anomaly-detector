@@ -14,8 +14,8 @@ function FitOnce({ points }: { points: [number, number][] }) {
   const done = useRef(false);
   useEffect(() => {
     if (done.current || points.length === 0) return;
-    if (points.length === 1) map.setView(points[0], 14);
-    else map.fitBounds(L.latLngBounds(points), { padding: [36, 36], maxZoom: 15 });
+    if (points.length === 1) map.setView(points[0], 13);
+    else map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 14 });
     done.current = true;
   }, [map, points]);
   return null;
@@ -34,13 +34,13 @@ export function SonarMap({ detections }: { detections: Mapped[] }) {
   return (
     <MapContainer
       center={center}
-      zoom={12}
-      className="h-full w-full rounded-xl"
+      zoom={11}
+      className="h-full min-h-[480px] w-full rounded-xl"
       scrollWheelZoom
     >
       <TileLayer
-        attribution="&copy; OpenStreetMap, &copy; CARTO"
-        url="https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
+        attribution="Tiles © Esri"
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
       />
       <FitOnce points={points} />
       {detections.map((d) =>
@@ -48,25 +48,23 @@ export function SonarMap({ detections }: { detections: Mapped[] }) {
           <CircleMarker
             key={d.id}
             center={[d.latitude, d.longitude]}
-            radius={10}
+            radius={11}
             pathOptions={{
-              color: CLASS_COLOR[d.class] ?? "#5eead4",
-              fillColor: CLASS_COLOR[d.class] ?? "#5eead4",
-              fillOpacity: 0.85,
+              color: "#ffffff",
+              fillColor: CLASS_COLOR[d.class] ?? "#22d3ee",
+              fillOpacity: 0.92,
               weight: 2,
             }}
           >
             <Popup>
-              <div className="text-sm">
+              <div className="text-sm text-slate-900">
                 <strong>{CLASS_LABEL[d.class] ?? d.class}</strong> · {d.confidence.toFixed(0)}%
                 <br />
                 {d.source ? <span>{d.source}</span> : null}
                 <br />
-                {d.id}
-                <br />
                 {d.latitude.toFixed(5)}, {d.longitude.toFixed(5)}
                 <br />
-                <span className="text-xs">Zoom in — this pin stays on the chart.</span>
+                Zoom in — this pin stays on the map.
               </div>
             </Popup>
           </CircleMarker>
