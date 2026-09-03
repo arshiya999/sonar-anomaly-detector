@@ -25,23 +25,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { DetectReport, DetectResponse, SampleItem } from "@/lib/types";
+import { CLASS_LABEL } from "@/lib/labels";
+import type { DetectReport, DetectResponse, SampleItem, ScanLogEntry } from "@/lib/types";
+import { SurveyCharts } from "@/components/survey-charts";
 
 const SonarMap = dynamic(
   () => import("@/components/sonar-map").then((m) => m.SonarMap),
   { ssr: false, loading: () => <div className="h-full animate-pulse rounded-xl bg-muted" /> },
 );
-
-const CLASS_LABEL: Record<string, string> = {
-  ghost_net: "Ghost net / gear",
-  debris: "Man-made debris",
-  shipwreck: "Shipwreck",
-  aircraft: "Aircraft wreck",
-  propeller: "Propeller",
-  tire: "Tire",
-  cylinder: "Cylinder / pipe",
-  diver: "Diver / human",
-};
 
 type MetaForm = {
   latitude: string;
@@ -77,6 +68,15 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     weights?: string;
   } | null>(null);
   const [meta, setMeta] = useState<MetaForm>(DEFAULT_META);
+  const [log, setLog] = useState<ScanLogEntry[]>([]);
+
+  const refreshLog = () =>
+    fetch("/api/log", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.entries)) setLog(data.entries);
+      })
+      .catch(() => undefined);
 
   useEffect(() => {
     fetch("/api/samples", { cache: "no-store" })
@@ -85,6 +85,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
         if (Array.isArray(data) && data.length) setSamples(data);
       })
       .catch(() => undefined);
+    void refreshLog();
     const ping = () =>
       fetch("/api/health", { cache: "no-store" })
         .then((r) => r.json())
@@ -132,6 +133,12 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
             ? `${data.report.count} anomal${data.report.count === 1 ? "y" : "ies"} localized`
             : "Scan complete — no anomalies above threshold",
         );
+        await fetch("/api/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: imageFile.name, report: data.report }),
+        });
+        await refreshLog();
       } catch (err) {
         const message = err instanceof Error ? err.message : "Detection failed";
         setError(message);
@@ -213,10 +220,19 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     );
   };
 
-  const mapped = useMemo(
-    () => report?.detections.filter((d) => d.latitude != null && d.longitude != null) ?? [],
-    [report],
-  );
+  const mapped = useMemo(() => {
+    const fromLog = log.flatMap((e) =>
+      e.detections
+        .filter((d) => d.latitude != null && d.longitude != null)
+        .map((d) => ({ ...d, source: e.filename })),
+    );
+    const ids = new Set(fromLog.map((d) => d.id));
+    const extra =
+      report?.detections
+        .filter((d) => d.latitude != null && d.longitude != null && !ids.has(d.id))
+        .map((d) => ({ ...d, source: file?.name })) ?? [];
+    return [...fromLog, ...extra];
+  }, [log, report, file]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(1200px_circle_at_10%_-10%,rgba(45,212,191,0.12),transparent_45%),radial-gradient(900px_circle_at_100%_0%,rgba(56,189,248,0.08),transparent_40%)]">
@@ -374,11 +390,11 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
         </aside>
 
         <section className="flex min-w-0 flex-col gap-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-4">
             <Stat
               label="Anomalies"
               value={report ? String(report.count) : "—"}
-              hint="After noise / shadow filter"
+              hint="This image, after noise filter"
             />
             <Stat
               label="Inference"
@@ -398,13 +414,19 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                   : "Awaiting scan"
               }
             />
+            <Stat
+              label="Logged images"
+              value={String(log.length)}
+              hint={`${mapped.length} map pins kept on zoom`}
+            />
           </div>
 
           <Tabs defaultValue="overlay">
-            <TabsList>
+            <TabsList className="h-auto flex-wrap">
               <TabsTrigger value="overlay">Detections</TabsTrigger>
               <TabsTrigger value="map">Geotagged map</TabsTrigger>
               <TabsTrigger value="report">Structured report</TabsTrigger>
+              <TabsTrigger value="charts">Charts & log</TabsTrigger>
             </TabsList>
             <TabsContent value="overlay">
               <Card className="overflow-hidden">
@@ -440,13 +462,20 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
             </TabsContent>
             <TabsContent value="map">
               <Card className="overflow-hidden">
-                <CardContent className="h-[480px] p-0">
+                <CardContent className="h-[520px] p-0">
                   {mapped.length === 0 ? (
                     <div className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground">
-                      No geotagged hits yet. Run a scan with latitude/longitude metadata.
+                      No geotagged hits yet. Run a scan with latitude/longitude metadata — pins stay
+                      when you zoom.
                     </div>
                   ) : (
-                    <SonarMap detections={mapped} />
+                    <div className="relative h-full">
+                      <p className="pointer-events-none absolute top-3 left-3 z-[1000] rounded-md bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
+                        {mapped.length} recorded hazard{mapped.length === 1 ? "" : "s"} — scroll to
+                        zoom, pins stay put
+                      </p>
+                      <SonarMap detections={mapped} />
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -496,6 +525,59 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                               </TableCell>
                               <TableCell className="text-xs">
                                 {d.dimensions.width_m} × {d.dimensions.length_m}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="charts">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Survey charts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <SurveyCharts entries={log} />
+                </CardContent>
+              </Card>
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle className="text-base">Image intake log</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {log.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Every upload or sample click is recorded here.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>When</TableHead>
+                            <TableHead>Image</TableHead>
+                            <TableHead>Hits</TableHead>
+                            <TableHead>ms</TableHead>
+                            <TableHead>Survey</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {log.slice(0, 40).map((e) => (
+                            <TableRow key={e.id}>
+                              <TableCell className="font-mono text-xs">
+                                {e.at.replace("T", " ").slice(0, 19)}
+                              </TableCell>
+                              <TableCell className="max-w-[180px] truncate text-xs">
+                                {e.filename}
+                              </TableCell>
+                              <TableCell>{e.count}</TableCell>
+                              <TableCell className="font-mono text-xs">{e.inference_ms}</TableCell>
+                              <TableCell className="max-w-[160px] truncate text-xs">
+                                {e.survey}
                               </TableCell>
                             </TableRow>
                           ))}
