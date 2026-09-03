@@ -1,0 +1,13 @@
+# Single public URL on Render: https://your-service.onrender.com
+# Dashboard: New → Blueprint → connect this GitHub repo after you click Create repo.
+services:
+  - type: web
+    name: abyss
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: ML_API_URL
+        value: http://127.0.0.1:8765

@@ -6,7 +6,13 @@ const nextConfig: NextConfig = {
     "localhost",
     "*.cursor.sh",
     "*.cursorusercontent.com",
-    "*.local",
+    "*.loca.lt",
+    "*.trycloudflare.com",
+    "*.ngrok-free.app",
+    "*.ngrok.io",
+    "*.onrender.com",
+    "*.railway.app",
+    "*.fly.dev",
   ],
 };
 
