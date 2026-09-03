@@ -52,13 +52,13 @@ export function SonarMap({ detections }: { detections: Mapped[] }) {
       />
       <Polyline
         positions={TRANSECT}
-        pathOptions={{ color: "#22d3ee", weight: 3, dashArray: "10 8", opacity: 0.85 }}
+        pathOptions={{ color: "#fbbf24", weight: 3, dashArray: "10 8", opacity: 0.9 }}
       />
       <FitOnce points={points} />
       <CircleMarker
         center={[13.0827, 80.3708]}
         radius={7}
-        pathOptions={{ color: "#fde047", fillColor: "#22d3ee", fillOpacity: 1, weight: 2 }}
+        pathOptions={{ color: "#fde047", fillColor: "#f472b6", fillOpacity: 1, weight: 2 }}
       >
         <Popup>
           <div className="text-sm text-slate-900">

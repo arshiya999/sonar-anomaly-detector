@@ -247,7 +247,7 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
             role="switch"
             aria-checked={showLog}
             onClick={() => setShowLog((v) => !v)}
-            className={`relative h-5 w-9 rounded-full transition ${showLog ? "bg-cyan-400" : "bg-slate-600"}`}
+            className={`relative h-5 w-9 rounded-full transition ${showLog ? "bg-amber-400" : "bg-stone-600"}`}
           >
             <span
               className={`absolute top-0.5 size-4 rounded-full bg-white transition ${showLog ? "left-4" : "left-0.5"}`}
