@@ -44,7 +44,7 @@ export function ClassMixPie({
             innerRadius={54}
             outerRadius={86}
             paddingAngle={2}
-            stroke="#082f49"
+            stroke="#1c1014"
             strokeWidth={2}
           >
             {data.map((row) => (
@@ -58,7 +58,7 @@ export function ClassMixPie({
                     <tspan x={viewBox.cx} dy="-0.2em" fill="#f8fafc" fontSize="22" fontWeight={700}>
                       {preview ? "8" : total}
                     </tspan>
-                    <tspan x={viewBox.cx} dy="1.4em" fill="#a5f3fc" fontSize="10">
+                    <tspan x={viewBox.cx} dy="1.4em" fill="#fde68a" fontSize="10">
                       {preview ? "classes" : "contacts"}
                     </tspan>
                   </text>

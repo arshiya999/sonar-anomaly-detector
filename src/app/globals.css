@@ -49,72 +49,72 @@
 }
 
 :root {
-  --background: oklch(0.18 0.05 230);
-  --foreground: oklch(0.97 0.02 200);
-  --card: oklch(0.23 0.05 228);
-  --card-foreground: oklch(0.97 0.02 200);
-  --popover: oklch(0.23 0.05 228);
-  --popover-foreground: oklch(0.97 0.02 200);
-  --primary: oklch(0.82 0.14 195);
-  --primary-foreground: oklch(0.18 0.05 230);
-  --secondary: oklch(0.32 0.07 250);
-  --secondary-foreground: oklch(0.95 0.03 200);
-  --muted: oklch(0.28 0.04 230);
-  --muted-foreground: oklch(0.82 0.04 200);
-  --accent: oklch(0.7 0.16 55);
-  --accent-foreground: oklch(0.18 0.05 230);
+  --background: oklch(0.17 0.04 55);
+  --foreground: oklch(0.98 0.02 90);
+  --card: oklch(0.23 0.05 55);
+  --card-foreground: oklch(0.98 0.02 90);
+  --popover: oklch(0.23 0.05 55);
+  --popover-foreground: oklch(0.98 0.02 90);
+  --primary: oklch(0.84 0.16 75);
+  --primary-foreground: oklch(0.2 0.05 55);
+  --secondary: oklch(0.4 0.14 330);
+  --secondary-foreground: oklch(0.97 0.02 90);
+  --muted: oklch(0.28 0.04 50);
+  --muted-foreground: oklch(0.84 0.04 80);
+  --accent: oklch(0.78 0.18 145);
+  --accent-foreground: oklch(0.18 0.05 145);
   --destructive: oklch(0.68 0.2 25);
-  --border: oklch(0.4 0.06 210);
-  --input: oklch(0.35 0.05 210);
-  --ring: oklch(0.82 0.14 195);
-  --chart-1: oklch(0.78 0.16 195);
+  --border: oklch(0.42 0.07 55);
+  --input: oklch(0.36 0.05 55);
+  --ring: oklch(0.84 0.16 75);
+  --chart-1: oklch(0.78 0.16 75);
   --chart-2: oklch(0.75 0.18 145);
-  --chart-3: oklch(0.78 0.16 55);
+  --chart-3: oklch(0.72 0.2 330);
   --chart-4: oklch(0.72 0.18 25);
-  --chart-5: oklch(0.72 0.16 300);
+  --chart-5: oklch(0.72 0.16 280);
   --radius: 0.75rem;
-  --sidebar: oklch(0.2 0.05 230);
-  --sidebar-foreground: oklch(0.97 0.02 200);
-  --sidebar-primary: oklch(0.82 0.14 195);
-  --sidebar-primary-foreground: oklch(0.18 0.05 230);
-  --sidebar-accent: oklch(0.32 0.07 250);
-  --sidebar-accent-foreground: oklch(0.97 0.02 200);
-  --sidebar-border: oklch(0.4 0.06 210);
-  --sidebar-ring: oklch(0.82 0.14 195);
+  --sidebar: oklch(0.2 0.04 55);
+  --sidebar-foreground: oklch(0.97 0.02 90);
+  --sidebar-primary: oklch(0.84 0.16 75);
+  --sidebar-primary-foreground: oklch(0.2 0.05 55);
+  --sidebar-accent: oklch(0.4 0.14 330);
+  --sidebar-accent-foreground: oklch(0.97 0.02 90);
+  --sidebar-border: oklch(0.42 0.07 55);
+  --sidebar-ring: oklch(0.84 0.16 75);
 }
 
 .dark {
-  --background: oklch(0.18 0.05 230);
-  --foreground: oklch(0.97 0.02 200);
-  --card: oklch(0.23 0.05 228);
-  --card-foreground: oklch(0.97 0.02 200);
-  --popover: oklch(0.23 0.05 228);
-  --popover-foreground: oklch(0.97 0.02 200);
-  --primary: oklch(0.82 0.14 195);
-  --primary-foreground: oklch(0.18 0.05 230);
-  --secondary: oklch(0.32 0.07 250);
-  --secondary-foreground: oklch(0.95 0.03 200);
-  --muted: oklch(0.28 0.04 230);
-  --muted-foreground: oklch(0.82 0.04 200);
-  --accent: oklch(0.7 0.16 55);
-  --accent-foreground: oklch(0.18 0.05 230);
+  --background: oklch(0.17 0.04 55);
+  --foreground: oklch(0.98 0.02 90);
+  --card: oklch(0.23 0.05 55);
+  --card-foreground: oklch(0.98 0.02 90);
+  --popover: oklch(0.23 0.05 55);
+  --popover-foreground: oklch(0.98 0.02 90);
+  --primary: oklch(0.84 0.16 75);
+  --primary-foreground: oklch(0.2 0.05 55);
+  --secondary: oklch(0.4 0.14 330);
+  --secondary-foreground: oklch(0.97 0.02 90);
+  --muted: oklch(0.28 0.04 50);
+  --muted-foreground: oklch(0.84 0.04 80);
+  --accent: oklch(0.78 0.18 145);
+  --accent-foreground: oklch(0.18 0.05 145);
   --destructive: oklch(0.68 0.2 25);
-  --border: oklch(0.4 0.06 210);
-  --input: oklch(0.35 0.05 210);
-  --ring: oklch(0.82 0.14 195);
-  --chart-1: oklch(0.78 0.16 195);
+  --border: oklch(0.42 0.07 55);
+  --input: oklch(0.36 0.05 55);
+  --ring: oklch(0.84 0.16 75);
+  --chart-1: oklch(0.78 0.16 75);
   --chart-2: oklch(0.75 0.18 145);
-  --chart-3: oklch(0.78 0.16 55);
+  --chart-3: oklch(0.72 0.2 330);
   --chart-4: oklch(0.72 0.18 25);
-  --chart-5: oklch(0.72 0.16 300);
-  --sidebar: oklch(0.2 0.05 230);
-  --sidebar-foreground: oklch(0.97 0.02 200);
-  --sidebar-primary: oklch(0.82 0.14 195);
-  --sidebar-primary-foreground: oklch(0.18 0.05 230);
-  --sidebar-accent: oklch(0.32 0.07 250);
-  --sidebar-accent-foreground: oklch(0.97 0.02 200);
-  --sidebar-border: oklch(0.4 0.06 210);
-  --sidebar-ring: oklch(0.82 0.14 195);
+  --chart-5: oklch(0.72 0.16 280);
+  --sidebar: oklch(0.2 0.04 55);
+  --sidebar-foreground: oklch(0.97 0.02 90);
+  --sidebar-primary: oklch(0.84 0.16 75);
+  --sidebar-primary-foreground: oklch(0.2 0.05 55);
+  --sidebar-accent: oklch(0.4 0.14 330);
+  --sidebar-accent-foreground: oklch(0.97 0.02 90);
+  --sidebar-border: oklch(0.42 0.07 55);
+  --sidebar-ring: oklch(0.84 0.16 75);
 }
 
 @layer base {
@@ -129,7 +129,7 @@
     color-scheme: dark;
   }
   .leaflet-container {
-    background: #082f49;
+    background: #1c1917;
     font-family: inherit;
     height: 100%;
     width: 100%;
@@ -141,14 +141,16 @@
 }
 
 .abyss-bg {
-  background-color: #031018;
+  background-color: #1c1014;
   background-image:
-    radial-gradient(ellipse 90% 55% at 10% -10%, rgba(34, 211, 238, 0.22), transparent 50%),
-    radial-gradient(ellipse 70% 45% at 100% 0%, rgba(251, 191, 36, 0.16), transparent 45%),
-    radial-gradient(ellipse 60% 40% at 70% 100%, rgba(217, 70, 239, 0.12), transparent 50%),
-    linear-gradient(rgba(34, 211, 238, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34, 211, 238, 0.045) 1px, transparent 1px);
+    radial-gradient(ellipse 80% 55% at 0% -10%, rgba(251, 113, 133, 0.55), transparent 52%),
+    radial-gradient(ellipse 70% 50% at 100% 0%, rgba(251, 191, 36, 0.5), transparent 48%),
+    radial-gradient(ellipse 65% 45% at 15% 100%, rgba(52, 211, 153, 0.38), transparent 50%),
+    radial-gradient(ellipse 55% 40% at 90% 85%, rgba(192, 132, 252, 0.42), transparent 48%),
+    linear-gradient(rgba(251, 191, 36, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(244, 114, 182, 0.06) 1px, transparent 1px);
   background-size:
+    auto,
     auto,
     auto,
     auto,
@@ -162,8 +164,8 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, #67e8f9, #fde047, transparent);
-  box-shadow: 0 0 18px #22d3ee;
+  background: linear-gradient(90deg, transparent, #f472b6, #fde047, #34d399, transparent);
+  box-shadow: 0 0 18px #fbbf24;
   animation: abyss-sweep 2.2s linear infinite;
 }
 
@@ -187,7 +189,7 @@
   position: absolute;
   inset: -14px;
   border-radius: 999px;
-  border: 1px solid rgba(103, 232, 249, 0.45);
+  border: 1px solid rgba(251, 191, 36, 0.5);
   animation: abyss-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 .sonar-logo::after {

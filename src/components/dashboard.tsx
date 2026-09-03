@@ -36,7 +36,7 @@ import { SonarTheater } from "@/components/sonar-theater";
 
 const SonarMap = dynamic(
   () => import("@/components/sonar-map").then((m) => m.SonarMap),
-  { ssr: false, loading: () => <div className="h-full animate-pulse bg-cyan-950/40" /> },
+  { ssr: false, loading: () => <div className="h-full animate-pulse bg-amber-950/40" /> },
 );
 
 type MetaForm = {
@@ -334,30 +334,30 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
 
   return (
     <div className="abyss-bg min-h-screen">
-      <header className="border-b border-cyan-400/20 bg-black/35 backdrop-blur-md">
+      <header className="border-b border-amber-400/30 bg-gradient-to-r from-rose-500/30 via-amber-400/25 to-emerald-400/30 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-xl bg-cyan-400 p-2.5 text-sky-950 shadow-[0_0_32px_rgba(34,211,238,0.55)]">
+            <div className="mt-0.5 rounded-xl bg-amber-400 p-2.5 text-stone-950 shadow-[0_0_32px_rgba(251,191,36,0.65)]">
               <Radar className="size-6" />
             </div>
             <div>
-              <p className="font-mono text-[11px] tracking-[0.28em] text-cyan-300 uppercase">
+              <p className="font-mono text-[11px] tracking-[0.28em] text-rose-300 uppercase">
                 {MODEL_METRICS.org} · {MODEL_METRICS.problem}
               </p>
               <h1 className="font-heading text-2xl font-semibold tracking-tight text-white sm:text-3xl">
                 ABYSS
-                <span className="ml-2 text-lg font-normal text-cyan-200/80 sm:text-xl">
+                <span className="ml-2 text-lg font-normal text-amber-200/90 sm:text-xl">
                   benthic sonar intelligence
                 </span>
               </h1>
-              <p className="mt-1 max-w-2xl text-sm text-sky-100/85">
+              <p className="mt-1 max-w-2xl text-sm text-stone-100/90">
                 Ghost nets, wrecks, and man-made debris — found in side-scan waterfalls, scored
                 against acoustic shadow, and dropped as geotagged cleanup orders.
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-xs text-cyan-200/90">{clock ? `${clock} IST` : "IST"}</span>
+            <span className="font-mono text-xs text-amber-100">{clock ? `${clock} IST` : "IST"}</span>
             <Badge
               className={
                 health?.ok
@@ -375,7 +375,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
             </Badge>
             <Button
               size="lg"
-              className="h-10 gap-2 bg-amber-400 px-4 text-sky-950 hover:bg-amber-300"
+              className="h-10 gap-2 bg-amber-400 px-4 text-stone-950 hover:bg-amber-300"
               onClick={() => void runJudgeDemo()}
               disabled={busy || demo}
             >
@@ -384,19 +384,19 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
             </Button>
           </div>
         </div>
-        <div className="mx-auto grid max-w-[1440px] grid-cols-2 gap-px border-t border-cyan-400/15 bg-cyan-400/10 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mx-auto grid max-w-[1440px] grid-cols-2 gap-2 border-t border-white/10 p-3 sm:grid-cols-3 lg:grid-cols-6">
           {[
-            ["mAP@50", MODEL_METRICS.map50, "held-out sonar val"],
-            ["Precision", MODEL_METRICS.precision, "real SSS + FLS"],
-            ["Train set", String(MODEL_METRICS.trainImages), `${MODEL_METRICS.valImages} val images`],
-            ["Model", MODEL_METRICS.model, `${MODEL_METRICS.params} · ${MODEL_METRICS.imgsz}px`],
-            ["Runtime", MODEL_METRICS.device, report ? `${report.inference_ms} ms this ping` : "edge nano"],
-            ["Contacts", report ? String(report.count) : "—", `${mapped.length} map pins`],
-          ].map(([k, v, d]) => (
-            <div key={k} className="bg-[#041821]/80 px-3 py-2.5">
-              <p className="font-mono text-[10px] tracking-widest text-cyan-300/80 uppercase">{k}</p>
+            ["mAP@50", MODEL_METRICS.map50, "held-out sonar val", "bg-rose-500/25 border-rose-400/50"],
+            ["Precision", MODEL_METRICS.precision, "real SSS + FLS", "bg-amber-400/25 border-amber-400/50"],
+            ["Train set", String(MODEL_METRICS.trainImages), `${MODEL_METRICS.valImages} val images`, "bg-emerald-400/25 border-emerald-400/50"],
+            ["Model", MODEL_METRICS.model, `${MODEL_METRICS.params} · ${MODEL_METRICS.imgsz}px`, "bg-violet-400/25 border-violet-400/50"],
+            ["Runtime", MODEL_METRICS.device, report ? `${report.inference_ms} ms this ping` : "edge nano", "bg-orange-400/25 border-orange-400/50"],
+            ["Contacts", report ? String(report.count) : "—", `${mapped.length} map pins`, "bg-lime-400/25 border-lime-400/50"],
+          ].map(([k, v, d, tone]) => (
+            <div key={k} className={`rounded-xl border px-3 py-2.5 ${tone}`}>
+              <p className="font-mono text-[10px] tracking-widest text-white/70 uppercase">{k}</p>
               <p className="font-heading text-lg font-semibold text-white">{v}</p>
-              <p className="truncate text-[11px] text-sky-200/70">{d}</p>
+              <p className="truncate text-[11px] text-white/70">{d}</p>
             </div>
           ))}
         </div>
@@ -417,10 +417,10 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
           ].map(([t, d]) => (
             <div
               key={t}
-              className="rounded-xl border border-cyan-400/20 bg-black/25 px-3 py-2.5 backdrop-blur-sm"
+              className="rounded-xl border border-amber-400/30 bg-black/20 px-3 py-2.5 backdrop-blur-sm"
             >
-              <p className="text-sm font-medium text-cyan-100">{t}</p>
-              <p className="mt-1 text-xs leading-relaxed text-sky-200/75">{d}</p>
+              <p className="text-sm font-medium text-amber-100">{t}</p>
+              <p className="mt-1 text-xs leading-relaxed text-stone-200/80">{d}</p>
             </div>
           ))}
         </div>
@@ -445,14 +445,14 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                   }}
                 />
                 <Button
-                  className="h-10 w-full bg-cyan-400 text-sky-950 hover:bg-cyan-300"
+                  className="h-10 w-full bg-fuchsia-400 text-stone-950 hover:bg-fuchsia-300"
                   onClick={() => inputRef.current?.click()}
                   disabled={busy}
                 >
                   <Upload /> Upload sonar image
                 </Button>
                 <div>
-                  <div className="mb-2 flex items-center justify-between text-xs text-sky-100">
+                  <div className="mb-2 flex items-center justify-between text-xs text-stone-100">
                     <span>Confidence gate</span>
                     <span className="font-mono text-amber-300">{threshold}%</span>
                   </div>
@@ -468,7 +468,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                 </div>
                 <Button
                   variant="outline"
-                  className="w-full border-cyan-400/40"
+                  className="w-full border-amber-400/50"
                   disabled={!file || busy}
                   onClick={() => file && void runDetect(file)}
                 >
@@ -479,7 +479,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
             </Card>
 
             <details className="rounded-xl border border-white/10 bg-black/25 p-3">
-              <summary className="cursor-pointer text-sm font-medium text-cyan-100">
+              <summary className="cursor-pointer text-sm font-medium text-amber-100">
                 Ping / geotag metadata
               </summary>
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -492,7 +492,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                     ["meters_per_pixel_y", "m / px along"],
                   ] as const
                 ).map(([key, label]) => (
-                  <label key={key} className="col-span-1 space-y-1 text-xs text-sky-200/80">
+                  <label key={key} className="col-span-1 space-y-1 text-xs text-stone-200/80">
                     {label}
                     <Input
                       value={meta[key]}
@@ -501,7 +501,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                     />
                   </label>
                 ))}
-                <label className="col-span-2 space-y-1 text-xs text-sky-200/80">
+                <label className="col-span-2 space-y-1 text-xs text-stone-200/80">
                   Survey name
                   <Input
                     value={meta.survey}
@@ -512,9 +512,9 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               </div>
             </details>
 
-            <Card className="border-cyan-400/20 bg-black/25">
+            <Card className="border-violet-400/30 bg-black/20">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base text-cyan-100">Real sonar gallery</CardTitle>
+                <CardTitle className="text-base text-violet-100">Real sonar gallery</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-2">
                 {samples.length === 0 ? (
@@ -530,7 +530,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                       className={`overflow-hidden rounded-lg border text-left transition hover:border-amber-300 hover:shadow-[0_0_16px_rgba(251,191,36,0.25)] ${
                         file?.name === s.file
                           ? "border-amber-300 ring-2 ring-amber-300/40"
-                          : "border-cyan-400/20"
+                          : "border-fuchsia-400/30"
                       }`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -539,7 +539,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                         alt={s.example_class}
                         className="h-20 w-full object-cover"
                       />
-                      <span className="block truncate px-2 py-1 text-[11px] text-sky-100/80">
+                      <span className="block truncate px-2 py-1 text-[11px] text-stone-100/80">
                         {CLASS_LABEL[s.example_class] ?? s.example_class}
                       </span>
                     </button>
@@ -571,18 +571,18 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                   <ClassMixPie rows={mixRows} height={250} />
                 </CardContent>
               </Card>
-              <Card className="overflow-hidden border-cyan-400/30">
+              <Card className="overflow-hidden border-emerald-400/40">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base text-cyan-100">
+                  <CardTitle className="text-base text-emerald-100">
                     NIOT survey track · Bay of Bengal
                   </CardTitle>
-                  <p className="text-xs text-sky-100/70">
-                    Cyan dashed line is the planned AUV transect. Coloured pins are model contacts.
+                  <p className="text-xs text-stone-200/75">
+                    Gold dashed line is the planned AUV transect. Coloured pins are model contacts.
                   </p>
                 </CardHeader>
                 <CardContent className="relative h-[300px] p-0 sm:h-[360px]">
                   <SonarMap detections={mapped} />
-                  <div className="pointer-events-none absolute right-3 bottom-3 z-[1000] rounded-lg bg-sky-950/90 px-2 py-1.5 text-[10px] text-cyan-50">
+                  <div className="pointer-events-none absolute right-3 bottom-3 z-[1000] rounded-lg bg-stone-950/90 px-2 py-1.5 text-[10px] text-amber-100">
                     {mapped.length ? `${mapped.length} geotagged hazards` : "13.08°N 80.37°E"}
                   </div>
                 </CardContent>
@@ -593,7 +593,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               {Object.entries(CLASS_LABEL).map(([cls, label]) => (
                 <span
                   key={cls}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-[11px] text-sky-50"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-[11px] text-stone-50"
                 >
                   <span className="size-2.5 rounded-full" style={{ background: CLASS_COLOR[cls] }} />
                   {label}
@@ -602,7 +602,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
             </div>
 
             <Tabs defaultValue="report">
-              <TabsList className="h-auto flex-wrap bg-cyan-950/70">
+              <TabsList className="h-auto flex-wrap bg-stone-900/70">
                 <TabsTrigger value="report">Cleanup report</TabsTrigger>
                 <TabsTrigger value="map">Full map</TabsTrigger>
                 <TabsTrigger value="charts">Ops graphs</TabsTrigger>
@@ -625,11 +625,11 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                   </CardHeader>
                   <CardContent>
                     {!report ? (
-                      <p className="text-sm text-sky-200/70">
+                      <p className="text-sm text-stone-200/70">
                         Run the judge demo to generate a structured cleanup order (JSON + CSV).
                       </p>
                     ) : report.count === 0 ? (
-                      <p className="text-sm text-sky-200/70">
+                      <p className="text-sm text-stone-200/70">
                         No man-made anomalies above the current confidence gate.
                       </p>
                     ) : (
@@ -678,7 +678,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                 </Card>
               </TabsContent>
               <TabsContent value="map">
-                <Card className="overflow-hidden border-cyan-400/25">
+                <Card className="overflow-hidden border-emerald-400/30">
                   <CardContent className="h-[540px] p-0">
                     <SonarMap detections={mapped} />
                   </CardContent>
@@ -700,7 +700,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
             </Tabs>
           </section>
         </div>
-        <footer className="border-t border-cyan-400/15 pb-8 pt-4 text-center text-[11px] text-sky-200/60">
+        <footer className="border-t border-amber-400/20 pb-8 pt-4 text-center text-[11px] text-stone-200/70">
           Trained on SCTD 1.0 · Marine Debris FLS watertank · SeabedObjects-KLSG · YOLO11n {MODEL_METRICS.params} ·
           mAP@50 {MODEL_METRICS.map50} · NIOT Bay of Bengal default origin
         </footer>
