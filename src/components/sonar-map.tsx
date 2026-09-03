@@ -21,11 +21,34 @@ function FitOnce({ points }: { points: [number, number][] }) {
   const map = useMap();
   const done = useRef(false);
   useEffect(() => {
+    const size = map.getSize();
+    if (size.x < 8 || size.y < 8) return;
+    map.invalidateSize();
     if (done.current || points.length === 0) return;
     if (points.length === 1) map.setView(points[0], 13);
     else map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 14 });
     done.current = true;
   }, [map, points]);
+  return null;
+}
+
+function ResizeGuard() {
+  const map = useMap();
+  useEffect(() => {
+    const kick = () => {
+      try {
+        if (map.getSize().x > 0) map.invalidateSize();
+      } catch {
+        /* unmounted */
+      }
+    };
+    const t = window.setTimeout(kick, 80);
+    window.addEventListener("resize", kick);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("resize", kick);
+    };
+  }, [map]);
   return null;
 }
 
@@ -54,6 +77,7 @@ export function SonarMap({ detections }: { detections: Mapped[] }) {
         positions={TRANSECT}
         pathOptions={{ color: "#fbbf24", weight: 3, dashArray: "10 8", opacity: 0.9 }}
       />
+      <ResizeGuard />
       <FitOnce points={points} />
       <CircleMarker
         center={[13.0827, 80.3708]}

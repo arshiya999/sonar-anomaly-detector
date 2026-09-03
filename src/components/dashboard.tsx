@@ -581,7 +581,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                   </p>
                 </CardHeader>
                 <CardContent className="relative h-[300px] p-0 sm:h-[360px]">
-                  <SonarMap detections={mapped} />
+                  <SonarMap key="overview-map" detections={mapped} />
                   <div className="pointer-events-none absolute right-3 bottom-3 z-[1000] rounded-lg bg-stone-950/90 px-2 py-1.5 text-[10px] text-amber-100">
                     {mapped.length ? `${mapped.length} geotagged hazards` : "13.08°N 80.37°E"}
                   </div>
@@ -680,7 +680,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               <TabsContent value="map">
                 <Card className="overflow-hidden border-emerald-400/30">
                   <CardContent className="h-[540px] p-0">
-                    <SonarMap detections={mapped} />
+                    <SonarMap key="full-map" detections={mapped} />
                   </CardContent>
                 </Card>
               </TabsContent>
