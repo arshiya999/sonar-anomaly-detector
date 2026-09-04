@@ -7,7 +7,7 @@
     "dev:ml": "python -m uvicorn --app-dir ml server:app --host 0.0.0.0 --port 8765",
     "dev:all": "node scripts/start.cjs",
     "dev:vite": "npm run dev --prefix frontend",
-    "dev:api": "cd backend && PYTHONPATH=. python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8766",
+    "seed:surveys": "python3 scripts/seed_reference_surveys.py",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 47281",
     "start:site": "node scripts/serve.cjs",

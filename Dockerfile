@@ -16,6 +16,7 @@ RUN npm ci
 
 COPY . .
 ENV ML_API_URL=http://127.0.0.1:8765
+ENV OPS_API_URL=http://127.0.0.1:8766
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

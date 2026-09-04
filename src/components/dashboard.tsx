@@ -85,13 +85,20 @@ type MetaForm = {
 };
 
 const DEFAULT_META: MetaForm = {
-  latitude: "13.0827",
-  longitude: "80.3708",
-  heading_deg: "42",
-  meters_per_pixel_x: "0.08",
-  meters_per_pixel_y: "0.05",
-  survey: "NIOT Bay of Bengal transect",
+  latitude: "",
+  longitude: "",
+  heading_deg: "",
+  meters_per_pixel_x: "",
+  meters_per_pixel_y: "",
+  survey: "",
 };
+
+function optionalNumber(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 type Mapped = Detection & { source?: string };
 
@@ -120,7 +127,28 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     fetch("/api/log", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data.entries)) setLog(data.entries);
+        if (!Array.isArray(data.entries)) return;
+        setLog(data.entries);
+        const latestEntry = data.entries[0] as ScanLogEntry | undefined;
+        const overlayFromDb = latestEntry?.detections?.find((d) => d.overlay_url)?.overlay_url;
+        if (overlayFromDb) {
+          setOverlay((prev) => (prev?.startsWith("data:") ? prev : overlayFromDb));
+        }
+        if (latestEntry) {
+          setReport((prev) => {
+            if (prev) return prev;
+            return {
+              model: "sonar-debris-yolo11n.pt",
+              image_size: { width: 0, height: 0 },
+              inference_ms: latestEntry.inference_ms,
+              threshold: latestEntry.threshold,
+              detections: latestEntry.detections,
+              count: latestEntry.count,
+              metadata: {},
+              survey_id: latestEntry.survey,
+            };
+          });
+        }
       })
       .catch(() => undefined);
 
@@ -167,7 +195,11 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
         .catch(() => setHealth({ ok: false }));
     void ping();
     const id = setInterval(ping, 8000);
-    return () => clearInterval(id);
+    const logId = setInterval(() => void refreshLog(), 12000);
+    return () => {
+      clearInterval(id);
+      clearInterval(logId);
+    };
   }, []);
 
   const runDetect = useCallback(
@@ -178,18 +210,19 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
       const form = new FormData();
       form.append("image", imageFile);
       form.append("conf_threshold", String(threshold / 100));
-      form.append(
-        "metadata",
-        JSON.stringify({
-          latitude: Number(used.latitude),
-          longitude: Number(used.longitude),
-          heading_deg: Number(used.heading_deg),
-          meters_per_pixel_x: Number(used.meters_per_pixel_x),
-          meters_per_pixel_y: Number(used.meters_per_pixel_y),
-          survey: used.survey,
-          sensor: "side-scan-sonar",
-        }),
-      );
+      const metadata: Record<string, unknown> = { sensor: "side-scan-sonar" };
+      const lat = optionalNumber(used.latitude);
+      const lon = optionalNumber(used.longitude);
+      const heading = optionalNumber(used.heading_deg);
+      const mppx = optionalNumber(used.meters_per_pixel_x);
+      const mppy = optionalNumber(used.meters_per_pixel_y);
+      if (lat != null) metadata.latitude = lat;
+      if (lon != null) metadata.longitude = lon;
+      if (heading != null) metadata.heading_deg = heading;
+      if (mppx != null) metadata.meters_per_pixel_x = mppx;
+      if (mppy != null) metadata.meters_per_pixel_y = mppy;
+      if (used.survey.trim()) metadata.survey = used.survey.trim();
+      form.append("metadata", JSON.stringify(metadata));
       try {
         const res = await fetch("/api/detect", { method: "POST", body: form });
         const data = (await res.json()) as DetectResponse;
@@ -208,7 +241,11 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
         await fetch("/api/log", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: imageFile.name, report: data.report }),
+          body: JSON.stringify({
+            filename: imageFile.name,
+            report: data.report,
+            overlay_jpeg_base64: data.overlay_jpeg_base64,
+          }),
         });
         await refreshLog();
       } catch (err) {
@@ -231,12 +268,12 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
       try {
         const m = await fetch(`/samples/${item.meta}`).then((r) => r.json());
         nextMeta = {
-          latitude: String(m.latitude ?? DEFAULT_META.latitude),
-          longitude: String(m.longitude ?? DEFAULT_META.longitude),
-          heading_deg: String(m.heading_deg ?? DEFAULT_META.heading_deg),
-          meters_per_pixel_x: String(m.meters_per_pixel_x ?? DEFAULT_META.meters_per_pixel_x),
-          meters_per_pixel_y: String(m.meters_per_pixel_y ?? DEFAULT_META.meters_per_pixel_y),
-          survey: String(m.survey ?? DEFAULT_META.survey),
+          latitude: m.latitude != null ? String(m.latitude) : "",
+          longitude: m.longitude != null ? String(m.longitude) : "",
+          heading_deg: m.heading_deg != null ? String(m.heading_deg) : "",
+          meters_per_pixel_x: m.meters_per_pixel_x != null ? String(m.meters_per_pixel_x) : "",
+          meters_per_pixel_y: m.meters_per_pixel_y != null ? String(m.meters_per_pixel_y) : "",
+          survey: m.survey != null ? String(m.survey) : "",
         };
         setMeta(nextMeta);
       } catch {
@@ -253,9 +290,13 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
 
   useEffect(() => {
     if (booted.current || !health?.ok || !samples[0]) return;
+    if (log.length > 0) {
+      booted.current = true;
+      return;
+    }
     booted.current = true;
     void loadSample(samples[0]);
-  }, [health, samples, loadSample]);
+  }, [health, samples, loadSample, log.length]);
 
   const onFile = async (next: File) => {
     setFile(next);
@@ -356,19 +397,6 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     return [...fromLog, ...extra];
   }, [log, report, file]);
 
-  const mixRows = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const d of mapped) counts[d.class] = (counts[d.class] ?? 0) + 1;
-    if (report) {
-      for (const d of report.detections) {
-        if (d.latitude == null || d.longitude == null) {
-          counts[d.class] = (counts[d.class] ?? 0) + 1;
-        }
-      }
-    }
-    return Object.entries(counts).map(([cls, count]) => ({ class: cls, count }));
-  }, [mapped, report]);
-
   const allDetections: Mapped[] = useMemo(() => {
     const fromLog = log.flatMap((e) => e.detections.map((d) => ({ ...d, source: e.filename })));
     const ids = new Set(fromLog.map((d) => d.id));
@@ -376,6 +404,12 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
       report?.detections.filter((d) => !ids.has(d.id)).map((d) => ({ ...d, source: file?.name })) ?? [];
     return [...fromLog, ...extra];
   }, [log, report, file]);
+
+  const mixRows = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const d of allDetections) counts[d.class] = (counts[d.class] ?? 0) + 1;
+    return Object.entries(counts).map(([cls, count]) => ({ class: cls, count }));
+  }, [allDetections]);
 
   const latest = useMemo(() => {
     if (report?.detections.length) {
@@ -949,7 +983,12 @@ function UploadPage({
             ).map(([key, label]) => (
               <label key={key} className="space-y-1 text-xs text-slate-600">
                 {label}
-                <Input value={meta[key]} onChange={(e) => setMeta({ ...meta, [key]: e.target.value })} className="h-8" />
+                <Input
+                  value={meta[key]}
+                  placeholder="sidecar / ping only"
+                  onChange={(e) => setMeta({ ...meta, [key]: e.target.value })}
+                  className="h-8"
+                />
               </label>
             ))}
             <label className="col-span-2 space-y-1 text-xs text-slate-600">
@@ -1243,7 +1282,12 @@ function SettingsPage({
             ).map(([key, label]) => (
               <label key={key} className="space-y-1 text-xs text-slate-600">
                 {label}
-                <Input value={meta[key]} onChange={(e) => setMeta({ ...meta, [key]: e.target.value })} className="h-8" />
+                <Input
+                  value={meta[key]}
+                  placeholder="sidecar / ping only"
+                  onChange={(e) => setMeta({ ...meta, [key]: e.target.value })}
+                  className="h-8"
+                />
               </label>
             ))}
             <label className="col-span-2 space-y-1 text-xs text-slate-600">

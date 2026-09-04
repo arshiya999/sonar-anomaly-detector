@@ -12,7 +12,7 @@ from app.config import STORAGE, settings
 from app.database import Base, engine
 from app.hub import hub, pending
 from app.pipeline.infer import get_model
-from app.api import detections, reports, sonar, surveys, system
+from app.api import bridge, detections, reports, sonar, surveys, system
 
 log = logging.getLogger("aqua")
 logging.basicConfig(level=settings.log_level)
@@ -57,6 +57,7 @@ STORAGE.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=str(STORAGE)), name="media")
 
 app.include_router(system.router, prefix="/api")
+app.include_router(bridge.router, prefix="/api")
 app.include_router(sonar.router, prefix="/api")
 app.include_router(surveys.router, prefix="/api")
 app.include_router(detections.router, prefix="/api")
