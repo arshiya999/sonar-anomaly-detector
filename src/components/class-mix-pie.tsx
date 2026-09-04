@@ -4,11 +4,11 @@ import { Cell, Label, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from
 import { CLASS_COLOR, CLASS_LABEL } from "@/lib/labels";
 
 const TOOLTIP_STYLE = {
-  background: "#0f2740",
-  border: "1px solid #2dd4bf",
+  background: "#ffffff",
+  border: "1px solid #e2e8f0",
   borderRadius: 10,
   fontSize: 12,
-  color: "#ecfeff",
+  color: "#0f172a",
 };
 
 type Row = { class: string; count: number };
@@ -44,21 +44,21 @@ export function ClassMixPie({
             innerRadius={54}
             outerRadius={86}
             paddingAngle={2}
-            stroke="#1c1014"
+            stroke="#ffffff"
             strokeWidth={2}
           >
             {data.map((row) => (
-              <Cell key={row.class} fill={CLASS_COLOR[row.class] ?? "#22d3ee"} />
+              <Cell key={row.class} fill={CLASS_COLOR[row.class] ?? "#2563eb"} />
             ))}
             <Label
               content={({ viewBox }) => {
                 if (!viewBox || !("cx" in viewBox) || !("cy" in viewBox)) return null;
                 return (
                   <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                    <tspan x={viewBox.cx} dy="-0.2em" fill="#f8fafc" fontSize="22" fontWeight={700}>
+                    <tspan x={viewBox.cx} dy="-0.2em" fill="#0f172a" fontSize="22" fontWeight={700}>
                       {preview ? "8" : total}
                     </tspan>
-                    <tspan x={viewBox.cx} dy="1.4em" fill="#fde68a" fontSize="10">
+                    <tspan x={viewBox.cx} dy="1.4em" fill="#64748b" fontSize="10">
                       {preview ? "classes" : "contacts"}
                     </tspan>
                   </text>
@@ -67,8 +67,8 @@ export function ClassMixPie({
             />
           </Pie>
           <Legend
-            wrapperStyle={{ fontSize: 11, color: "#e2e8f0" }}
-            formatter={(value) => <span style={{ color: "#e2e8f0" }}>{value}</span>}
+            wrapperStyle={{ fontSize: 11, color: "#334155" }}
+            formatter={(value) => <span style={{ color: "#334155" }}>{value}</span>}
           />
           <Tooltip contentStyle={TOOLTIP_STYLE} />
         </PieChart>

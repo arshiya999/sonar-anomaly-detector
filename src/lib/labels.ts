@@ -19,3 +19,16 @@ export const CLASS_COLOR: Record<string, string> = {
   cylinder: "#facc15",
   diver: "#fb7185",
 };
+
+export function confidenceBand(confidence: number): "low" | "medium" | "high" {
+  if (confidence > 80) return "high";
+  if (confidence >= 50) return "medium";
+  return "low";
+}
+
+export function confidenceColor(confidence: number): string {
+  const band = confidenceBand(confidence);
+  if (band === "high") return "#ef4444";
+  if (band === "medium") return "#f97316";
+  return "#22c55e";
+}

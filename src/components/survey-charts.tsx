@@ -46,11 +46,11 @@ const GRAPHS: { id: GraphId; label: string; hint: string; icon: typeof BarChart3
 ];
 
 const TOOLTIP_STYLE = {
-  background: "oklch(0.2 0.03 220)",
-  border: "1px solid oklch(0.32 0.03 210)",
+  background: "#ffffff",
+  border: "1px solid #e2e8f0",
   borderRadius: 10,
   fontSize: 12,
-  color: "oklch(0.93 0.02 200)",
+  color: "#0f172a",
 };
 
 export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
@@ -143,9 +143,9 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
                       <stop offset="100%" stopColor="#5eead4" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.32 0.03 210 / 0.6)" />
-                  <XAxis dataKey="label" tick={{ fill: "oklch(0.72 0.03 200)", fontSize: 11 }} />
-                  <YAxis allowDecimals={false} tick={{ fill: "oklch(0.72 0.03 200)", fontSize: 11 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fill: "#64748b", fontSize: 11 }} />
                   <Tooltip contentStyle={TOOLTIP_STYLE} />
                   <Area
                     type="monotone"
@@ -174,9 +174,9 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
             >
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={stats.confBuckets} margin={{ left: 0, right: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.32 0.03 210 / 0.6)" />
-                  <XAxis dataKey="label" tick={{ fill: "oklch(0.72 0.03 200)", fontSize: 11 }} />
-                  <YAxis allowDecimals={false} tick={{ fill: "oklch(0.72 0.03 200)", fontSize: 11 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fill: "#64748b", fontSize: 11 }} />
                   <Tooltip contentStyle={TOOLTIP_STYLE} />
                   <Bar dataKey="count" name="Detections" fill="#38bdf8" radius={[6, 6, 0, 0]} />
                 </BarChart>
@@ -190,9 +190,9 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
             >
               <ResponsiveContainer width="100%" height={260}>
                 <AreaChart data={stats.speed} margin={{ left: 0, right: 8, top: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.32 0.03 210 / 0.6)" />
-                  <XAxis dataKey="i" tick={{ fill: "oklch(0.72 0.03 200)", fontSize: 11 }} name="Scan" />
-                  <YAxis tick={{ fill: "oklch(0.72 0.03 200)", fontSize: 11 }} unit=" ms" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="i" tick={{ fill: "#64748b", fontSize: 11 }} name="Scan" />
+                  <YAxis tick={{ fill: "#64748b", fontSize: 11 }} unit=" ms" />
                   <Tooltip contentStyle={TOOLTIP_STYLE} />
                   <Area
                     type="monotone"
@@ -214,9 +214,9 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
             >
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={stats.risk} margin={{ left: 0, right: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.32 0.03 210 / 0.6)" />
-                  <XAxis dataKey="label" tick={{ fill: "oklch(0.72 0.03 200)", fontSize: 11 }} />
-                  <YAxis tick={{ fill: "oklch(0.72 0.03 200)", fontSize: 11 }} domain={[0, 100]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} />
+                  <YAxis tick={{ fill: "#64748b", fontSize: 11 }} domain={[0, 100]} />
                   <Tooltip contentStyle={TOOLTIP_STYLE} />
                   <Bar dataKey="score" name="Mean hazard" radius={[6, 6, 0, 0]} maxBarSize={42}>
                     {stats.risk.map((row) => (

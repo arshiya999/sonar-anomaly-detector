@@ -67,11 +67,11 @@ export function SonarTheater({
             <>
               {src ? <GlowBoxes report={busy ? null : report} imageSrc={src} /> : null}
               {busy ? <div className="scanline" /> : null}
-              <div className="pointer-events-none absolute inset-3 border border-amber-300/25">
-                <span className="absolute top-0 left-0 size-4 border-t-2 border-l-2 border-amber-300" />
-                <span className="absolute top-0 right-0 size-4 border-t-2 border-r-2 border-rose-300" />
-                <span className="absolute bottom-0 left-0 size-4 border-b-2 border-l-2 border-emerald-300" />
-                <span className="absolute right-0 bottom-0 size-4 border-b-2 border-r-2 border-violet-300" />
+              <div className="pointer-events-none absolute inset-3 border border-[#c9a227]/25">
+                <span className="absolute top-0 left-0 size-4 border-t-2 border-l-2 border-[#c9a227]" />
+                <span className="absolute top-0 right-0 size-4 border-t-2 border-r-2 border-[#c9a227]" />
+                <span className="absolute bottom-0 left-0 size-4 border-b-2 border-l-2 border-[#c9a227]" />
+                <span className="absolute right-0 bottom-0 size-4 border-b-2 border-r-2 border-[#c9a227]" />
               </div>
             </>
           )}

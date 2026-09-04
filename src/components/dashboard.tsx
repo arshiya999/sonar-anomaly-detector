@@ -4,16 +4,26 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  BarChart3,
-  Download,
+  Activity,
+  Bell,
+  CheckCircle2,
+  Cpu,
+  Eye,
   FileSpreadsheet,
+  History,
+  Info,
+  LayoutDashboard,
   Loader2,
   Map as MapIcon,
+  Menu,
   Play,
-  Radar,
   ScanLine,
-  Sparkles,
+  Settings,
+  ShieldAlert,
+  Target,
+  TriangleAlert,
   Upload,
+  User,
   Waves,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -29,10 +39,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CLASS_COLOR, CLASS_LABEL } from "@/lib/labels";
+import { CLASS_COLOR, CLASS_LABEL, confidenceBand, confidenceColor } from "@/lib/labels";
 import { MODEL_METRICS } from "@/lib/metrics";
-import type { DetectReport, DetectResponse, SampleItem, ScanLogEntry } from "@/lib/types";
+import type { DetectReport, DetectResponse, Detection, SampleItem, ScanLogEntry } from "@/lib/types";
 import { SurveyCharts } from "@/components/survey-charts";
 import { ClassMixPie } from "@/components/class-mix-pie";
 import { PipelineStrip } from "@/components/pipeline-strip";
@@ -40,8 +49,31 @@ import { SonarTheater } from "@/components/sonar-theater";
 
 const SonarMap = dynamic(
   () => import("@/components/sonar-map").then((m) => m.SonarMap),
-  { ssr: false, loading: () => <div className="h-full animate-pulse bg-white/5" /> },
+  { ssr: false, loading: () => <div className="h-full min-h-[280px] animate-pulse bg-slate-200" /> },
 );
+
+type PageId =
+  | "dashboard"
+  | "upload"
+  | "analysis"
+  | "detections"
+  | "map"
+  | "report"
+  | "history"
+  | "settings"
+  | "about";
+
+const NAV: { id: PageId; label: string; icon: typeof LayoutDashboard }[] = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "upload", label: "Upload", icon: Upload },
+  { id: "analysis", label: "Analysis", icon: ScanLine },
+  { id: "detections", label: "Detections", icon: Target },
+  { id: "map", label: "Map", icon: MapIcon },
+  { id: "report", label: "Report", icon: FileSpreadsheet },
+  { id: "history", label: "History", icon: History },
+  { id: "settings", label: "Settings", icon: Settings },
+  { id: "about", label: "About", icon: Info },
+];
 
 type MetaForm = {
   latitude: string;
@@ -61,8 +93,12 @@ const DEFAULT_META: MetaForm = {
   survey: "NIOT Bay of Bengal transect",
 };
 
+type Mapped = Detection & { source?: string };
+
 export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem[] }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [page, setPage] = useState<PageId>("dashboard");
+  const [navOpen, setNavOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<string | null>(null);
@@ -72,11 +108,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
   const [error, setError] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(22);
   const [samples, setSamples] = useState<SampleItem[]>(initialSamples);
-  const [health, setHealth] = useState<{
-    ok: boolean;
-    trained?: boolean;
-    weights?: string;
-  } | null>(null);
+  const [health, setHealth] = useState<{ ok: boolean; trained?: boolean; weights?: string } | null>(null);
   const [meta, setMeta] = useState<MetaForm>(DEFAULT_META);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
   const [pipeStep, setPipeStep] = useState(0);
@@ -166,9 +198,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
         }
         setReport(data.report);
         setOverlay(
-          data.overlay_jpeg_base64
-            ? `data:image/jpeg;base64,${data.overlay_jpeg_base64}`
-            : null,
+          data.overlay_jpeg_base64 ? `data:image/jpeg;base64,${data.overlay_jpeg_base64}` : null,
         );
         toast.success(
           data.report.count
@@ -232,6 +262,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     setPreview(URL.createObjectURL(next));
     setOverlay(null);
     setReport(null);
+    setPage("analysis");
     await runDetect(next);
   };
 
@@ -241,16 +272,18 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
       return;
     }
     setDemo(true);
+    setPage("analysis");
     try {
       const pack = samples.slice(0, 3);
       let i = 0;
       for (const item of pack) {
         i += 1;
-        setDemoHint(`Judge demo ${i} / ${pack.length} · ${item.file}`);
+        setDemoHint(`Live demo ${i} / ${pack.length} · ${item.file}`);
         await loadSample(item);
       }
-      setDemoHint("Demo stacked — map, pie, and cleanup order are live");
-      toast.success("Demo complete — open Map, Analytics, and Reports");
+      setDemoHint("Demo stacked — map, detections, and reports are live");
+      toast.success("Demo complete");
+      setPage("dashboard");
     } finally {
       setDemo(false);
     }
@@ -301,12 +334,12 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
       )
       .join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Aqua Vision briefing</title>
-<style>body{font-family:ui-sans-serif,system-ui;background:#0b1220;color:#f4f1ea;padding:32px}h1{color:#c9a227}table{border-collapse:collapse;width:100%}td,th{border:1px solid #2a3348;padding:8px;text-align:left}</style>
+<style>body{font-family:ui-sans-serif,system-ui;background:#eef1f6;color:#0f172a;padding:32px}h1{color:#2563eb}table{border-collapse:collapse;width:100%;background:#fff}td,th{border:1px solid #e2e8f0;padding:8px;text-align:left}</style>
 </head><body><p>MoES · NIOT · PS 26057</p><h1>Aqua Vision cleanup briefing</h1>
 <p>${report.survey_id} · ${report.model} · ${report.inference_ms} ms · ${report.count} contacts</p>
 <table><thead><tr><th>ID</th><th>Class</th><th>Conf</th><th>Hazard</th><th>Lat, Lon</th></tr></thead><tbody>${rows}</tbody></table>
 <p>Trained YOLO11n mAP@50 74.9% on SCTD + Marine Debris FLS + SeabedObjects-KLSG.</p></body></html>`;
-    triggerDownload(new Blob([html], { type: "text/html" }), "abyss-briefing.html");
+    triggerDownload(new Blob([html], { type: "text/html" }), "aqua-vision-briefing.html");
   };
 
   const mapped = useMemo(() => {
@@ -336,209 +369,169 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     return Object.entries(counts).map(([cls, count]) => ({ class: cls, count }));
   }, [mapped, report]);
 
+  const allDetections: Mapped[] = useMemo(() => {
+    const fromLog = log.flatMap((e) => e.detections.map((d) => ({ ...d, source: e.filename })));
+    const ids = new Set(fromLog.map((d) => d.id));
+    const extra =
+      report?.detections.filter((d) => !ids.has(d.id)).map((d) => ({ ...d, source: file?.name })) ?? [];
+    return [...fromLog, ...extra];
+  }, [log, report, file]);
+
+  const latest = useMemo(() => {
+    if (report?.detections.length) {
+      return [...report.detections].sort((a, b) => b.confidence - a.confidence)[0];
+    }
+    return allDetections[0] ?? null;
+  }, [report, allDetections]);
+
+  const alerts = allDetections.filter((d) => confidenceBand(d.confidence) === "high").length;
+  const ready = Boolean(health?.ok);
+  const go = (next: PageId) => {
+    setPage(next);
+    setNavOpen(false);
+  };
+
+  const pageTitle: Record<PageId, string> = {
+    dashboard: "Operations overview",
+    upload: "Upload sonar log",
+    analysis: "Waterfall analysis",
+    detections: "All detections",
+    map: "Global detections map",
+    report: "Cleanup report",
+    history: "Survey history",
+    settings: "Detector settings",
+    about: "About Aqua Vision",
+  };
+
   return (
-    <div className="abyss-bg min-h-screen">
-      <header className="border-b border-white/10 bg-[#0b1220]/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-lg bg-[#c9a227] p-2.5 text-[#0b1220]">
-              <Radar className="size-6" />
-            </div>
+    <div className="flex min-h-screen bg-[#eef1f6]">
+      {navOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
+          aria-label="Close navigation"
+          onClick={() => setNavOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[248px] flex-col bg-[#0b1c33] text-slate-100 transition-transform lg:static lg:translate-x-0 ${
+          navOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="border-b border-white/10 px-5 py-5">
+          <p className="font-heading text-lg font-semibold tracking-[0.14em] text-white uppercase">
+            Aqua Vision
+          </p>
+          <p className="mt-1 text-[11px] tracking-wide text-slate-400">Side-Scan Sonar Intelligence</p>
+        </div>
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
+          {NAV.map((item) => {
+            const Icon = item.icon;
+            const active = page === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => go(item.id)}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                  active ? "bg-[#2563eb] text-white shadow-sm" : "text-slate-300 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                <Icon className="size-4" />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="border-t border-white/10 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs text-emerald-300">
+            <CheckCircle2 className="size-4" />
+            System Health: {ready ? "All systems operational" : "Detector offline"}
+          </div>
+          <ShipGraphic />
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden"
+              onClick={() => setNavOpen(true)}
+              aria-label="Open navigation"
+            >
+              <Menu className="size-5" />
+            </button>
             <div>
-              <p className="font-mono text-[11px] tracking-[0.22em] text-[#c9a227] uppercase">
+              <p className="text-sm font-semibold text-slate-900">{pageTitle[page]}</p>
+              <p className="hidden text-[11px] text-slate-500 sm:block">
                 {MODEL_METRICS.org} · {MODEL_METRICS.problem}
               </p>
-              <h1 className="font-heading text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-                Aqua Vision
-              </h1>
-              <p className="mt-1 max-w-xl text-sm text-white/70">
-                Professional sonar intelligence for ghost gear, wrecks, and seabed debris.
-              </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-xs text-white/60">{clock ? `${clock} IST` : "IST"}</span>
-            <Badge
-              className={
-                health?.ok
-                  ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-100"
-                  : "border-red-500/40 bg-red-500/15"
-              }
-            >
-              {health == null
-                ? "Linking detector…"
-                : health.ok
-                  ? health.trained
-                    ? "Detector online"
-                    : "Detector online"
-                  : "Inference offline"}
-            </Badge>
-            <Button
-              size="lg"
-              className="h-10 gap-2 bg-[#c9a227] px-4 text-[#0b1220] hover:bg-[#ddb84a]"
-              onClick={() => void runJudgeDemo()}
-              disabled={busy || demo}
-            >
-              {demo || busy ? <Loader2 className="animate-spin" /> : <Play />}
-              {demo ? "Demo running" : "Run live demo"}
-            </Button>
+          <div className="flex items-center gap-2">
+            <StatusPill ok={ready} label={`Model: ${ready ? "Ready" : "Offline"}`} />
+            <StatusPill ok={ready && !busy} label={`Status: ${busy ? "Scanning" : ready ? "Ready" : "Wait"}`} />
+            <button type="button" className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100" onClick={() => go("detections")}>
+              <Bell className="size-4" />
+              {alerts > 0 ? (
+                <span className="absolute top-0.5 right-0.5 grid size-4 place-items-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+                  {alerts > 9 ? "9+" : alerts}
+                </span>
+              ) : null}
+            </button>
+            <div className="grid size-8 place-items-center rounded-full bg-slate-800 text-xs font-semibold text-white">
+              <User className="size-4" />
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="mx-auto max-w-[1440px] px-4 py-5">
-        <Tabs defaultValue="scan" className="gap-5">
-          <TabsList
-            variant="line"
-            className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b border-white/10 bg-transparent p-0"
-          >
-            <TabsTrigger value="scan" className="rounded-none px-4 py-3">
-              <ScanLine /> Scan
-            </TabsTrigger>
-            <TabsTrigger value="map" className="rounded-none px-4 py-3">
-              <MapIcon /> Map
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="rounded-none px-4 py-3">
-              <BarChart3 /> Analytics
-            </TabsTrigger>
-            <TabsTrigger value="reports" className="rounded-none px-4 py-3">
-              <FileSpreadsheet /> Reports
-            </TabsTrigger>
-            <TabsTrigger value="model" className="rounded-none px-4 py-3">
-              <Sparkles /> Model
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="scan" className="space-y-5">
-            <PipelineStrip
-              active={pipeStep}
-              complete={Boolean(report) && !busy}
-              hint={
-                demoHint ||
-                (busy
-                  ? "Processing sonar log"
-                  : report
-                    ? "Last ping fused and geotagged"
-                    : "Standing by")
-              }
+        <main className="flex-1 px-4 py-5 lg:px-6">
+          {page === "dashboard" && (
+            <HomePage
+              ready={ready}
+              busy={busy}
+              alerts={alerts}
+              mapped={mapped}
+              mixRows={mixRows}
+              allDetections={allDetections}
+              latest={latest}
+              overlay={overlay}
+              preview={preview}
+              log={log}
+              go={go}
+              onDemo={() => void runJudgeDemo()}
+              demo={demo}
             />
-            <div className="grid gap-5 xl:grid-cols-[300px_1fr]">
-              <aside className="flex flex-col gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Acquire log</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <input
-                      ref={inputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,.tif,.tiff"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) void onFile(f);
-                      }}
-                    />
-                    <Button
-                      className="h-10 w-full bg-[#c9a227] text-[#0b1220] hover:bg-[#ddb84a]"
-                      onClick={() => inputRef.current?.click()}
-                      disabled={busy}
-                    >
-                      <Upload /> Upload sonar image
-                    </Button>
-                    <div>
-                      <div className="mb-2 flex items-center justify-between text-xs text-white/70">
-                        <span>Confidence gate</span>
-                        <span className="font-mono text-[#c9a227]">{threshold}%</span>
-                      </div>
-                      <Slider
-                        min={5}
-                        max={80}
-                        value={[threshold]}
-                        onValueChange={(v) => {
-                          const next = Array.isArray(v) ? Number(v[0]) : Number(v);
-                          if (Number.isFinite(next)) setThreshold(next);
-                        }}
-                      />
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      disabled={!file || busy}
-                      onClick={() => file && void runDetect(file)}
-                    >
-                      {busy ? <Loader2 className="animate-spin" /> : <Waves />}
-                      Re-run at {threshold}%
-                    </Button>
-                  </CardContent>
-                </Card>
-                <details className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <summary className="cursor-pointer text-sm font-medium">Ping / geotag metadata</summary>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    {(
-                      [
-                        ["latitude", "Latitude"],
-                        ["longitude", "Longitude"],
-                        ["heading_deg", "Heading °"],
-                        ["meters_per_pixel_x", "m / px across"],
-                        ["meters_per_pixel_y", "m / px along"],
-                      ] as const
-                    ).map(([key, label]) => (
-                      <label key={key} className="col-span-1 space-y-1 text-xs text-white/65">
-                        {label}
-                        <Input
-                          value={meta[key]}
-                          onChange={(e) => setMeta({ ...meta, [key]: e.target.value })}
-                          className="h-8"
-                        />
-                      </label>
-                    ))}
-                    <label className="col-span-2 space-y-1 text-xs text-white/65">
-                      Survey name
-                      <Input
-                        value={meta.survey}
-                        onChange={(e) => setMeta({ ...meta, survey: e.target.value })}
-                        className="h-8"
-                      />
-                    </label>
-                  </div>
-                </details>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Reference gallery</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-2">
-                    {samples.length === 0 ? (
-                      <p className="col-span-2 text-sm text-muted-foreground">
-                        Sample gallery is empty. Run <code>python ml/prepare_dataset.py</code>.
-                      </p>
-                    ) : (
-                      samples.map((s) => (
-                        <button
-                          key={s.file}
-                          type="button"
-                          onClick={() => void loadSample(s)}
-                          className={`overflow-hidden rounded-lg border text-left transition hover:border-[#c9a227] ${
-                            file?.name === s.file
-                              ? "border-[#c9a227] ring-1 ring-[#c9a227]/50"
-                              : "border-white/10"
-                          }`}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={`/samples/${s.file}`}
-                            alt={s.example_class}
-                            className="h-20 w-full object-cover"
-                          />
-                          <span className="block truncate px-2 py-1 text-[11px] text-white/70">
-                            {CLASS_LABEL[s.example_class] ?? s.example_class}
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </CardContent>
-                </Card>
-              </aside>
+          )}
+          {page === "upload" && (
+            <UploadPage
+              inputRef={inputRef}
+              threshold={threshold}
+              setThreshold={setThreshold}
+              busy={busy}
+              file={file}
+              samples={samples}
+              meta={meta}
+              setMeta={setMeta}
+              onPick={() => inputRef.current?.click()}
+              onFile={onFile}
+              onSample={(s) => {
+                setPage("analysis");
+                void loadSample(s);
+              }}
+              onRerun={() => file && void runDetect(file)}
+            />
+          )}
+          {page === "analysis" && (
+            <div className="space-y-4">
+              <PipelineStrip
+                active={pipeStep}
+                complete={Boolean(report) && !busy}
+                hint={demoHint || (busy ? "Processing sonar log" : report ? "Last ping fused and geotagged" : "Standing by")}
+              />
               <SonarTheater
                 preview={preview}
                 overlay={overlay}
@@ -547,173 +540,874 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                 report={report}
                 filename={file?.name}
               />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="map">
-            <Card className="overflow-hidden">
-              <CardHeader>
-                <CardTitle>Survey map</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Gold transect is the planned AUV path. Pins are geotagged detections from Scan.
-                </p>
-              </CardHeader>
-              <CardContent className="relative h-[560px] p-0">
-                <SonarMap key="full-map" detections={mapped} />
-                <div className="pointer-events-none absolute right-3 bottom-3 z-[1000] rounded-md bg-[#0b1220]/90 px-2 py-1.5 text-[11px] text-[#e8d5a3]">
-                  {mapped.length ? `${mapped.length} geotagged hazards` : "13.08°N 80.37°E"}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="analytics" className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,320px)_1fr]">
-              <Card>
-                <CardHeader className="pb-1">
-                  <CardTitle>Class mix</CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    {mixRows.length ? "Live session mix" : "Taxonomy colour key"}
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <ClassMixPie rows={mixRows} height={280} />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle>Operations graphs</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Intake, confidence, latency, and hazard from every scanned image.
-                  </p>
+              <Card className="shadow-sm">
+                <CardHeader>
+                  <CardTitle>Session analytics</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <SurveyCharts entries={log} />
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="reports">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2">
-                <div>
-                  <CardTitle>Cleanup report</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Export JSON, CSV, or an HTML briefing for the operations team.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={downloadJson} disabled={!report}>
-                    <Download /> JSON
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={downloadCsv} disabled={!report}>
-                    <Download /> CSV
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={downloadBriefing} disabled={!report}>
-                    <Download /> Briefing
-                  </Button>
-                </div>
+          )}
+          {page === "detections" && (
+            <DetectionsPage detections={allDetections} overlay={overlay} preview={preview} go={go} />
+          )}
+          {page === "map" && (
+            <Card className="overflow-hidden shadow-sm">
+              <CardHeader>
+                <CardTitle>Global detections map</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Pins are colored by fused confidence: red high, orange medium, green low.
+                </p>
               </CardHeader>
-              <CardContent>
-                {!report ? (
-                  <p className="text-sm text-muted-foreground">
-                    Run a scan or the live demo, then return here for the structured order.
-                  </p>
-                ) : report.count === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No man-made anomalies above the current confidence gate.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>ID</TableHead>
-                          <TableHead>Class</TableHead>
-                          <TableHead>Conf.</TableHead>
-                          <TableHead>Hazard</TableHead>
-                          <TableHead>Lat / Lon</TableHead>
-                          <TableHead>Size (m)</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {report.detections.map((d) => (
-                          <TableRow key={d.id}>
-                            <TableCell className="font-mono text-xs">{d.id}</TableCell>
-                            <TableCell>
-                              <span className="inline-flex items-center gap-1.5">
-                                <span
-                                  className="size-2 rounded-full"
-                                  style={{ background: CLASS_COLOR[d.class] }}
-                                />
-                                {CLASS_LABEL[d.class] ?? d.class}
-                              </span>
-                            </TableCell>
-                            <TableCell>{d.confidence.toFixed(0)}%</TableCell>
-                            <TableCell>{d.hazard_score}</TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {d.latitude != null && d.longitude != null
-                                ? `${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}`
-                                : "—"}
-                            </TableCell>
-                            <TableCell className="text-xs">
-                              {d.dimensions.width_m} × {d.dimensions.length_m}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
+              <CardContent className="relative h-[620px] p-0">
+                <SonarMap key="full-map" detections={mapped} />
+                <MapLegend count={mapped.length} />
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
+          {page === "report" && (
+            <ReportPage
+              report={report}
+              downloadJson={downloadJson}
+              downloadCsv={downloadCsv}
+              downloadBriefing={downloadBriefing}
+            />
+          )}
+          {page === "history" && <HistoryPage log={log} go={go} />}
+          {page === "settings" && (
+            <SettingsPage
+              threshold={threshold}
+              setThreshold={setThreshold}
+              meta={meta}
+              setMeta={setMeta}
+              health={health}
+              report={report}
+            />
+          )}
+          {page === "about" && <AboutPage />}
+        </main>
 
-          <TabsContent value="model">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                ["mAP@50", MODEL_METRICS.map50, "Held-out sonar validation"],
-                ["Precision", MODEL_METRICS.precision, "Real SSS and FLS imagery"],
-                ["Recall", MODEL_METRICS.recall, "After shadow fusion"],
-                ["Train / val", `${MODEL_METRICS.trainImages} / ${MODEL_METRICS.valImages}`, "Public labelled pings"],
-                ["Architecture", MODEL_METRICS.model, `${MODEL_METRICS.params} · ${MODEL_METRICS.imgsz} px`],
-                ["Runtime", MODEL_METRICS.device, report ? `${report.inference_ms} ms this ping` : "Edge nano"],
-              ].map(([k, v, d]) => (
-                <Card key={k}>
-                  <CardContent className="pt-5">
-                    <p className="font-mono text-[10px] tracking-widest text-[#c9a227] uppercase">{k}</p>
-                    <p className="font-heading mt-1 text-2xl font-semibold">{v}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{d}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              {[
-                ["Real sonar, not COCO", "SCTD wrecks, ARIS FLS debris, KLSG seabed objects."],
-                ["Shadow-aware scores", "YOLO × contrast × acoustic-shadow penalty."],
-                ["Ops-ready output", "Lat/lon, size in metres, hazard rank, JSON/CSV."],
-              ].map(([t, d]) => (
-                <Card key={t}>
-                  <CardHeader>
-                    <CardTitle className="text-base">{t}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{d}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        <footer className="mt-8 border-t border-white/10 pb-8 pt-4 text-center text-[11px] text-white/45">
-          Aqua Vision · SCTD 1.0 · Marine Debris FLS · SeabedObjects-KLSG · YOLO11n {MODEL_METRICS.params} ·
-          mAP@50 {MODEL_METRICS.map50}
+        <footer className="flex flex-col gap-1 border-t border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <span>Aqua Vision v1.0.0</span>
+          <span className="text-center">AI-Powered Underwater Debris &amp; Anomaly Detection using Side-Scan Sonar</span>
+          <span>Last updated {clock ? `${clock} IST` : "—"}</span>
         </footer>
-      </main>
+      </div>
     </div>
+  );
+}
+
+function HomePage({
+  ready,
+  busy,
+  alerts,
+  mapped,
+  mixRows,
+  allDetections,
+  latest,
+  overlay,
+  preview,
+  log,
+  go,
+  onDemo,
+  demo,
+}: {
+  ready: boolean;
+  busy: boolean;
+  alerts: number;
+  mapped: Mapped[];
+  mixRows: { class: string; count: number }[];
+  allDetections: Mapped[];
+  latest: Detection | null;
+  overlay: string | null;
+  preview: string | null;
+  log: ScanLogEntry[];
+  go: (p: PageId) => void;
+  onDemo: () => void;
+  demo: boolean;
+}) {
+  const thumb = overlay ?? preview;
+  const recent = allDetections.slice(0, 5);
+  const bands = {
+    low: allDetections.filter((d) => confidenceBand(d.confidence) === "low").length,
+    medium: allDetections.filter((d) => confidenceBand(d.confidence) === "medium").length,
+    high: allDetections.filter((d) => confidenceBand(d.confidence) === "high").length,
+  };
+  const bandTotal = Math.max(1, bands.low + bands.medium + bands.high);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-slate-600">Live NIOT transect intelligence from the onboard YOLO11n detector.</p>
+        <Button className="gap-2" onClick={onDemo} disabled={busy || demo}>
+          {demo || busy ? <Loader2 className="animate-spin" /> : <Play />}
+          {demo ? "Demo running" : "Run live demo"}
+        </Button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <MetricCard
+          title="System Status"
+          value={busy ? "Scanning" : ready ? "Ready" : "Offline"}
+          tone={ready ? "green" : "red"}
+          icon={<Activity className="size-5" />}
+        />
+        <MetricCard
+          title="Model Status"
+          value={ready ? "Ready" : "Offline"}
+          hint={`YOLO11n · ${MODEL_METRICS.params}`}
+          tone="purple"
+          icon={<Cpu className="size-5" />}
+        />
+        <MetricCard
+          title="Total Detections"
+          value={String(allDetections.length)}
+          tone="blue"
+          icon={<Target className="size-5" />}
+        />
+        <MetricCard
+          title="Surveys Completed"
+          value={String(log.length)}
+          tone="orange"
+          icon={<Waves className="size-5" />}
+        />
+        <MetricCard
+          title="Alerts"
+          value={String(alerts)}
+          hint="High confidence (>80%)"
+          tone="red"
+          icon={<TriangleAlert className="size-5" />}
+        />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.85fr_0.85fr]">
+        <Card className="overflow-hidden shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Global Detections Map</CardTitle>
+            <p className="text-xs text-muted-foreground">Confidence pins on the Bay of Bengal transect</p>
+          </CardHeader>
+          <CardContent className="relative h-[340px] p-0">
+            <SonarMap key="home-map" detections={mapped} />
+            <MapLegend count={mapped.length} />
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-base">Detections by Class</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mixRows.length === 0 ? (
+              <EmptyNote text="No detections yet. Upload a sonar image or run the live demo." />
+            ) : (
+              <ClassMixPie rows={mixRows} height={260} />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-base">Confidence Distribution</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {allDetections.length === 0 ? (
+              <EmptyNote text="Confidence bands appear after the first fused scan." />
+            ) : (
+              <>
+                <StackedBand label="High (>80%)" count={bands.high} color="#ef4444" share={bands.high / bandTotal} />
+                <StackedBand label="Medium (50–80%)" count={bands.medium} color="#f97316" share={bands.medium / bandTotal} />
+                <StackedBand label="Low (<50%)" count={bands.low} color="#22c55e" share={bands.low / bandTotal} />
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base">Recent Activity</CardTitle>
+            <Button size="sm" variant="ghost" onClick={() => go("history")}>
+              View All History
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {log.length === 0 ? (
+              <EmptyNote text="Survey history is empty until a ping is processed." />
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>File Name</TableHead>
+                      <TableHead>Date &amp; Time</TableHead>
+                      <TableHead>Detections</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {log.slice(0, 6).map((e, i) => {
+                      const high = e.detections.some((d) => confidenceBand(d.confidence) === "high");
+                      return (
+                        <TableRow key={e.id}>
+                          <TableCell className="font-mono text-xs">#{1000 + (log.length - i)}</TableCell>
+                          <TableCell className="max-w-[180px] truncate text-xs">{e.filename}</TableCell>
+                          <TableCell className="font-mono text-[11px]">{e.at.replace("T", " ").slice(0, 19)}</TableCell>
+                          <TableCell>{e.count}</TableCell>
+                          <TableCell>
+                            <Badge className={high ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}>
+                              {high ? "High Alert" : "Completed"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <button type="button" className="text-slate-500 hover:text-blue-600" onClick={() => go("analysis")}>
+                              <Eye className="size-4" />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Latest Detection</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!latest ? (
+              <EmptyNote text="Waiting for the first contact." />
+            ) : (
+              <>
+                {thumb ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={thumb} alt="Latest detection" className="h-36 w-full rounded-lg object-cover" />
+                ) : (
+                  <div className="grid h-36 place-items-center rounded-lg bg-slate-100 text-xs text-slate-500">
+                    No image
+                  </div>
+                )}
+                <dl className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <dt className="text-slate-500">Class</dt>
+                    <dd className="font-medium">{CLASS_LABEL[latest.class] ?? latest.class}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Confidence</dt>
+                    <dd className="font-medium" style={{ color: confidenceColor(latest.confidence) }}>
+                      {(latest.confidence / 100).toFixed(2)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Latitude</dt>
+                    <dd className="font-mono">{latest.latitude?.toFixed(5) ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Longitude</dt>
+                    <dd className="font-mono">{latest.longitude?.toFixed(5) ?? "—"}</dd>
+                  </div>
+                </dl>
+                <Button className="w-full" onClick={() => go("analysis")}>
+                  View Details
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base">Recent Detections</CardTitle>
+          <Button size="sm" variant="ghost" onClick={() => go("detections")}>
+            View All Detections
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {recent.length === 0 ? (
+            <EmptyNote text="Top contacts will appear here after inference." />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {recent.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => go("analysis")}
+                  className="overflow-hidden rounded-xl border border-slate-200 bg-white text-left hover:border-blue-400"
+                >
+                  {thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumb} alt="" className="h-24 w-full object-cover" />
+                  ) : (
+                    <div className="h-24 bg-slate-100" />
+                  )}
+                  <div className="space-y-0.5 p-2">
+                    <p className="truncate text-xs font-semibold">{CLASS_LABEL[d.class] ?? d.class}</p>
+                    <p className="text-[11px] font-medium" style={{ color: confidenceColor(d.confidence) }}>
+                      {d.confidence.toFixed(0)}%
+                    </p>
+                    <p className="font-mono text-[10px] text-slate-500">
+                      {d.latitude != null && d.longitude != null
+                        ? `${d.latitude.toFixed(4)}, ${d.longitude.toFixed(4)}`
+                        : "Ungeotagged"}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function UploadPage({
+  inputRef,
+  threshold,
+  setThreshold,
+  busy,
+  file,
+  samples,
+  meta,
+  setMeta,
+  onPick,
+  onFile,
+  onSample,
+  onRerun,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  threshold: number;
+  setThreshold: (n: number) => void;
+  busy: boolean;
+  file: File | null;
+  samples: SampleItem[];
+  meta: MetaForm;
+  setMeta: (m: MetaForm) => void;
+  onPick: () => void;
+  onFile: (f: File) => void;
+  onSample: (s: SampleItem) => void;
+  onRerun: () => void;
+}) {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Acquire log</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,.tif,.tiff"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void onFile(f);
+            }}
+          />
+          <Button className="h-10 w-full" onClick={onPick} disabled={busy}>
+            <Upload /> Upload sonar image
+          </Button>
+          <div>
+            <div className="mb-2 flex items-center justify-between text-xs text-slate-600">
+              <span>Confidence gate</span>
+              <span className="font-mono text-blue-700">{threshold}%</span>
+            </div>
+            <Slider
+              min={5}
+              max={80}
+              value={[threshold]}
+              onValueChange={(v) => {
+                const next = Array.isArray(v) ? Number(v[0]) : Number(v);
+                if (Number.isFinite(next)) setThreshold(next);
+              }}
+            />
+          </div>
+          <Button variant="outline" className="w-full" disabled={!file || busy} onClick={onRerun}>
+            {busy ? <Loader2 className="animate-spin" /> : <Waves />}
+            Re-run at {threshold}%
+          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["latitude", "Latitude"],
+                ["longitude", "Longitude"],
+                ["heading_deg", "Heading °"],
+                ["meters_per_pixel_x", "m / px across"],
+                ["meters_per_pixel_y", "m / px along"],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key} className="space-y-1 text-xs text-slate-600">
+                {label}
+                <Input value={meta[key]} onChange={(e) => setMeta({ ...meta, [key]: e.target.value })} className="h-8" />
+              </label>
+            ))}
+            <label className="col-span-2 space-y-1 text-xs text-slate-600">
+              Survey name
+              <Input value={meta.survey} onChange={(e) => setMeta({ ...meta, survey: e.target.value })} className="h-8" />
+            </label>
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Reference gallery</CardTitle>
+          <p className="text-sm text-muted-foreground">Real SCTD / FLS / KLSG sonar crops shipped with the detector.</p>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {samples.length === 0 ? (
+            <p className="col-span-full text-sm text-muted-foreground">
+              Sample gallery is empty. Run <code>python ml/prepare_dataset.py</code>.
+            </p>
+          ) : (
+            samples.map((s) => (
+              <button
+                key={s.file}
+                type="button"
+                onClick={() => onSample(s)}
+                className={`overflow-hidden rounded-lg border text-left transition hover:border-blue-500 ${
+                  file?.name === s.file ? "border-blue-500 ring-1 ring-blue-500/40" : "border-slate-200"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/samples/${s.file}`} alt={s.example_class} className="h-24 w-full object-cover" />
+                <span className="block truncate px-2 py-1 text-[11px] text-slate-600">
+                  {CLASS_LABEL[s.example_class] ?? s.example_class}
+                </span>
+              </button>
+            ))
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function DetectionsPage({
+  detections,
+  overlay,
+  preview,
+  go,
+}: {
+  detections: Mapped[];
+  overlay: string | null;
+  preview: string | null;
+  go: (p: PageId) => void;
+}) {
+  const thumb = overlay ?? preview;
+  return (
+    <Card className="shadow-sm">
+      <CardHeader>
+        <CardTitle>Detections</CardTitle>
+        <p className="text-sm text-muted-foreground">{detections.length} contacts across logged surveys.</p>
+      </CardHeader>
+      <CardContent>
+        {detections.length === 0 ? (
+          <EmptyNote text="No detections logged yet." />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead />
+                  <TableHead>Class</TableHead>
+                  <TableHead>Confidence</TableHead>
+                  <TableHead>Hazard</TableHead>
+                  <TableHead>Lat / Lon</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detections.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell>
+                      {thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumb} alt="" className="size-10 rounded object-cover" />
+                      ) : (
+                        <span
+                          className="inline-block size-3 rounded-full"
+                          style={{ background: CLASS_COLOR[d.class] }}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell>{CLASS_LABEL[d.class] ?? d.class}</TableCell>
+                    <TableCell style={{ color: confidenceColor(d.confidence) }}>{d.confidence.toFixed(0)}%</TableCell>
+                    <TableCell>{d.hazard_score}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {d.latitude != null && d.longitude != null
+                        ? `${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}`
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[160px] truncate text-xs">{d.source ?? "—"}</TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="ghost" onClick={() => go("analysis")}>
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReportPage({
+  report,
+  downloadJson,
+  downloadCsv,
+  downloadBriefing,
+}: {
+  report: DetectReport | null;
+  downloadJson: () => void;
+  downloadCsv: () => void;
+  downloadBriefing: () => void;
+}) {
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <div>
+          <CardTitle>Cleanup report</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">Export JSON, CSV, or an HTML briefing for operations.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={downloadJson} disabled={!report}>
+            JSON
+          </Button>
+          <Button size="sm" variant="outline" onClick={downloadCsv} disabled={!report}>
+            CSV
+          </Button>
+          <Button size="sm" variant="outline" onClick={downloadBriefing} disabled={!report}>
+            Briefing
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!report ? (
+          <EmptyNote text="Run a scan or the live demo, then return here for the structured order." />
+        ) : report.count === 0 ? (
+          <EmptyNote text="No man-made anomalies above the current confidence gate." />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Class</TableHead>
+                  <TableHead>Conf.</TableHead>
+                  <TableHead>Hazard</TableHead>
+                  <TableHead>Lat / Lon</TableHead>
+                  <TableHead>Size (m)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {report.detections.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-mono text-xs">{d.id}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2 rounded-full" style={{ background: CLASS_COLOR[d.class] }} />
+                        {CLASS_LABEL[d.class] ?? d.class}
+                      </span>
+                    </TableCell>
+                    <TableCell>{d.confidence.toFixed(0)}%</TableCell>
+                    <TableCell>{d.hazard_score}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {d.latitude != null && d.longitude != null
+                        ? `${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}`
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {d.dimensions.width_m} × {d.dimensions.length_m}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function HistoryPage({ log, go }: { log: ScanLogEntry[]; go: (p: PageId) => void }) {
+  return (
+    <Card className="shadow-sm">
+      <CardHeader>
+        <CardTitle>Survey history</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {log.length === 0 ? (
+          <EmptyNote text="No surveys completed yet." />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>When (UTC)</TableHead>
+                <TableHead>Image</TableHead>
+                <TableHead>Hits</TableHead>
+                <TableHead>ms</TableHead>
+                <TableHead>Survey</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {log.map((e) => (
+                <TableRow key={e.id}>
+                  <TableCell className="font-mono text-xs">{e.at.replace("T", " ").slice(0, 19)}</TableCell>
+                  <TableCell className="max-w-[220px] truncate text-xs">{e.filename}</TableCell>
+                  <TableCell>{e.count}</TableCell>
+                  <TableCell className="font-mono text-xs">{e.inference_ms}</TableCell>
+                  <TableCell className="max-w-[180px] truncate text-xs">{e.survey}</TableCell>
+                  <TableCell>
+                    <Button size="sm" variant="ghost" onClick={() => go("analysis")}>
+                      Open
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SettingsPage({
+  threshold,
+  setThreshold,
+  meta,
+  setMeta,
+  health,
+  report,
+}: {
+  threshold: number;
+  setThreshold: (n: number) => void;
+  meta: MetaForm;
+  setMeta: (m: MetaForm) => void;
+  health: { ok: boolean; trained?: boolean; weights?: string } | null;
+  report: DetectReport | null;
+}) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Inference</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Detector {health?.ok ? "online" : "offline"}
+            {health?.weights ? ` · ${health.weights}` : ""}
+          </p>
+          <div>
+            <div className="mb-2 flex justify-between text-xs">
+              <span>Confidence gate</span>
+              <span className="font-mono">{threshold}%</span>
+            </div>
+            <Slider
+              min={5}
+              max={80}
+              value={[threshold]}
+              onValueChange={(v) => {
+                const next = Array.isArray(v) ? Number(v[0]) : Number(v);
+                if (Number.isFinite(next)) setThreshold(next);
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["latitude", "Latitude"],
+                ["longitude", "Longitude"],
+                ["heading_deg", "Heading °"],
+                ["meters_per_pixel_x", "m / px across"],
+                ["meters_per_pixel_y", "m / px along"],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key} className="space-y-1 text-xs text-slate-600">
+                {label}
+                <Input value={meta[key]} onChange={(e) => setMeta({ ...meta, [key]: e.target.value })} className="h-8" />
+              </label>
+            ))}
+            <label className="col-span-2 space-y-1 text-xs text-slate-600">
+              Survey name
+              <Input value={meta.survey} onChange={(e) => setMeta({ ...meta, survey: e.target.value })} className="h-8" />
+            </label>
+          </div>
+        </CardContent>
+      </Card>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {[
+          ["mAP@50", MODEL_METRICS.map50, "Held-out sonar validation"],
+          ["Precision", MODEL_METRICS.precision, "Real SSS and FLS imagery"],
+          ["Recall", MODEL_METRICS.recall, "After shadow fusion"],
+          ["Train / val", `${MODEL_METRICS.trainImages} / ${MODEL_METRICS.valImages}`, "Public labelled pings"],
+          ["Architecture", MODEL_METRICS.model, `${MODEL_METRICS.params} · ${MODEL_METRICS.imgsz} px`],
+          ["Runtime", MODEL_METRICS.device, report ? `${report.inference_ms} ms this ping` : "Edge nano"],
+        ].map(([k, v, d]) => (
+          <Card key={k} className="shadow-sm">
+            <CardContent className="pt-5">
+              <p className="font-mono text-[10px] tracking-widest text-blue-700 uppercase">{k}</p>
+              <p className="font-heading mt-1 text-2xl font-semibold">{v}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{d}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AboutPage() {
+  return (
+    <div className="mx-auto max-w-3xl space-y-4">
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Aqua Vision</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm leading-relaxed text-slate-600">
+          <p>
+            Aqua Vision is an operations console for {MODEL_METRICS.org} problem {MODEL_METRICS.problem}: detect ghost gear,
+            wrecks, and man-made debris in side-scan sonar and issue geotagged cleanup reports.
+          </p>
+          <p>
+            The detector is YOLO11n ({MODEL_METRICS.params}) trained on SCTD 1.0, Marine Debris FLS, and
+            SeabedObjects-KLSG. Inference fuses box score with local contrast and an acoustic-shadow penalty, then
+            projects pixel centres to latitude/longitude from ping metadata.
+          </p>
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Pipeline</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-slate-600">
+          <p>1. Lee speckle filter and dropout inpaint</p>
+          <p>2. CLAHE contrast restore</p>
+          <p>3. YOLO11n detection</p>
+          <p>4. Contrast × acoustic-shadow fusion</p>
+          <p>5. Geotag and cleanup report (JSON / CSV / HTML)</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function MetricCard({
+  title,
+  value,
+  hint,
+  tone,
+  icon,
+}: {
+  title: string;
+  value: string;
+  hint?: string;
+  tone: "green" | "purple" | "blue" | "orange" | "red";
+  icon: React.ReactNode;
+}) {
+  const tones = {
+    green: "bg-emerald-50 text-emerald-700",
+    purple: "bg-violet-50 text-violet-700",
+    blue: "bg-blue-50 text-blue-700",
+    orange: "bg-orange-50 text-orange-700",
+    red: "bg-red-50 text-red-700",
+  };
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="flex items-center justify-between gap-3 pt-5">
+        <div>
+          <p className="text-xs font-medium text-slate-500">{title}</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
+          {hint ? <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p> : null}
+        </div>
+        <div className={`rounded-xl p-2.5 ${tones[tone]}`}>{icon}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatusPill({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span
+      className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium sm:inline-flex ${
+        ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"
+      }`}
+    >
+      {ok ? <CheckCircle2 className="size-3.5" /> : <ShieldAlert className="size-3.5" />}
+      {label}
+    </span>
+  );
+}
+
+function MapLegend({ count }: { count: number }) {
+  return (
+    <div className="pointer-events-none absolute right-3 bottom-3 z-[1000] rounded-md bg-white/95 px-2 py-1.5 text-[11px] text-slate-700 shadow">
+      <div className="mb-1 font-medium">{count ? `${count} geotagged hazards` : "13.08°N 80.37°E"}</div>
+      <div className="flex gap-2">
+        <span className="flex items-center gap-1">
+          <i className="size-2 rounded-full bg-red-500" /> High
+        </span>
+        <span className="flex items-center gap-1">
+          <i className="size-2 rounded-full bg-orange-500" /> Medium
+        </span>
+        <span className="flex items-center gap-1">
+          <i className="size-2 rounded-full bg-green-500" /> Low
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function StackedBand({ label, count, color, share }: { label: string; count: number; color: string; share: number }) {
+  return (
+    <div>
+      <div className="mb-1 flex justify-between text-xs text-slate-600">
+        <span>{label}</span>
+        <span className="font-mono">{count}</span>
+      </div>
+      <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full rounded-full" style={{ width: `${Math.round(share * 100)}%`, background: color }} />
+      </div>
+    </div>
+  );
+}
+
+function EmptyNote({ text }: { text: string }) {
+  return <p className="rounded-lg bg-slate-50 px-3 py-8 text-center text-sm text-slate-500">{text}</p>;
+}
+
+function ShipGraphic() {
+  return (
+    <svg viewBox="0 0 220 88" className="mt-3 w-full opacity-80" aria-hidden>
+      <rect x="0" y="48" width="220" height="40" fill="#08203a" />
+      <path d="M0 62 Q55 48 110 62 T220 62 V88 H0 Z" fill="#0e3a5c" />
+      <path d="M48 40 L168 40 L158 52 L58 52 Z" fill="#94a3b8" />
+      <rect x="92" y="22" width="36" height="18" rx="2" fill="#cbd5e1" />
+      <rect x="104" y="10" width="10" height="14" fill="#64748b" />
+      <path d="M110 52 L110 78" stroke="#38bdf8" strokeWidth="2" />
+      <path d="M90 78 Q110 70 130 78" fill="none" stroke="#38bdf8" strokeWidth="1.5" opacity="0.8" />
+      <path d="M70 82 Q110 68 150 82" fill="none" stroke="#38bdf8" strokeWidth="1" opacity="0.5" />
+      <circle cx="78" cy="80" r="3" fill="#f97316" />
+      <circle cx="128" cy="76" r="3" fill="#ef4444" />
+      <circle cx="152" cy="82" r="3" fill="#22c55e" />
+    </svg>
   );
 }
 
