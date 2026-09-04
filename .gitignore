@@ -20,6 +20,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 .env*
+!.env.example
+/data/aqua_storage/
+frontend/node_modules/
+backend/**/__pycache__/
 .vercel
 *.tsbuildinfo
 /data/survey-log.json

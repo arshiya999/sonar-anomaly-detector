@@ -1,0 +1,94 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from app.config import STORAGE, settings
+from app.database import Base, engine
+from app.hub import hub, pending
+from app.pipeline.infer import get_model
+from app.api import detections, reports, sonar, surveys, system
+
+log = logging.getLogger("aqua")
+logging.basicConfig(level=settings.log_level)
+
+
+async def _drain_ws() -> None:
+    import queue as q
+
+    while True:
+        try:
+            room, payload = pending.get_nowait()
+        except q.Empty:
+            await asyncio.sleep(0.05)
+            continue
+        await hub.broadcast(room, payload)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    get_model()
+    task = asyncio.create_task(_drain_ws())
+    yield
+    task.cancel()
+
+
+app = FastAPI(
+    title="Aqua Vision",
+    description="SIH26057 — AI-powered side-scan sonar debris and anomaly detection",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins or ["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+STORAGE.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(STORAGE)), name="media")
+
+app.include_router(system.router, prefix="/api")
+app.include_router(sonar.router, prefix="/api")
+app.include_router(surveys.router, prefix="/api")
+app.include_router(detections.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
+
+
+async def _ws(room: str, ws: WebSocket) -> None:
+    await ws.accept()
+    await hub.join(room, ws)
+    try:
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        await hub.leave(room, ws)
+
+
+@app.websocket("/ws/sonar")
+async def ws_sonar(ws: WebSocket):
+    await _ws("sonar", ws)
+
+
+@app.websocket("/ws/detections")
+async def ws_detections(ws: WebSocket):
+    await _ws("detections", ws)
+
+
+@app.websocket("/ws/alerts")
+async def ws_alerts(ws: WebSocket):
+    await _ws("alerts", ws)
+
+
+@app.get("/health")
+@app.get("/api/health")
+def health():
+    return {"ok": True, "service": "aqua-vision"}

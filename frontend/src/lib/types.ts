@@ -1,0 +1,70 @@
+export type SystemStatus = {
+  system: "ready" | "processing" | "error";
+  sonar: "connected" | "disconnected" | "paused";
+  sonar_detail: string;
+  model: "loaded" | "not_loaded";
+  model_info: {
+    loaded: boolean;
+    exists: boolean;
+    name: string | null;
+    classes: string[];
+    task: string;
+    device: string;
+    error: string | null;
+    path: string;
+  };
+  total_detections: number;
+  unread_alerts: number;
+  high_confidence_alerts: number;
+  current_survey: { id: string; name: string; status: string; source: string } | null;
+  problem: string;
+  organization: string;
+  department: string;
+  health: string;
+  clock: string;
+};
+
+export type Detection = {
+  id: string;
+  survey_id: string;
+  frame_id: string;
+  class_name: string;
+  raw_confidence: number;
+  final_confidence: number;
+  validation_status: string;
+  risk_level: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  width_m: number | null;
+  length_m: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  gps_label: string;
+  timestamp: string | null;
+  depth: number | null;
+  heading: number | null;
+  ping_number: number | null;
+  created_at: string;
+  image_url: string | null;
+  overlay_url: string | null;
+  shadow_url: string | null;
+  validation_reason: string | null;
+  operator_decision: string | null;
+  survey_name?: string | null;
+};
+
+export type SurveyRow = {
+  id: string;
+  name: string;
+  source_type: string;
+  source_name: string;
+  status: string;
+  frames: number;
+  detections: number;
+  alerts: number;
+  model: string | null;
+  created_at: string;
+  error: string | null;
+};

@@ -1,31 +1,47 @@
 services:
-  ml:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: aqua
+      POSTGRES_PASSWORD: aqua
+      POSTGRES_DB: aqua_vision
+    ports:
+      - "5432:5432"
+    volumes:
+      - aqua_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aqua -d aqua_vision"]
+      interval: 5s
+      retries: 10
+
+  api:
     build:
       context: .
-      dockerfile: Dockerfile.ml
+      dockerfile: Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql+psycopg://aqua:aqua@db:5432/aqua_vision
+      MODEL_PATH: /app/ml/weights/sonar-debris-yolo11n.pt
+      STORAGE_DIR: /app/data/aqua_storage
+      CORS_ORIGINS: http://127.0.0.1:47281,http://localhost:47281
     ports:
       - "8765:8765"
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health')",
-        ]
-      interval: 15s
-      timeout: 8s
-      retries: 20
-      start_period: 40s
+    volumes:
+      - aqua_store:/app/data/aqua_storage
+    depends_on:
+      db:
+        condition: service_healthy
 
   web:
     build:
-      context: .
-      dockerfile: Dockerfile.web
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "47281:47281"
-    environment:
-      ML_API_URL: http://ml:8765
     depends_on:
-      ml:
-        condition: service_healthy
+      - api
+    environment:
+      VITE_API_URL: http://127.0.0.1:8765
+
+volumes:
+  aqua_pg:
+  aqua_store:
