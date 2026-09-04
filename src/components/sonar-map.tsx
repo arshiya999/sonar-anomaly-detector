@@ -17,18 +17,24 @@ const TRANSECT: [number, number][] = [
   [13.112, 80.438],
 ];
 
-function FitOnce({ points }: { points: [number, number][] }) {
+function FitOnce({ points, world }: { points: [number, number][]; world?: boolean }) {
   const map = useMap();
   const done = useRef(false);
   useEffect(() => {
     const size = map.getSize();
     if (size.x < 8 || size.y < 8) return;
     map.invalidateSize();
-    if (done.current || points.length === 0) return;
+    if (done.current) return;
+    if (world) {
+      map.setView([18, 40], 2);
+      done.current = true;
+      return;
+    }
+    if (points.length === 0) return;
     if (points.length === 1) map.setView(points[0], 4);
     else map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 5 });
     done.current = true;
-  }, [map, points]);
+  }, [map, points, world]);
   return null;
 }
 
@@ -66,8 +72,8 @@ export function SonarMap({
         .map((d) => [d.latitude as number, d.longitude as number] as [number, number]),
     [detections],
   );
-  const center = points[0] ?? ([20, 80] as [number, number]);
-  const zoom = points.length ? 5 : 2;
+  const center = points[0] ?? ([18, 40] as [number, number]);
+  const zoom = basemap === "world" ? 2 : points.length ? 5 : 2;
 
   return (
     <MapContainer
@@ -83,8 +89,8 @@ export function SonarMap({
         />
       ) : (
         <TileLayer
-          attribution="© OpenStreetMap © CARTO"
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution="© OpenStreetMap"
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
       )}
       {basemap === "imagery" ? (
@@ -94,7 +100,7 @@ export function SonarMap({
         />
       ) : null}
       <ResizeGuard />
-      <FitOnce points={points} />
+      <FitOnce points={points} world={basemap === "world"} />
       {detections.map((d) =>
         d.latitude != null && d.longitude != null ? (
           <CircleMarker
