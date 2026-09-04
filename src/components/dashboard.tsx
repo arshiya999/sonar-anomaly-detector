@@ -640,7 +640,7 @@ function HomePage({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-600">Live NIOT transect intelligence from the onboard YOLO11n detector.</p>
+        <p className="text-sm text-slate-600">Side-scan sonar intelligence · detections, map, and reports from processed pings.</p>
         <Button className="gap-2" onClick={onDemo} disabled={busy || demo}>
           {demo || busy ? <Loader2 className="animate-spin" /> : <Play />}
           {demo ? "Demo running" : "Run live demo"}
