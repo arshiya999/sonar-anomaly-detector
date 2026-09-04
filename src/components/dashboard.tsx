@@ -419,11 +419,16 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
           navOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="border-b border-white/10 px-5 py-5">
-          <p className="font-heading text-lg font-semibold tracking-[0.14em] text-white uppercase">
-            Aqua Vision
-          </p>
-          <p className="mt-1 text-[11px] tracking-wide text-slate-400">Side-Scan Sonar Intelligence</p>
+        <div className="flex items-start gap-3 border-b border-white/10 px-5 py-5">
+          <div className="mt-0.5 grid size-9 place-items-center rounded-lg bg-[#2563eb]">
+            <Waves className="size-5 text-white" />
+          </div>
+          <div>
+            <p className="font-heading text-lg font-semibold tracking-[0.14em] text-white uppercase">
+              Aqua Vision
+            </p>
+            <p className="mt-1 text-[11px] tracking-wide text-slate-400">Side-Scan Sonar Intelligence</p>
+          </div>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
           {NAV.map((item) => {
@@ -472,6 +477,16 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="hidden h-8 text-slate-600 sm:inline-flex"
+              onClick={() => void runJudgeDemo()}
+              disabled={busy || demo}
+            >
+              {demo || busy ? <Loader2 className="animate-spin" /> : <Play />}
+              Demo
+            </Button>
             <StatusPill ok={ready} label={`Model: ${ready ? "Ready" : "Offline"}`} />
             <StatusPill ok={ready && !busy} label={`Status: ${busy ? "Scanning" : ready ? "Ready" : "Wait"}`} />
             <button type="button" className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100" onClick={() => go("detections")}>
@@ -502,8 +517,6 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               preview={preview}
               log={log}
               go={go}
-              onDemo={() => void runJudgeDemo()}
-              demo={demo}
             />
           )}
           {page === "upload" && (
@@ -589,7 +602,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
           {page === "about" && <AboutPage />}
         </main>
 
-        <footer className="flex flex-col gap-1 border-t border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+        <footer className="flex flex-col gap-1 bg-[#0b1c33] px-4 py-2 text-[11px] text-slate-300 sm:flex-row sm:items-center sm:justify-between">
           <span>Aqua Vision v1.0.0</span>
           <span className="text-center">AI-Powered Underwater Debris &amp; Anomaly Detection using Side-Scan Sonar</span>
           <span>Last updated {clock ? `${clock} IST` : "—"}</span>
@@ -611,8 +624,6 @@ function HomePage({
   preview,
   log,
   go,
-  onDemo,
-  demo,
 }: {
   ready: boolean;
   busy: boolean;
@@ -625,8 +636,6 @@ function HomePage({
   preview: string | null;
   log: ScanLogEntry[];
   go: (p: PageId) => void;
-  onDemo: () => void;
-  demo: boolean;
 }) {
   const thumb = overlay ?? preview;
   const recent = allDetections.slice(0, 5);
@@ -639,14 +648,6 @@ function HomePage({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-600">Side-scan sonar intelligence · detections, map, and reports from processed pings.</p>
-        <Button className="gap-2" onClick={onDemo} disabled={busy || demo}>
-          {demo || busy ? <Loader2 className="animate-spin" /> : <Play />}
-          {demo ? "Demo running" : "Run live demo"}
-        </Button>
-      </div>
-
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           title="System Status"
@@ -682,50 +683,95 @@ function HomePage({
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.85fr_0.85fr]">
-        <Card className="overflow-hidden shadow-sm">
+      <div className="grid gap-4 xl:grid-cols-12">
+        <Card className="overflow-hidden shadow-sm xl:col-span-6">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Global Detections Map</CardTitle>
-            <p className="text-xs text-muted-foreground">Confidence pins on the Bay of Bengal transect</p>
           </CardHeader>
-          <CardContent className="relative h-[340px] p-0">
+          <CardContent className="relative h-[380px] p-0">
             <SonarMap key="home-map" detections={mapped} />
             <MapLegend count={mapped.length} />
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-base">Detections by Class</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {mixRows.length === 0 ? (
-              <EmptyNote text="No detections yet. Upload a sonar image or run the live demo." />
-            ) : (
-              <ClassMixPie rows={mixRows} height={260} />
-            )}
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-4 xl:col-span-3">
+          <Card className="flex-1 shadow-sm">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-base">Detections by Class</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {mixRows.length === 0 ? (
+                <EmptyNote text="No detections yet. Upload a sonar image or run the live demo." />
+              ) : (
+                <ClassMixPie rows={mixRows} height={220} />
+              )}
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-base">Confidence Distribution</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {allDetections.length === 0 ? (
+                <EmptyNote text="Confidence bands appear after the first fused scan." />
+              ) : (
+                <>
+                  <StackedBand label="High (>80%)" count={bands.high} color="#ef4444" share={bands.high / bandTotal} />
+                  <StackedBand label="Medium (50–80%)" count={bands.medium} color="#f97316" share={bands.medium / bandTotal} />
+                  <StackedBand label="Low (<50%)" count={bands.low} color="#22c55e" share={bands.low / bandTotal} />
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card className="shadow-sm">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-base">Confidence Distribution</CardTitle>
+        <Card className="shadow-sm xl:col-span-3">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Latest Detection</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {allDetections.length === 0 ? (
-              <EmptyNote text="Confidence bands appear after the first fused scan." />
+          <CardContent className="space-y-3">
+            {!latest ? (
+              <EmptyNote text="Waiting for the first contact." />
             ) : (
               <>
-                <StackedBand label="High (>80%)" count={bands.high} color="#ef4444" share={bands.high / bandTotal} />
-                <StackedBand label="Medium (50–80%)" count={bands.medium} color="#f97316" share={bands.medium / bandTotal} />
-                <StackedBand label="Low (<50%)" count={bands.low} color="#22c55e" share={bands.low / bandTotal} />
+                {thumb ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={thumb} alt="Latest detection" className="h-40 w-full rounded-lg object-cover" />
+                ) : (
+                  <div className="grid h-40 place-items-center rounded-lg bg-slate-100 text-xs text-slate-500">
+                    No image
+                  </div>
+                )}
+                <dl className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <dt className="text-slate-500">Class</dt>
+                    <dd className="font-medium">{CLASS_LABEL[latest.class] ?? latest.class}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Confidence</dt>
+                    <dd className="font-medium" style={{ color: confidenceColor(latest.confidence) }}>
+                      {(latest.confidence / 100).toFixed(2)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Latitude</dt>
+                    <dd className="font-mono">{latest.latitude?.toFixed(5) ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Longitude</dt>
+                    <dd className="font-mono">{latest.longitude?.toFixed(5) ?? "—"}</dd>
+                  </div>
+                </dl>
+                <Button className="w-full" onClick={() => go("analysis")}>
+                  View Details
+                </Button>
               </>
             )}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+      <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base">Recent Activity</CardTitle>
@@ -779,93 +825,48 @@ function HomePage({
         </Card>
 
         <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Latest Detection</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base">Recent Detections</CardTitle>
+            <Button size="sm" variant="ghost" onClick={() => go("detections")}>
+              View All Detections
+            </Button>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {!latest ? (
-              <EmptyNote text="Waiting for the first contact." />
+          <CardContent>
+            {recent.length === 0 ? (
+              <EmptyNote text="Top contacts will appear here after inference." />
             ) : (
-              <>
-                {thumb ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={thumb} alt="Latest detection" className="h-36 w-full rounded-lg object-cover" />
-                ) : (
-                  <div className="grid h-36 place-items-center rounded-lg bg-slate-100 text-xs text-slate-500">
-                    No image
-                  </div>
-                )}
-                <dl className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <dt className="text-slate-500">Class</dt>
-                    <dd className="font-medium">{CLASS_LABEL[latest.class] ?? latest.class}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">Confidence</dt>
-                    <dd className="font-medium" style={{ color: confidenceColor(latest.confidence) }}>
-                      {(latest.confidence / 100).toFixed(2)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">Latitude</dt>
-                    <dd className="font-mono">{latest.latitude?.toFixed(5) ?? "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">Longitude</dt>
-                    <dd className="font-mono">{latest.longitude?.toFixed(5) ?? "—"}</dd>
-                  </div>
-                </dl>
-                <Button className="w-full" onClick={() => go("analysis")}>
-                  View Details
-                </Button>
-              </>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {recent.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => go("analysis")}
+                    className="overflow-hidden rounded-xl border border-slate-200 bg-white text-left hover:border-blue-400"
+                  >
+                    {thumb ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumb} alt="" className="h-20 w-full object-cover" />
+                    ) : (
+                      <div className="h-20 bg-slate-100" />
+                    )}
+                    <div className="space-y-0.5 p-2">
+                      <p className="truncate text-xs font-semibold">{CLASS_LABEL[d.class] ?? d.class}</p>
+                      <p className="text-[11px] font-medium" style={{ color: confidenceColor(d.confidence) }}>
+                        {d.confidence.toFixed(0)}%
+                      </p>
+                      <p className="font-mono text-[10px] text-slate-500">
+                        {d.latitude != null && d.longitude != null
+                          ? `${d.latitude.toFixed(4)}, ${d.longitude.toFixed(4)}`
+                          : "Ungeotagged"}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
       </div>
-
-      <Card className="shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-base">Recent Detections</CardTitle>
-          <Button size="sm" variant="ghost" onClick={() => go("detections")}>
-            View All Detections
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {recent.length === 0 ? (
-            <EmptyNote text="Top contacts will appear here after inference." />
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              {recent.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => go("analysis")}
-                  className="overflow-hidden rounded-xl border border-slate-200 bg-white text-left hover:border-blue-400"
-                >
-                  {thumb ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={thumb} alt="" className="h-24 w-full object-cover" />
-                  ) : (
-                    <div className="h-24 bg-slate-100" />
-                  )}
-                  <div className="space-y-0.5 p-2">
-                    <p className="truncate text-xs font-semibold">{CLASS_LABEL[d.class] ?? d.class}</p>
-                    <p className="text-[11px] font-medium" style={{ color: confidenceColor(d.confidence) }}>
-                      {d.confidence.toFixed(0)}%
-                    </p>
-                    <p className="font-mono text-[10px] text-slate-500">
-                      {d.latitude != null && d.longitude != null
-                        ? `${d.latitude.toFixed(4)}, ${d.longitude.toFixed(4)}`
-                        : "Ungeotagged"}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
