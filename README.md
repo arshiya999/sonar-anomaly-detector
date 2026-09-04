@@ -16,25 +16,30 @@ ml/                    Training, public-dataset prep, YOLO weights
 data/aqua_storage/     Frame images written at runtime
 ```
 
-## 2. Setup commands
+The operator website (navy sidebar, light cards, blue primary) is the **Next.js** app on port **47281**. FastAPI + Vite remain under `backend/` and `frontend/` for the SIH ingest APIs.
+
+## 2. Setup commands (operator console)
 
 ```bash
-# PostgreSQL 16, database aqua_vision, user aqua / aqua
-sudo pg_ctlcluster 16 main start   # or: docker compose up db
-
-python3 -m pip install -r backend/requirements.txt -r ml/requirements.txt
-cd frontend && npm install && cd ..
-
-# API
-cd backend && PYTHONPATH=. uvicorn app.main:app --host 0.0.0.0 --port 8765
-
-# UI (proxies /api /ws /media to the API)
-cd frontend && npm run dev
+python3 -m pip install -r ml/requirements.txt
+npm install
+npm run dev:all
 ```
 
 Open http://127.0.0.1:47281
 
-Docker: `docker compose up --build` (Postgres + API + Vite).
+This starts YOLO inference (`ml/server.py` on 8765) and the blue Aqua Vision dashboard.
+
+Optional SIH API (PostgreSQL, live ingest, WebSockets):
+
+```bash
+# PostgreSQL 16, database aqua_vision, user aqua / aqua
+sudo pg_ctlcluster 16 main start
+
+python3 -m pip install -r backend/requirements.txt
+cd backend && PYTHONPATH=. uvicorn app.main:app --host 0.0.0.0 --port 8766
+cd frontend && npm install && npm run dev   # Vite on 47281 only if Next is not already bound
+```
 
 ## 3. Environment variables
 
