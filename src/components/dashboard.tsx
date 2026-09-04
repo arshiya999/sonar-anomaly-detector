@@ -16,7 +16,6 @@ import {
   Loader2,
   Map as MapIcon,
   Menu,
-  Play,
   ScanLine,
   Settings,
   ShieldAlert,
@@ -41,7 +40,8 @@ import {
 } from "@/components/ui/table";
 import { CLASS_COLOR, CLASS_LABEL, confidenceBand, confidenceColor } from "@/lib/labels";
 import { MODEL_METRICS } from "@/lib/metrics";
-import type { DetectReport, DetectResponse, Detection, SampleItem, ScanLogEntry } from "@/lib/types";
+import { formatIst } from "@/lib/format";
+import type { DetectReport, DetectResponse, Detection, ScanLogEntry, SurveyPin } from "@/lib/types";
 import { SurveyCharts } from "@/components/survey-charts";
 import { ClassMixPie } from "@/components/class-mix-pie";
 import { PipelineStrip } from "@/components/pipeline-strip";
@@ -100,9 +100,65 @@ function optionalNumber(value: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+function saveOrigin(meta: MetaForm) {
+  const lat = optionalNumber(meta.latitude);
+  const lon = optionalNumber(meta.longitude);
+  if (lat == null || lon == null) return;
+  try {
+    localStorage.setItem("aqua-survey-origin", JSON.stringify(meta));
+  } catch {
+    /* private mode */
+  }
+}
+
+async function resolveGps(used: MetaForm): Promise<MetaForm> {
+  const next = { ...used };
+  if (optionalNumber(next.latitude) != null && optionalNumber(next.longitude) != null) {
+    if (!next.heading_deg.trim()) next.heading_deg = "0";
+    if (!next.meters_per_pixel_x.trim()) next.meters_per_pixel_x = "0.08";
+    if (!next.meters_per_pixel_y.trim()) next.meters_per_pixel_y = "0.05";
+    return next;
+  }
+  try {
+    const raw = localStorage.getItem("aqua-survey-origin");
+    if (raw) {
+      const saved = JSON.parse(raw) as MetaForm;
+      if (optionalNumber(saved.latitude) != null && optionalNumber(saved.longitude) != null) {
+        next.latitude = saved.latitude;
+        next.longitude = saved.longitude;
+        next.heading_deg = next.heading_deg || saved.heading_deg || "0";
+        next.meters_per_pixel_x = next.meters_per_pixel_x || saved.meters_per_pixel_x || "0.08";
+        next.meters_per_pixel_y = next.meters_per_pixel_y || saved.meters_per_pixel_y || "0.05";
+        return next;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  const geo = await new Promise<GeolocationPosition | null>((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      resolve,
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 4000, maximumAge: 60_000 },
+    );
+  });
+  if (geo) {
+    next.latitude = String(geo.coords.latitude);
+    next.longitude = String(geo.coords.longitude);
+    if (!next.heading_deg.trim()) next.heading_deg = "0";
+    if (!next.meters_per_pixel_x.trim()) next.meters_per_pixel_x = "0.08";
+    if (!next.meters_per_pixel_y.trim()) next.meters_per_pixel_y = "0.05";
+  }
+  return next;
+}
+
 type Mapped = Detection & { source?: string };
 
-export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem[] }) {
+export function Dashboard() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState<PageId>("dashboard");
   const [navOpen, setNavOpen] = useState(false);
@@ -111,17 +167,13 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
   const [overlay, setOverlay] = useState<string | null>(null);
   const [report, setReport] = useState<DetectReport | null>(null);
   const [busy, setBusy] = useState(false);
-  const [demo, setDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(22);
-  const [samples, setSamples] = useState<SampleItem[]>(initialSamples);
   const [health, setHealth] = useState<{ ok: boolean; trained?: boolean; weights?: string } | null>(null);
   const [meta, setMeta] = useState<MetaForm>(DEFAULT_META);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
   const [pipeStep, setPipeStep] = useState(0);
   const [clock, setClock] = useState("");
-  const [demoHint, setDemoHint] = useState("");
-  const booted = useRef(false);
 
   const refreshLog = () =>
     fetch("/api/log", { cache: "no-store" })
@@ -130,7 +182,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
         if (!Array.isArray(data.entries)) return;
         setLog(data.entries);
         const latestEntry = data.entries[0] as ScanLogEntry | undefined;
-        const overlayFromDb = latestEntry?.detections?.find((d) => d.overlay_url)?.overlay_url;
+        const overlayFromDb = latestEntry?.overlay_url ?? latestEntry?.detections?.find((d) => d.overlay_url)?.overlay_url;
         if (overlayFromDb) {
           setOverlay((prev) => (prev?.startsWith("data:") ? prev : overlayFromDb));
         }
@@ -181,12 +233,6 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
   }, [busy, report]);
 
   useEffect(() => {
-    fetch("/api/samples", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length) setSamples(data);
-      })
-      .catch(() => undefined);
     void refreshLog();
     const ping = () =>
       fetch("/api/health", { cache: "no-store" })
@@ -206,11 +252,16 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     async (imageFile: File, nextMeta?: MetaForm) => {
       setBusy(true);
       setError(null);
-      const used = nextMeta ?? meta;
+      const used = await resolveGps(nextMeta ?? meta);
+      setMeta(used);
+      saveOrigin(used);
       const form = new FormData();
       form.append("image", imageFile);
       form.append("conf_threshold", String(threshold / 100));
-      const metadata: Record<string, unknown> = { sensor: "side-scan-sonar" };
+      const metadata: Record<string, unknown> = {
+        sensor: "side-scan-sonar",
+        survey: used.survey.trim() || imageFile.name,
+      };
       const lat = optionalNumber(used.latitude);
       const lon = optionalNumber(used.longitude);
       const heading = optionalNumber(used.heading_deg);
@@ -221,7 +272,6 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
       if (heading != null) metadata.heading_deg = heading;
       if (mppx != null) metadata.meters_per_pixel_x = mppx;
       if (mppy != null) metadata.meters_per_pixel_y = mppy;
-      if (used.survey.trim()) metadata.survey = used.survey.trim();
       form.append("metadata", JSON.stringify(metadata));
       try {
         const res = await fetch("/api/detect", { method: "POST", body: form });
@@ -248,6 +298,11 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
           }),
         });
         await refreshLog();
+        toast.message(
+          lat != null
+            ? `Plotted on the map at ${Number(lat).toFixed(4)}, ${Number(lon).toFixed(4)}`
+            : "Scan stored. Add latitude/longitude on Upload to move the pin.",
+        );
       } catch (err) {
         const message = err instanceof Error ? err.message : "Detection failed";
         setError(message);
@@ -259,45 +314,6 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     [meta, threshold],
   );
 
-  const loadSample = useCallback(
-    async (item: SampleItem) => {
-      const imgRes = await fetch(`/samples/${item.file}`);
-      const blob = await imgRes.blob();
-      const sampleFile = new File([blob], item.file, { type: blob.type || "image/jpeg" });
-      let nextMeta = meta;
-      try {
-        const m = await fetch(`/samples/${item.meta}`).then((r) => r.json());
-        nextMeta = {
-          latitude: m.latitude != null ? String(m.latitude) : "",
-          longitude: m.longitude != null ? String(m.longitude) : "",
-          heading_deg: m.heading_deg != null ? String(m.heading_deg) : "",
-          meters_per_pixel_x: m.meters_per_pixel_x != null ? String(m.meters_per_pixel_x) : "",
-          meters_per_pixel_y: m.meters_per_pixel_y != null ? String(m.meters_per_pixel_y) : "",
-          survey: m.survey != null ? String(m.survey) : "",
-        };
-        setMeta(nextMeta);
-      } catch {
-        /* keep form */
-      }
-      setFile(sampleFile);
-      setPreview(URL.createObjectURL(sampleFile));
-      setOverlay(null);
-      setReport(null);
-      await runDetect(sampleFile, nextMeta);
-    },
-    [meta, runDetect],
-  );
-
-  useEffect(() => {
-    if (booted.current || !health?.ok || !samples[0]) return;
-    if (log.length > 0) {
-      booted.current = true;
-      return;
-    }
-    booted.current = true;
-    void loadSample(samples[0]);
-  }, [health, samples, loadSample, log.length]);
-
   const onFile = async (next: File) => {
     setFile(next);
     setPreview(URL.createObjectURL(next));
@@ -305,29 +321,6 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     setReport(null);
     setPage("analysis");
     await runDetect(next);
-  };
-
-  const runJudgeDemo = async () => {
-    if (!samples.length) {
-      toast.error("Sample gallery is empty");
-      return;
-    }
-    setDemo(true);
-    setPage("analysis");
-    try {
-      const pack = samples.slice(0, 3);
-      let i = 0;
-      for (const item of pack) {
-        i += 1;
-        setDemoHint(`Live demo ${i} / ${pack.length} · ${item.file}`);
-        await loadSample(item);
-      }
-      setDemoHint("Demo stacked — map, detections, and reports are live");
-      toast.success("Demo complete");
-      setPage("dashboard");
-    } finally {
-      setDemo(false);
-    }
   };
 
   const downloadJson = () => {
@@ -410,6 +403,23 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
     for (const d of allDetections) counts[d.class] = (counts[d.class] ?? 0) + 1;
     return Object.entries(counts).map(([cls, count]) => ({ class: cls, count }));
   }, [allDetections]);
+
+  const surveyPins: SurveyPin[] = useMemo(() => {
+    const pins: SurveyPin[] = [];
+    for (const e of log) {
+      const lat = e.latitude ?? e.detections.find((d) => d.latitude != null)?.latitude ?? null;
+      const lon = e.longitude ?? e.detections.find((d) => d.longitude != null)?.longitude ?? null;
+      if (lat == null || lon == null) continue;
+      pins.push({
+        id: e.id,
+        filename: e.filename,
+        latitude: lat,
+        longitude: lon,
+        overlay_url: e.overlay_url ?? e.image_url ?? e.detections.find((d) => d.overlay_url)?.overlay_url ?? null,
+      });
+    }
+    return pins;
+  }, [log]);
 
   const latest = useMemo(() => {
     if (report?.detections.length) {
@@ -511,16 +521,6 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="hidden h-8 text-slate-600 sm:inline-flex"
-              onClick={() => void runJudgeDemo()}
-              disabled={busy || demo}
-            >
-              {demo || busy ? <Loader2 className="animate-spin" /> : <Play />}
-              Demo
-            </Button>
             <StatusPill ok={ready} label={`Model: ${ready ? "Ready" : "Offline"}`} />
             <StatusPill ok={ready && !busy} label={`Status: ${busy ? "Scanning" : ready ? "Ready" : "Wait"}`} />
             <button type="button" className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100" onClick={() => go("detections")}>
@@ -544,6 +544,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               busy={busy}
               alerts={alerts}
               mapped={mapped}
+              surveys={surveyPins}
               mixRows={mixRows}
               allDetections={allDetections}
               latest={latest}
@@ -560,15 +561,10 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               setThreshold={setThreshold}
               busy={busy}
               file={file}
-              samples={samples}
               meta={meta}
               setMeta={setMeta}
               onPick={() => inputRef.current?.click()}
               onFile={onFile}
-              onSample={(s) => {
-                setPage("analysis");
-                void loadSample(s);
-              }}
               onRerun={() => file && void runDetect(file)}
             />
           )}
@@ -577,7 +573,7 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
               <PipelineStrip
                 active={pipeStep}
                 complete={Boolean(report) && !busy}
-                hint={demoHint || (busy ? "Processing sonar log" : report ? "Last ping fused and geotagged" : "Standing by")}
+                hint={busy ? "Processing sonar log" : report ? "Last ping fused and geotagged" : "Standing by"}
               />
               <SonarTheater
                 preview={preview}
@@ -609,8 +605,8 @@ export function Dashboard({ initialSamples = [] }: { initialSamples?: SampleItem
                 </p>
               </CardHeader>
               <CardContent className="relative h-[620px] p-0">
-                <SonarMap key="full-map" detections={mapped} />
-                <MapLegend count={mapped.length} />
+                <SonarMap key="full-map" detections={mapped} surveys={surveyPins} />
+                <MapLegend count={mapped.length + surveyPins.length} />
               </CardContent>
             </Card>
           )}
@@ -651,6 +647,7 @@ function HomePage({
   busy,
   alerts,
   mapped,
+  surveys,
   mixRows,
   allDetections,
   latest,
@@ -663,6 +660,7 @@ function HomePage({
   busy: boolean;
   alerts: number;
   mapped: Mapped[];
+  surveys: SurveyPin[];
   mixRows: { class: string; count: number }[];
   allDetections: Mapped[];
   latest: Detection | null;
@@ -723,8 +721,8 @@ function HomePage({
             <CardTitle className="text-base">Global Detections Map</CardTitle>
           </CardHeader>
           <CardContent className="relative h-[380px] p-0">
-            <SonarMap key="home-map" detections={mapped} />
-            <MapLegend count={mapped.length} />
+            <SonarMap key="home-map" detections={mapped} surveys={surveys} />
+            <MapLegend count={mapped.length + surveys.length} />
           </CardContent>
         </Card>
 
@@ -735,7 +733,7 @@ function HomePage({
             </CardHeader>
             <CardContent>
               {mixRows.length === 0 ? (
-                <EmptyNote text="No detections yet. Upload a sonar image or run the live demo." />
+                <EmptyNote text="No detections yet. Upload a sonar image to run the detector." />
               ) : (
                 <ClassMixPie rows={mixRows} height={220} />
               )}
@@ -836,7 +834,7 @@ function HomePage({
                         <TableRow key={e.id}>
                           <TableCell className="font-mono text-xs">#{1000 + (log.length - i)}</TableCell>
                           <TableCell className="max-w-[180px] truncate text-xs">{e.filename}</TableCell>
-                          <TableCell className="font-mono text-[11px]">{e.at.replace("T", " ").slice(0, 19)}</TableCell>
+                          <TableCell className="font-mono text-[11px]">{formatIst(e.at)}</TableCell>
                           <TableCell>{e.count}</TableCell>
                           <TableCell>
                             <Badge className={high ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}>
@@ -877,9 +875,9 @@ function HomePage({
                     onClick={() => go("analysis")}
                     className="overflow-hidden rounded-xl border border-slate-200 bg-white text-left hover:border-blue-400"
                   >
-                    {thumb ? (
+                    {d.overlay_url || d.image_url || thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={thumb} alt="" className="h-20 w-full object-cover" />
+                      <img src={d.overlay_url || d.image_url || thumb || ""} alt="" className="h-20 w-full object-cover" />
                     ) : (
                       <div className="h-20 bg-slate-100" />
                     )}
@@ -911,12 +909,10 @@ function UploadPage({
   setThreshold,
   busy,
   file,
-  samples,
   meta,
   setMeta,
   onPick,
   onFile,
-  onSample,
   onRerun,
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -924,12 +920,10 @@ function UploadPage({
   setThreshold: (n: number) => void;
   busy: boolean;
   file: File | null;
-  samples: SampleItem[];
   meta: MetaForm;
   setMeta: (m: MetaForm) => void;
   onPick: () => void;
   onFile: (f: File) => void;
-  onSample: (s: SampleItem) => void;
   onRerun: () => void;
 }) {
   return (
@@ -985,7 +979,7 @@ function UploadPage({
                 {label}
                 <Input
                   value={meta[key]}
-                  placeholder="sidecar / ping only"
+                  placeholder="required to plot on map"
                   onChange={(e) => setMeta({ ...meta, [key]: e.target.value })}
                   className="h-8"
                 />
@@ -1000,31 +994,19 @@ function UploadPage({
       </Card>
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Reference gallery</CardTitle>
-          <p className="text-sm text-muted-foreground">Real SCTD / FLS / KLSG sonar crops shipped with the detector.</p>
+          <CardTitle>Map position</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Every upload is drawn on the map. Use ping GPS from the file (EXIF) or type latitude and longitude
+            here. If both are empty, the last survey position or this device location is used.
+          </p>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {samples.length === 0 ? (
-            <p className="col-span-full text-sm text-muted-foreground">
-              Sample gallery is empty. Run <code>python ml/prepare_dataset.py</code>.
+        <CardContent>
+          {file ? (
+            <p className="text-sm text-slate-700">
+              Ready: <span className="font-mono">{file.name}</span>
             </p>
           ) : (
-            samples.map((s) => (
-              <button
-                key={s.file}
-                type="button"
-                onClick={() => onSample(s)}
-                className={`overflow-hidden rounded-lg border text-left transition hover:border-blue-500 ${
-                  file?.name === s.file ? "border-blue-500 ring-1 ring-blue-500/40" : "border-slate-200"
-                }`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/samples/${s.file}`} alt={s.example_class} className="h-24 w-full object-cover" />
-                <span className="block truncate px-2 py-1 text-[11px] text-slate-600">
-                  {CLASS_LABEL[s.example_class] ?? s.example_class}
-                </span>
-              </button>
-            ))
+            <p className="text-sm text-slate-500">No sonar file selected yet.</p>
           )}
         </CardContent>
       </Card>
@@ -1138,7 +1120,7 @@ function ReportPage({
       </CardHeader>
       <CardContent>
         {!report ? (
-          <EmptyNote text="Run a scan or the live demo, then return here for the structured order." />
+          <EmptyNote text="Upload a sonar image, then return here for the structured order." />
         ) : report.count === 0 ? (
           <EmptyNote text="No man-made anomalies above the current confidence gate." />
         ) : (
@@ -1198,7 +1180,7 @@ function HistoryPage({ log, go }: { log: ScanLogEntry[]; go: (p: PageId) => void
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>When (UTC)</TableHead>
+                <TableHead>When (IST)</TableHead>
                 <TableHead>Image</TableHead>
                 <TableHead>Hits</TableHead>
                 <TableHead>ms</TableHead>
@@ -1209,7 +1191,7 @@ function HistoryPage({ log, go }: { log: ScanLogEntry[]; go: (p: PageId) => void
             <TableBody>
               {log.map((e) => (
                 <TableRow key={e.id}>
-                  <TableCell className="font-mono text-xs">{e.at.replace("T", " ").slice(0, 19)}</TableCell>
+                  <TableCell className="font-mono text-xs">{formatIst(e.at)}</TableCell>
                   <TableCell className="max-w-[220px] truncate text-xs">{e.filename}</TableCell>
                   <TableCell>{e.count}</TableCell>
                   <TableCell className="font-mono text-xs">{e.inference_ms}</TableCell>
@@ -1284,7 +1266,7 @@ function SettingsPage({
                 {label}
                 <Input
                   value={meta[key]}
-                  placeholder="sidecar / ping only"
+                  placeholder="required to plot on map"
                   onChange={(e) => setMeta({ ...meta, [key]: e.target.value })}
                   className="h-8"
                 />
@@ -1404,7 +1386,7 @@ function StatusPill({ ok, label }: { ok: boolean; label: string }) {
 function MapLegend({ count }: { count: number }) {
   return (
     <div className="pointer-events-none absolute right-3 bottom-3 z-[1000] rounded-md bg-white/95 px-2 py-1.5 text-[11px] text-slate-700 shadow">
-      <div className="mb-1 font-medium">{count ? `${count} geotagged hazards` : "13.08°N 80.37°E"}</div>
+      <div className="mb-1 font-medium">{count ? `${count} mapped pings` : "Upload a sonar image to plot"}</div>
       <div className="flex gap-2">
         <span className="flex items-center gap-1">
           <i className="size-2 rounded-full bg-red-500" /> High

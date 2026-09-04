@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime
-
 import cv2
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -28,13 +28,29 @@ HAZARD = {
 }
 
 
+def _now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def _iso(dt: datetime | None) -> str:
     if dt is None:
-        return datetime.utcnow().isoformat() + "Z"
+        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     text = dt.isoformat()
     if text.endswith("Z") or "+" in text[10:] or text.endswith("+00:00"):
-        return text
+        return text.replace("+00:00", "Z")
     return text + "Z"
+
+
+def _is_seed_raster(name: str) -> bool:
+    n = (name or "").lower()
+    return n.startswith("sctd_") or n.startswith("wt_marine-debris")
+
+
+def _survey_title(report: dict, filename: str) -> str:
+    raw = str(report.get("survey_id") or "")
+    if not raw or raw in {"unspecified", "undefined"} or "demo transect" in raw.lower():
+        return filename
+    return raw
 
 
 class MlIngest(BaseModel):
@@ -60,19 +76,12 @@ def _save_overlay(survey_id: str, b64: str | None) -> str | None:
 
 @router.post("/ingest/ml-report")
 def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
-    existing = (
-        db.query(Survey)
-        .filter(Survey.source_name == body.filename, Survey.status == "completed")
-        .first()
-    )
-    if existing:
-        return {"ok": True, "survey_id": existing.id, "deduped": True}
-
     report = body.report
     meta = report.get("metadata") if isinstance(report.get("metadata"), dict) else {}
     dets = report.get("detections") or []
+    stamp = _now()
     survey = Survey(
-        name=str(report.get("survey_id") or meta.get("survey") or body.filename),
+        name=_survey_title(report, body.filename),
         source_type="upload",
         source_name=body.filename,
         status="completed",
@@ -80,8 +89,9 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
         detections_count=len(dets),
         alerts_count=sum(1 for d in dets if float(d.get("confidence") or 0) > 80),
         model_name=str(report.get("model") or "yolo"),
-        started_at=datetime.utcnow(),
-        ended_at=datetime.utcnow(),
+        created_at=stamp,
+        started_at=stamp,
+        ended_at=stamp,
     )
     db.add(survey)
     db.flush()
@@ -91,11 +101,20 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
     h = int(size.get("height") or 0)
     lat0 = meta.get("latitude")
     lon0 = meta.get("longitude")
+    if lat0 is None or lon0 is None:
+        last = db.query(GpsTrack).order_by(GpsTrack.timestamp.desc()).first()
+        if last:
+            lat0, lon0 = last.latitude, last.longitude
+            meta = {**meta, "latitude": lat0, "longitude": lon0, "gps_source": meta.get("gps_source") or "last_survey"}
+    for d in dets:
+        if d.get("latitude") is None and lat0 is not None:
+            d["latitude"] = float(lat0)
+            d["longitude"] = float(lon0)
     frame = SonarFrame(
         survey_id=survey.id,
         frame_seq=0,
         ping_number=None,
-        timestamp=datetime.utcnow(),
+        timestamp=stamp,
         image_path=overlay_path or "",
         overlay_path=overlay_path,
         quality_score=1.0,
@@ -126,7 +145,7 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
                 seq=0,
                 latitude=float(lat0),
                 longitude=float(lon0),
-                timestamp=datetime.utcnow(),
+                timestamp=stamp,
             )
         )
     for d in dets:
@@ -152,7 +171,7 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
             length_m=dims.get("length_m"),
             latitude=d.get("latitude"),
             longitude=d.get("longitude"),
-            timestamp=datetime.utcnow(),
+            timestamp=stamp,
         )
         db.add(row)
         db.flush()
@@ -177,10 +196,21 @@ def ops_log(db: Session = Depends(get_db)):
     surveys = db.query(Survey).order_by(Survey.created_at.desc()).all()
     out = []
     for s in surveys:
+        if _is_seed_raster(s.source_name):
+            continue
         frame = db.query(SonarFrame).filter(SonarFrame.survey_id == s.id).order_by(SonarFrame.frame_seq).first()
         dets = db.query(Detection).filter(Detection.survey_id == s.id).all()
         overlay = media_url(frame.overlay_path) if frame else None
         image = media_url(frame.image_path) if frame else None
+        meta_row = (
+            db.query(SonarMetadata).filter(SonarMetadata.frame_id == frame.id).first() if frame else None
+        )
+        frame_lat = meta_row.latitude if meta_row else None
+        frame_lon = meta_row.longitude if meta_row else None
+        if frame_lat is None:
+            geo = next((d for d in dets if d.latitude is not None), None)
+            if geo:
+                frame_lat, frame_lon = geo.latitude, geo.longitude
         packed = []
         for d in dets:
             packed.append(
@@ -214,6 +244,10 @@ def ops_log(db: Session = Depends(get_db)):
                 "inference_ms": frame.inference_ms if frame else 0,
                 "threshold": 0.22,
                 "detections": packed,
+                "latitude": frame_lat,
+                "longitude": frame_lon,
+                "overlay_url": overlay,
+                "image_url": image,
             }
         )
     return {"entries": out}

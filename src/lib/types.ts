@@ -50,5 +50,17 @@ export type ScanLogEntry = {
   inference_ms: number;
   threshold: number;
   detections: Detection[];
+  latitude?: number | null;
+  longitude?: number | null;
+  overlay_url?: string | null;
+  image_url?: string | null;
+};
+
+export type SurveyPin = {
+  id: string;
+  filename: string;
+  latitude: number;
+  longitude: number;
+  overlay_url?: string | null;
 };
 

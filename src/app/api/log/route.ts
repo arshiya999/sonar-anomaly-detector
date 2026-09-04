@@ -16,7 +16,11 @@ export async function GET() {
   } catch {
     /* ops API offline */
   }
-  return Response.json({ entries: readLog(), source: "file" });
+  const fileEntries = readLog().filter((e) => {
+    const n = e.filename.toLowerCase();
+    return !n.startsWith("sctd_") && !n.startsWith("wt_marine-debris");
+  });
+  return Response.json({ entries: fileEntries, source: "file" });
 }
 
 export async function POST(req: NextRequest) {
