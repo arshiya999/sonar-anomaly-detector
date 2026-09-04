@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
-import { CLASS_COLOR, CLASS_LABEL } from "@/lib/labels";
+import { CLASS_LABEL, confidenceColor } from "@/lib/labels";
 import type { Detection } from "@/lib/types";
 import "leaflet/dist/leaflet.css";
 
@@ -99,8 +99,8 @@ export function SonarMap({ detections }: { detections: Mapped[] }) {
             center={[d.latitude, d.longitude]}
             radius={22}
             pathOptions={{
-              color: CLASS_COLOR[d.class] ?? "#22d3ee",
-              fillColor: CLASS_COLOR[d.class] ?? "#22d3ee",
+              color: confidenceColor(d.confidence),
+              fillColor: confidenceColor(d.confidence),
               fillOpacity: 0.18,
               weight: 1,
             }}
@@ -115,7 +115,7 @@ export function SonarMap({ detections }: { detections: Mapped[] }) {
             radius={12}
             pathOptions={{
               color: "#ffffff",
-              fillColor: CLASS_COLOR[d.class] ?? "#22d3ee",
+              fillColor: confidenceColor(d.confidence),
               fillOpacity: 0.95,
               weight: 2,
             }}

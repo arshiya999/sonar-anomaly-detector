@@ -12,7 +12,7 @@ import {
 export function Toaster(props: ToasterProps) {
   return (
     <Sonner
-      theme="dark"
+      theme="light"
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

@@ -31,9 +31,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`dark ${geistSans.variable} ${geistMono.variable} ${syne.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${syne.variable} h-full antialiased`}
     >
-        <body className="min-h-full flex flex-col bg-[#0b1220] text-foreground">
+        <body className="min-h-full flex flex-col bg-[#eef1f6] text-foreground">
         {children}
         <Toaster />
       </body>
