@@ -25,8 +25,8 @@ function FitOnce({ points }: { points: [number, number][] }) {
     if (size.x < 8 || size.y < 8) return;
     map.invalidateSize();
     if (done.current || points.length === 0) return;
-    if (points.length === 1) map.setView(points[0], 13);
-    else map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 14 });
+    if (points.length === 1) map.setView(points[0], 4);
+    else map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 5 });
     done.current = true;
   }, [map, points]);
   return null;
@@ -52,7 +52,13 @@ function ResizeGuard() {
   return null;
 }
 
-export function SonarMap({ detections }: { detections: Mapped[] }) {
+export function SonarMap({
+  detections,
+  basemap = "world",
+}: {
+  detections: Mapped[];
+  basemap?: "world" | "imagery";
+}) {
   const points = useMemo(
     () =>
       detections
@@ -60,38 +66,35 @@ export function SonarMap({ detections }: { detections: Mapped[] }) {
         .map((d) => [d.latitude as number, d.longitude as number] as [number, number]),
     [detections],
   );
-  const center = points[0] ?? ([13.0827, 80.3708] as [number, number]);
+  const center = points[0] ?? ([20, 80] as [number, number]);
+  const zoom = points.length ? 5 : 2;
 
   return (
     <MapContainer
       center={center}
-      zoom={11}
+      zoom={zoom}
       className="h-full min-h-[280px] w-full"
       scrollWheelZoom
     >
-      <TileLayer
-        attribution="Tiles © Esri"
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-      />
-      <Polyline
-        positions={TRANSECT}
-        pathOptions={{ color: "#fbbf24", weight: 3, dashArray: "10 8", opacity: 0.9 }}
-      />
+      {basemap === "imagery" ? (
+        <TileLayer
+          attribution="Tiles © Esri"
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        />
+      ) : (
+        <TileLayer
+          attribution="© OpenStreetMap © CARTO"
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        />
+      )}
+      {basemap === "imagery" ? (
+        <Polyline
+          positions={TRANSECT}
+          pathOptions={{ color: "#fbbf24", weight: 3, dashArray: "10 8", opacity: 0.9 }}
+        />
+      ) : null}
       <ResizeGuard />
       <FitOnce points={points} />
-      <CircleMarker
-        center={[13.0827, 80.3708]}
-        radius={7}
-        pathOptions={{ color: "#fde047", fillColor: "#f472b6", fillOpacity: 1, weight: 2 }}
-      >
-        <Popup>
-          <div className="text-sm text-slate-900">
-            <strong>AUV origin · NIOT transect</strong>
-            <br />
-            13.0827°N, 80.3708°E
-          </div>
-        </Popup>
-      </CircleMarker>
       {detections.map((d) =>
         d.latitude != null && d.longitude != null ? (
           <CircleMarker
