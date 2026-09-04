@@ -3,143 +3,88 @@
 **Side-Scan Sonar Intelligence** for Smart India Hackathon 2026 problem **SIH26057**  
 Ministry of Earth Sciences (MoES) · National Institute of Ocean Technology (NIOT)
 
-End-to-end system: real side-scan imagery/logs enter FastAPI, are preprocessed, inferred with YOLO (detect and/or segment depending on weights), false-positive filtered, geotagged only when GPS exists, stored in PostgreSQL, pushed over WebSockets, and exported as JSON/CSV. The UI never hardcodes detections, coordinates, or “Ready” when the backend is down.
+Operator console (navy sidebar, light cards, OSM map) is a **Next.js** app. YOLO inference, PostgreSQL, and the ops API are wired behind it. Coordinates and detections come from real sonar rasters + sidecar ping metadata — GPS is never invented.
 
-## 1. Project structure
-
-```
-backend/app/           FastAPI, SQLAlchemy models, REST + WebSockets
-backend/app/ingest/    SonarDataSource adapters (raster, XTF, JSF, live TCP/dir)
-backend/app/pipeline/  preprocess, quality, YOLO, validation, geotag
-frontend/              Vite + React + TypeScript + Tailwind + Leaflet
-ml/                    Training, public-dataset prep, YOLO weights
-data/aqua_storage/     Frame images written at runtime
-```
-
-The operator website (navy sidebar, light cards, blue primary) is the **Next.js** app on port **47281**. FastAPI + Vite remain under `backend/` and `frontend/` for the SIH ingest APIs.
-
-## 2. Setup commands (operator console)
+## Run locally
 
 ```bash
-python3 -m pip install -r ml/requirements.txt
+# PostgreSQL 16 — database aqua_vision, user aqua / aqua
+sudo pg_ctlcluster 16 main start   # or docker compose up db -d
+
+python3 -m pip install -r ml/requirements.txt -r backend/requirements.txt
 npm install
 npm run dev:all
 ```
 
 Open http://127.0.0.1:47281
 
-This starts YOLO inference (`ml/server.py` on 8765) and the blue Aqua Vision dashboard.
+`dev:all` starts:
 
-Optional SIH API (PostgreSQL, live ingest, WebSockets):
+| Service | Port |
+| --- | --- |
+| Next.js operator dashboard | 47281 |
+| YOLO inference (`ml/server.py`) | 8765 |
+| Ops API + PostgreSQL (`backend/`) | 8766 |
+
+Seed the database with the reference SCTD / ARIS frames (YOLO + sidecar GPS):
 
 ```bash
-# PostgreSQL 16, database aqua_vision, user aqua / aqua
-sudo pg_ctlcluster 16 main start
-
-python3 -m pip install -r backend/requirements.txt
-cd backend && PYTHONPATH=. uvicorn app.main:app --host 0.0.0.0 --port 8766
-cd frontend && npm install && npm run dev   # Vite on 47281 only if Next is not already bound
+npm run seed:surveys
 ```
 
-## 3. Environment variables
+That writes **real** surveys and detections into Postgres. The dashboard loads them from `GET /api/log` (`source: postgres`). Overlay JPEGs are served at `/media/...` via a rewrite to the ops API.
+
+## Environment
 
 Copy `.env.example`:
 
 | Variable | Meaning |
 | --- | --- |
-| `DATABASE_URL` | SQLAlchemy URL, default `postgresql+psycopg://aqua:aqua@127.0.0.1:5432/aqua_vision` |
-| `MODEL_PATH` | YOLO `.pt` or `.onnx` path |
-| `STORAGE_DIR` | Frame JPEG storage |
-| `CORS_ORIGINS` | Comma-separated UI origins |
+| `OPS_API_URL` | Ops API, default `http://127.0.0.1:8766` |
+| `ML_API_URL` | YOLO API, default `http://127.0.0.1:8765` |
+| `DATABASE_URL` | `postgresql+psycopg://aqua:aqua@127.0.0.1:5432/aqua_vision` |
+| `MODEL_PATH` | YOLO `.pt` (default `ml/weights/sonar-debris-yolo11n.pt`) |
+| `STORAGE_DIR` | Overlay / frame JPEG storage |
+| `CORS_ORIGINS` | Operator UI origins |
 | `MAX_UPLOAD_MB` | Upload cap (default 64) |
 
-## 4. Database setup
+## Production (Docker)
 
 ```bash
-sudo -u postgres createuser -P aqua
-sudo -u postgres createdb -O aqua aqua_vision
-cd backend && PYTHONPATH=. alembic upgrade head
+docker compose up --build
 ```
 
-Tables are also created on API startup via SQLAlchemy metadata: `surveys`, `sonar_frames`, `sonar_metadata`, `detections`, `detection_validation`, `gps_tracks`, `alerts`, `operator_reviews`, `reports`, `model_runs`, `runtime_settings`.
+- `web` — Next.js on **47281**
+- `ml` — YOLO on **8765**
+- `api` — FastAPI + media on **8766**
+- `db` — PostgreSQL 16
 
-## 5. Backend setup
-
-`uvicorn app.main:app --host 0.0.0.0 --port 8765` from `backend/` with `PYTHONPATH=.`
-
-REST (prefix `/api`): sonar connect/disconnect/status, surveys start/stop/upload, frames/latest, detections (+ map + review), reports JSON/CSV, model/status, system/status, settings.
-
-WebSockets: `/ws/sonar`, `/ws/detections`, `/ws/alerts`.
-
-## 6. Frontend setup
-
-Vite on port **47281**. Proxies API and sockets so the browser uses one origin.
-
-## 7. AI model setup
-
-Default weights: `ml/weights/sonar-debris-yolo11n.pt` (object detection). Class names are read from the loaded Ultralytics model, not invented.
-
-To train: `python ml/prepare_dataset.py` then `python ml/train.py`. Export ONNX from Ultralytics for edge (`yolo export format=onnx`). If `MODEL_PATH` is missing the UI shows **AI model not loaded** and inference is refused.
-
-Measured validation metrics live in `ml/weights/metrics.json` and are **not** shown as live dashboard KPIs unless you cite that file as a training report.
-
-## 8. Supported sonar formats
-
-| Format | Parser | Notes |
-| --- | --- | --- |
-| PNG, JPEG, TIFF | `RasterSonarReader` | Optional `.json` / `.csv` sidecar for ping headers |
-| XTF | `XTFReader` | Triton FileFormat 123, packet magic `0xFACE`, ping type 0 |
-| JSF | `JSFReader` | Sync `0x1601`, sidescan message 80 |
-| JSON/CSV | `MetadataReader` | Sidecar only; does not invent GPS |
-
-XTF/JSF header layouts vary by manufacturer revision. If GPS fields are absent or out of range they stay **unavailable**.
-
-## 9. How to connect a real sonar source
-
-**Live TCP** — JSON line protocol, e.g. `{"image_b64":"<jpeg>", "latitude":..., "longitude":..., "ping_number":...}` or `{"path":"/incoming/frame.png"}`. Live Sonar page → host/port → Connect TCP.
-
-**Directory** — a logger writes PNG/JPG/TIF into a folder; each new file is a frame.
-
-**File survey** — Upload Survey for XTF/JSF/raster.
-
-Until a source is connected the live view is **SONAR DISCONNECTED** (no synthetic waterfall).
-
-## 10. SIH26057 requirement-to-feature mapping
-
-| Requirement | Feature |
-| --- | --- |
-| Ingest SSS | Raster / XTF / JSF / live adapters |
-| Automated CV | FastAPI processor thread |
-| Man-made debris | YOLO classes from weights + validation |
-| Detect + segment | YOLO `task` detect or segment; masks stored when present |
-| Shipwreck/pipe/cylinder/nets | Supported if those names exist on the loaded model |
-| Natural vs artificial | Contrast, ripple, acoustic-shadow filter |
-| Speckle, resolution, shadows, artefacts, dropouts | Lee, resize, shadow map, dropout inpaint |
-| Heave/pitch/roll | Quality flags; **Motion compensation unavailable** unless IMU keys exist |
-| Confidence 0–100% | `raw_confidence` and `final_confidence` |
-| False-positive filter | `pipeline/validate.py` CONFIRMED/LIKELY/UNCERTAIN/REJECTED |
-| Ping metadata / lat-lon | Sidecar + XTF/JSF fields; never fabricated |
-| Bounding dimensions | Pixels always; metres only with resolution metadata |
-| JSON/CSV | `/api/reports/{id}/json` and `/csv` |
-| Map | Leaflet OSM, confidence-coloured pins, real GPS track only |
-| Dashboard + overlays | Vite UI |
-| Real-time | WebSockets + live adapters |
-| Edge | CPU YOLO + optional ONNX next to the API (no cloud inference required) |
-
-## 11. Testing
+After first boot, seed from a host that can reach the containers:
 
 ```bash
-cd backend && PYTHONPATH=. python3 -m unittest discover -s tests -v
-python3 -m unittest discover -s ml/tests -v
-cd frontend && npx tsc -b
+python3 scripts/seed_reference_surveys.py http://127.0.0.1:8765 http://127.0.0.1:8766
 ```
 
-Upload a raster **without** GPS and confirm the UI shows **GPS unavailable**. Disconnect sonar and confirm **SONAR DISCONNECTED**.
+## Project layout
 
-## 12. Deployment
+```
+src/                    Next.js operator UI (this is the website)
+src/app/api/            Proxies: /api/detect → YOLO, /api/log → Postgres
+backend/app/           Ops FastAPI, SQLAlchemy, ingest, reports, WebSockets
+ml/                     Training + sonar-debris-yolo11n.pt + inference server
+public/samples/         SCTD / ARIS rasters + .meta.json ping sidecars
+frontend/               Optional Vite SIH console (do not bind 47281 while Next is running)
+```
 
-- Workstation: PostgreSQL + `uvicorn` + `npm run dev` (or `vite preview` after `npm run build` behind the API).
-- Compose: `docker compose up --build`.
-- AUV/edge box: run API + model on the vehicle computer; UI on the operator laptop; `MODEL_PATH` to ONNX/PT; no cloud GPU required.
+## Honesty rules
 
-Operator reviews (approve / reject / uncertain) are stored in `operator_reviews`.
+- Upload without latitude/longitude → detections stay **unmapped** (`GPS unavailable`).
+- Model offline → dashboard **Offline**, inference refused.
+- Class names come from the loaded Ultralytics weights: ghost_net, debris, shipwreck, aircraft, propeller, tire, cylinder, diver.
+
+## Tests
+
+```bash
+npm run test:ml
+npm run test:api
+```

@@ -14,6 +14,8 @@ export type Detection = {
     width_px: number;
     height_px: number;
   };
+  overlay_url?: string | null;
+  image_url?: string | null;
 };
 
 export type DetectReport = {
