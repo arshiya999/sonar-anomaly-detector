@@ -20,7 +20,7 @@ export function SonarTheater({
   report: DetectReport | null;
   filename?: string | null;
 }) {
-  const src = preview ?? overlay;
+  const src = overlay ?? preview;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1526]">
@@ -59,8 +59,7 @@ export function SonarTheater({
                 <Radar className="size-12 text-[#c9a227]" />
               </div>
               <p className="max-w-sm text-sm text-white/70">
-                First ping is arming automatically. Or press{" "}
-                <span className="text-[#c9a227]">Run live demo</span> to stack three real logs.
+                Upload a sonar image from the Upload page. The waterfall and map update from that ping only.
               </p>
             </div>
           ) : (

@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse, Response
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
+from geotag import merge_gps_metadata  # noqa: E402
 from infer import annotate, detect_image, get_model, report_to_csv, resolve_weights  # noqa: E402
 
 app = FastAPI(title="NIOT Marine Debris Detector", version="1.0.0")
@@ -62,6 +63,7 @@ async def detect(
         meta = {}
     if not isinstance(meta, dict):
         meta = {}
+    meta = merge_gps_metadata(meta, raw)
     report = detect_image(bgr, meta=meta, conf_threshold=conf_threshold)
     overlay_b64 = None
     if return_overlay:
@@ -89,6 +91,7 @@ async def detect_csv(
         meta = json.loads(metadata or "{}")
     except json.JSONDecodeError:
         meta = {}
+    meta = merge_gps_metadata(meta if isinstance(meta, dict) else {}, raw)
     report = detect_image(bgr, meta=meta, conf_threshold=conf_threshold)
     return Response(content=report_to_csv(report), media_type="text/csv")
 

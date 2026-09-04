@@ -2,8 +2,68 @@
 
 from __future__ import annotations
 
+import io
 import math
 from typing import Any
+
+
+def _exif_ratio(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        if hasattr(value, "numerator"):
+            return float(value.numerator) / float(value.denominator or 1)
+    return 0.0
+
+
+def _dms_to_deg(values: Any, ref: str | None) -> float | None:
+    if not values or len(values) < 3:
+        return None
+    deg = _exif_ratio(values[0]) + _exif_ratio(values[1]) / 60.0 + _exif_ratio(values[2]) / 3600.0
+    if ref in {"S", "W"}:
+        deg = -deg
+    return deg
+
+
+def read_exif_gps(image_bytes: bytes) -> tuple[float | None, float | None]:
+    try:
+        from PIL import Image
+        from PIL.ExifTags import GPSTAGS, IFD
+    except Exception:
+        return None, None
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        exif = img.getexif()
+        if not exif:
+            return None, None
+        gps = exif.get_ifd(IFD.GPSInfo) if hasattr(IFD, "GPSInfo") else None
+        if not gps:
+            return None, None
+        tagged = {GPSTAGS.get(k, k): v for k, v in gps.items()}
+        lat = _dms_to_deg(tagged.get("GPSLatitude"), tagged.get("GPSLatitudeRef"))
+        lon = _dms_to_deg(tagged.get("GPSLongitude"), tagged.get("GPSLongitudeRef"))
+        if lat is None or lon is None:
+            return None, None
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            return None, None
+        return round(lat, 7), round(lon, 7)
+    except Exception:
+        return None, None
+
+
+def merge_gps_metadata(meta: dict[str, Any], image_bytes: bytes | None = None) -> dict[str, Any]:
+    out = dict(meta or {})
+    if out.get("latitude") is not None and out.get("longitude") is not None:
+        return out
+    if not image_bytes:
+        return out
+    lat, lon = read_exif_gps(image_bytes)
+    if lat is None or lon is None:
+        return out
+    out["latitude"] = lat
+    out["longitude"] = lon
+    out["gps_source"] = "exif"
+    return out
 
 
 def destination(lat: float, lon: float, bearing_deg: float, distance_m: float) -> tuple[float, float]:

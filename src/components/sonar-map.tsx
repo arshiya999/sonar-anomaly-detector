@@ -1,40 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import L from "leaflet";
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import { CircleMarker, ImageOverlay, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
 import { CLASS_LABEL, confidenceColor } from "@/lib/labels";
-import type { Detection } from "@/lib/types";
+import type { Detection, SurveyPin } from "@/lib/types";
 import "leaflet/dist/leaflet.css";
 
 type Mapped = Detection & { source?: string };
 
-const TRANSECT: [number, number][] = [
-  [13.055, 80.305],
-  [13.068, 80.338],
-  [13.0827, 80.3708],
-  [13.096, 80.402],
-  [13.112, 80.438],
-];
-
-function FitOnce({ points, world }: { points: [number, number][]; world?: boolean }) {
+function FitPins({ points }: { points: [number, number][] }) {
   const map = useMap();
-  const done = useRef(false);
+  const key = points.map((p) => p.join(",")).join("|");
   useEffect(() => {
-    const size = map.getSize();
-    if (size.x < 8 || size.y < 8) return;
-    map.invalidateSize();
-    if (done.current) return;
-    if (world) {
-      map.setView([18, 40], 2);
-      done.current = true;
-      return;
+    try {
+      if (map.getSize().x < 8) return;
+      map.invalidateSize();
+      if (points.length === 0) {
+        map.setView([15, 75], 3);
+        return;
+      }
+      if (points.length === 1) map.setView(points[0], 13);
+      else map.fitBounds(L.latLngBounds(points), { padding: [48, 48], maxZoom: 14 });
+    } catch {
+      /* unmounted */
     }
-    if (points.length === 0) return;
-    if (points.length === 1) map.setView(points[0], 4);
-    else map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 5 });
-    done.current = true;
-  }, [map, points, world]);
+  }, [map, key, points]);
   return null;
 }
 
@@ -58,30 +49,36 @@ function ResizeGuard() {
   return null;
 }
 
+function overlayBounds(lat: number, lon: number): L.LatLngBoundsExpression {
+  const dlat = 0.006;
+  const dlon = 0.006 / Math.max(0.2, Math.cos((lat * Math.PI) / 180));
+  return [
+    [lat - dlat, lon - dlon],
+    [lat + dlat, lon + dlon],
+  ];
+}
+
 export function SonarMap({
   detections,
+  surveys = [],
   basemap = "world",
 }: {
   detections: Mapped[];
+  surveys?: SurveyPin[];
   basemap?: "world" | "imagery";
 }) {
-  const points = useMemo(
-    () =>
-      detections
-        .filter((d) => d.latitude != null && d.longitude != null)
-        .map((d) => [d.latitude as number, d.longitude as number] as [number, number]),
-    [detections],
-  );
-  const center = points[0] ?? ([18, 40] as [number, number]);
-  const zoom = basemap === "world" ? 2 : points.length ? 5 : 2;
+  const points = useMemo(() => {
+    const fromDet = detections
+      .filter((d) => d.latitude != null && d.longitude != null)
+      .map((d) => [d.latitude as number, d.longitude as number] as [number, number]);
+    const fromSurvey = surveys.map((s) => [s.latitude, s.longitude] as [number, number]);
+    return [...fromSurvey, ...fromDet];
+  }, [detections, surveys]);
+  const center = points[0] ?? ([15, 75] as [number, number]);
+  const zoom = points.length ? 13 : 3;
 
   return (
-    <MapContainer
-      center={center}
-      zoom={zoom}
-      className="h-full min-h-[280px] w-full"
-      scrollWheelZoom
-    >
+    <MapContainer center={center} zoom={zoom} className="h-full min-h-[280px] w-full" scrollWheelZoom>
       {basemap === "imagery" ? (
         <TileLayer
           attribution="Tiles © Esri"
@@ -93,29 +90,33 @@ export function SonarMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
       )}
-      {basemap === "imagery" ? (
-        <Polyline
-          positions={TRANSECT}
-          pathOptions={{ color: "#fbbf24", weight: 3, dashArray: "10 8", opacity: 0.9 }}
-        />
-      ) : null}
       <ResizeGuard />
-      <FitOnce points={points} world={basemap === "world"} />
-      {detections.map((d) =>
-        d.latitude != null && d.longitude != null ? (
-          <CircleMarker
-            key={`${d.id}-halo`}
-            center={[d.latitude, d.longitude]}
-            radius={22}
-            pathOptions={{
-              color: confidenceColor(d.confidence),
-              fillColor: confidenceColor(d.confidence),
-              fillOpacity: 0.18,
-              weight: 1,
-            }}
-          />
+      <FitPins points={points} />
+      {surveys.map((s) =>
+        s.overlay_url ? (
+          <ImageOverlay key={`${s.id}-img`} url={s.overlay_url} bounds={overlayBounds(s.latitude, s.longitude)} opacity={0.88} />
         ) : null,
       )}
+      {surveys.map((s) => (
+        <CircleMarker
+          key={`${s.id}-survey`}
+          center={[s.latitude, s.longitude]}
+          radius={10}
+          pathOptions={{ color: "#1d4ed8", fillColor: "#2563eb", fillOpacity: 0.85, weight: 2 }}
+        >
+          <Popup>
+            <div className="max-w-[220px] text-sm text-slate-900">
+              <strong>{s.filename}</strong>
+              <br />
+              {s.latitude.toFixed(5)}, {s.longitude.toFixed(5)}
+              {s.overlay_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={s.overlay_url} alt="" className="mt-2 max-h-36 w-full rounded object-cover" />
+              ) : null}
+            </div>
+          </Popup>
+        </CircleMarker>
+      ))}
       {detections.map((d) =>
         d.latitude != null && d.longitude != null ? (
           <CircleMarker
@@ -130,12 +131,16 @@ export function SonarMap({
             }}
           >
             <Popup>
-              <div className="text-sm text-slate-900">
+              <div className="max-w-[220px] text-sm text-slate-900">
                 <strong>{CLASS_LABEL[d.class] ?? d.class}</strong> · {d.confidence.toFixed(0)}%
                 <br />
                 {d.source ? <span>{d.source}</span> : null}
                 <br />
                 {d.latitude.toFixed(5)}, {d.longitude.toFixed(5)}
+                {d.overlay_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={d.overlay_url} alt="" className="mt-2 max-h-36 w-full rounded object-cover" />
+                ) : null}
               </div>
             </Popup>
           </CircleMarker>
