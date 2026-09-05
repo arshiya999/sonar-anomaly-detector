@@ -145,8 +145,8 @@ export function SonarMap({
         </CircleMarker>
       ))}
       {detections
-        .filter((d) => d.latitude != null && d.longitude != null)
-        .filter((d) => !surveys.some((s) => Math.abs(s.latitude - (d.latitude as number)) < 1e-4 && Math.abs(s.longitude - (d.longitude as number)) < 1e-4))
+        .filter((d): d is Mapped & { latitude: number; longitude: number } => d.latitude != null && d.longitude != null)
+        .filter((d) => !surveys.some((s) => Math.abs(s.latitude - d.latitude) < 1e-4 && Math.abs(s.longitude - d.longitude) < 1e-4))
         .map((d) => (
           <CircleMarker
             key={d.id}
