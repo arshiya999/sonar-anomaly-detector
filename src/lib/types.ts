@@ -62,5 +62,8 @@ export type SurveyPin = {
   latitude: number;
   longitude: number;
   overlay_url?: string | null;
+  material: string;
+  classId?: string;
+  confidence?: number | null;
 };
 
