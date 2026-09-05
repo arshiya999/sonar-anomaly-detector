@@ -626,9 +626,8 @@ export function Dashboard() {
         </main>
 
         <footer className="flex flex-col gap-1 bg-[#0b1c33] px-4 py-2 text-[11px] text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-          <span className="flex items-baseline gap-2">
-            <span className="font-display text-sm italic text-white">Aqua Vision</span>
-            <span>v1.0.0</span>
+          <span>
+            <span className="font-heading font-bold text-white">Aqua Vision</span> v1.0.0
           </span>
           <span className="text-center">AI-Powered Underwater Debris &amp; Anomaly Detection using Side-Scan Sonar</span>
           <span>Last updated {clock ? `${clock} IST` : "—"}</span>
@@ -1370,18 +1369,14 @@ function SettingsPage({
 function AboutPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <Card className="overflow-hidden shadow-sm">
-        <CardHeader className="bg-gradient-to-br from-[#0b1c33] via-[#123056] to-[#0b1c33] pb-8 pt-8">
-          <BrandMark size="hero" />
+      <Card className="shadow-sm">
+        <CardHeader>
+          <BrandMark onDark={false} size="hero" />
         </CardHeader>
-        <CardContent className="space-y-3 pt-6 text-sm leading-relaxed text-slate-600">
+        <CardContent className="space-y-3 text-sm leading-relaxed text-slate-600">
           <p>
-            The ocean does not offer a photograph. It offers a ping — a grey waterfall of returns that hide nets,
-            hulls, tyres, and pipes in speckle. Aqua Vision is built to read that language.
-          </p>
-          <p>
-            It is the operations console for {MODEL_METRICS.org} problem {MODEL_METRICS.problem}: detect ghost gear,
-            wrecks, and man-made debris in side-scan sonar, then pin each contact so a cleanup crew can steam to it.
+            Aqua Vision is an operations console for {MODEL_METRICS.org} problem {MODEL_METRICS.problem}: detect ghost gear,
+            wrecks, and man-made debris in side-scan sonar and issue geotagged cleanup reports.
           </p>
           <p>
             The detector is YOLO11n ({MODEL_METRICS.params}) trained on SCTD 1.0, Marine Debris FLS, and
