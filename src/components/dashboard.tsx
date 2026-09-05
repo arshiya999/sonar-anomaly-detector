@@ -178,7 +178,13 @@ export function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(22);
-  const [health, setHealth] = useState<{ ok: boolean; trained?: boolean; weights?: string } | null>(null);
+  const [health, setHealth] = useState<{
+    ok: boolean;
+    hosted?: boolean;
+    trained?: boolean;
+    weights?: string;
+    error?: string;
+  } | null>(null);
   const [meta, setMeta] = useState<MetaForm>(DEFAULT_META);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
   const logRef = useRef<ScanLogEntry[]>([]);
@@ -409,6 +415,8 @@ export function Dashboard() {
 
   const alerts = allDetections.filter((d) => confidenceBand(d.confidence) === "high").length;
   const ready = Boolean(health?.ok);
+  const siteLive = health !== null;
+  const hostedNoMl = Boolean(health?.hosted) && !ready;
   const go = (next: PageId) => {
     setPage(next);
     setNavOpen(false);
@@ -465,9 +473,15 @@ export function Dashboard() {
           })}
         </nav>
         <div className="border-t border-white/10 px-4 py-3">
-          <div className="flex items-center gap-2 text-xs text-emerald-300">
+          <div className={`flex items-center gap-2 text-xs ${ready ? "text-emerald-300" : siteLive ? "text-amber-200" : "text-red-300"}`}>
             <CheckCircle2 className="size-4" />
-            System Health: {ready ? "All systems operational" : "Detector offline"}
+            {ready
+              ? "System health: all systems operational"
+              : hostedNoMl
+                ? "Website live · YOLO not hosted here"
+                : siteLive
+                  ? "Website live · detector offline"
+                  : "Cannot reach this website"}
           </div>
           <ShipGraphic />
         </div>
@@ -489,8 +503,8 @@ export function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <StatusPill ok={ready} label={`Model: ${ready ? "Ready" : "Offline"}`} />
-            <StatusPill ok={ready && !busy} label={`Status: ${busy ? "Scanning" : ready ? "Ready" : "Wait"}`} />
+            <StatusPill ok={ready} warn={hostedNoMl} label={`Model: ${ready ? "Ready" : hostedNoMl ? "Not on this host" : "Offline"}`} />
+            <StatusPill ok={siteLive && !busy} warn={hostedNoMl && !busy} label={`Site: ${busy ? "Scanning" : siteLive ? "Live" : "Down"}`} />
             <button type="button" className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100" onClick={() => go("detections")}>
               <Bell className="size-4" />
               {alerts > 0 ? (
@@ -509,6 +523,7 @@ export function Dashboard() {
           {page === "dashboard" && (
             <HomePage
               ready={ready}
+              hostedNoMl={hostedNoMl}
               busy={busy}
               alerts={alerts}
               mapped={mapped}
@@ -640,6 +655,7 @@ export function Dashboard() {
 
 function HomePage({
   ready,
+  hostedNoMl,
   busy,
   alerts,
   mapped,
@@ -653,6 +669,7 @@ function HomePage({
   go,
 }: {
   ready: boolean;
+  hostedNoMl: boolean;
   busy: boolean;
   alerts: number;
   mapped: Mapped[];
@@ -679,14 +696,14 @@ function HomePage({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           title="System Status"
-          value={busy ? "Scanning" : ready ? "Ready" : "Offline"}
-          tone={ready ? "green" : "red"}
+          value={busy ? "Scanning" : ready || hostedNoMl ? "Live" : "Offline"}
+          tone={ready || hostedNoMl ? "green" : "red"}
           icon={<Activity className="size-5" />}
         />
         <MetricCard
           title="Model Status"
-          value={ready ? "Ready" : "Offline"}
-          hint={`YOLO11n · ${MODEL_METRICS.params}`}
+          value={ready ? "Ready" : hostedNoMl ? "Local only" : "Offline"}
+          hint={hostedNoMl ? "YOLO is not hosted on Vercel" : `YOLO11n · ${MODEL_METRICS.params}`}
           tone="purple"
           icon={<Cpu className="size-5" />}
         />
@@ -1289,7 +1306,7 @@ function SettingsPage({
   setThreshold: (n: number) => void;
   meta: MetaForm;
   setMeta: (m: MetaForm) => void;
-  health: { ok: boolean; trained?: boolean; weights?: string } | null;
+  health: { ok: boolean; hosted?: boolean; trained?: boolean; weights?: string; error?: string } | null;
   report: DetectReport | null;
 }) {
   return (
@@ -1300,8 +1317,11 @@ function SettingsPage({
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Detector {health?.ok ? "online" : "offline"}
-            {health?.weights ? ` · ${health.weights}` : ""}
+            {health?.ok
+              ? `Detector online${health.weights ? ` · ${health.weights}` : ""}`
+              : health?.hosted
+                ? "This public website is live. YOLO inference is not deployed on Vercel — run `npm run dev:all` locally to score uploads."
+                : `Detector offline${health?.error ? ` · ${health.error}` : ""}`}
           </p>
           <div>
             <div className="mb-2 flex justify-between text-xs">
@@ -1436,11 +1456,15 @@ function MetricCard({
   );
 }
 
-function StatusPill({ ok, label }: { ok: boolean; label: string }) {
+function StatusPill({ ok, warn, label }: { ok: boolean; warn?: boolean; label: string }) {
   return (
     <span
       className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium sm:inline-flex ${
-        ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"
+        ok
+          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+          : warn
+            ? "border-amber-200 bg-amber-50 text-amber-800"
+            : "border-red-200 bg-red-50 text-red-700"
       }`}
     >
       {ok ? <CheckCircle2 className="size-3.5" /> : <ShieldAlert className="size-3.5" />}
