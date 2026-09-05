@@ -404,6 +404,30 @@ export function Dashboard() {
     return Object.entries(counts).map(([cls, count]) => ({ class: cls, count }));
   }, [allDetections]);
 
+  const chartLog = useMemo(() => {
+    if (!report) return log;
+    const already = log.some(
+      (e) =>
+        e.filename === (file?.name ?? "") &&
+        e.detections.length === report.detections.length &&
+        e.detections[0]?.class === report.detections[0]?.class,
+    );
+    if (already) return log;
+    return [
+      {
+        id: "live-scan",
+        at: new Date().toISOString(),
+        filename: file?.name || "upload",
+        survey: report.survey_id,
+        count: report.count,
+        inference_ms: report.inference_ms,
+        threshold: report.threshold,
+        detections: report.detections,
+      } satisfies ScanLogEntry,
+      ...log,
+    ];
+  }, [log, report, file]);
+
   const surveyPins: SurveyPin[] = useMemo(() => {
     const pins: SurveyPin[] = [];
     for (const e of log) {
@@ -586,7 +610,7 @@ export function Dashboard() {
                   <CardTitle>Session analytics</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <SurveyCharts entries={log} />
+                  <SurveyCharts entries={chartLog} />
                 </CardContent>
               </Card>
             </div>

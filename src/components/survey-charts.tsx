@@ -23,6 +23,7 @@ import {
   YAxis,
 } from "recharts";
 import { CLASS_COLOR, CLASS_LABEL } from "@/lib/labels";
+import { formatIst } from "@/lib/format";
 import type { ScanLogEntry } from "@/lib/types";
 import { Toggle } from "@/components/ui/toggle";
 import { ClassMixPie } from "@/components/class-mix-pie";
@@ -65,12 +66,12 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-4">
-        <Insight k="Images logged" v={String(stats.scans)} d="Each upload is kept" />
-        <Insight k="Hazards plotted" v={String(stats.hits)} d="Pins survive map zoom" />
+        <Insight k="Images logged" v={String(stats.scans)} d="Running total of sonar files" />
+        <Insight k="Detections" v={String(stats.hits)} d="Anomalies found (also called hazards)" />
         <Insight
           k="Top class"
           v={stats.topClass ? CLASS_LABEL[stats.topClass] ?? stats.topClass : "—"}
-          d={stats.topClass ? `${stats.byClass[stats.topClass]} detections` : "Run a scan"}
+          d={stats.topClass ? `${stats.byClass[stats.topClass]} detections` : "Upload a sonar image"}
         />
         <Insight
           k="Mean confidence"
@@ -123,8 +124,8 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
               title="Debris pie chart"
               subtitle={
                 stats.classRows.length
-                  ? "Colour slices = class share of every logged hazard"
-                  : "Colour key until the first scan lands — then slices match real detections"
+                  ? "Each slice is a detected class across all uploaded images"
+                  : "Upload sonar files — slices appear for each class (pipe, wreck, debris, …)"
               }
             >
               <ClassMixPie rows={stats.classRows} height={280} />
@@ -133,7 +134,7 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
           {on.includes("timeline") && (
             <ChartCard
               title="Images entered"
-              subtitle="Intake cadence — each point is a sonar file someone submitted"
+              subtitle="Cumulative count — the line should rise every time you upload a new file"
             >
               <ResponsiveContainer width="100%" height={260}>
                 <AreaChart data={stats.timeline} margin={{ left: 0, right: 8, top: 8 }}>
@@ -150,7 +151,7 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
                   <Area
                     type="monotone"
                     dataKey="images"
-                    name="Images"
+                    name="Images uploaded (total)"
                     stroke="#5eead4"
                     fill="url(#intakeFill)"
                     strokeWidth={2}
@@ -158,7 +159,7 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
                   <Area
                     type="monotone"
                     dataKey="hits"
-                    name="Hazards"
+                    name="Detections (total)"
                     stroke="#38bdf8"
                     fill="transparent"
                     strokeWidth={2}
@@ -170,7 +171,7 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
           {on.includes("confidence") && (
             <ChartCard
               title="Fused confidence"
-              subtitle="After shadow / contrast filtering — low bins are likely clutter"
+              subtitle="How many detections fall in each confidence band (updates with every scan)"
             >
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={stats.confBuckets} margin={{ left: 0, right: 8 }}>
@@ -264,7 +265,7 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>When (UTC)</TableHead>
+                  <TableHead>When (IST)</TableHead>
                   <TableHead>Image</TableHead>
                   <TableHead>Hits</TableHead>
                   <TableHead>ms</TableHead>
@@ -278,7 +279,7 @@ export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
                   return (
                     <TableRow key={e.id}>
                       <TableCell className="font-mono text-xs">
-                        {e.at.replace("T", " ").slice(0, 19)}
+                        {formatIst(e.at)}
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate text-xs">{e.filename}</TableCell>
                       <TableCell className="font-medium">{e.count}</TableCell>
@@ -341,19 +342,16 @@ function buildStats(entries: ScanLogEntry[]) {
     { key: "50-75", lo: 50, hi: 75, count: 0 },
     { key: "75-100", lo: 75, hi: 101, count: 0 },
   ];
-  const bySlot: Record<string, { images: number; hits: number }> = {};
   let confSum = 0;
   let hits = 0;
   let msSum = 0;
-  const chronological = [...entries].reverse();
+  const chronological = [...entries].sort(
+    (a, b) => Date.parse(a.at || "") - Date.parse(b.at || "") || a.filename.localeCompare(b.filename),
+  );
   const speed = chronological.map((e, i) => ({ i: i + 1, ms: e.inference_ms }));
 
   for (const e of entries) {
     msSum += e.inference_ms;
-    const slot = e.at.slice(11, 16);
-    if (!bySlot[slot]) bySlot[slot] = { images: 0, hits: 0 };
-    bySlot[slot].images += 1;
-    bySlot[slot].hits += e.count;
     for (const d of e.detections) {
       hits += 1;
       confSum += d.confidence;
@@ -373,9 +371,15 @@ function buildStats(entries: ScanLogEntry[]) {
       count,
     }));
   const topClass = classRows[0]?.class ?? "";
-  const timeline = Object.entries(bySlot)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([label, v]) => ({ label, images: v.images, hits: v.hits }));
+  let runningHits = 0;
+  const timeline = chronological.map((e, i) => {
+    runningHits += e.detections.length;
+    const t = Date.parse(e.at);
+    const label = Number.isFinite(t)
+      ? new Date(t).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" })
+      : String(i + 1);
+    return { label: `${i + 1} · ${label}`, images: i + 1, hits: runningHits };
+  });
   const risk = Object.keys(riskN).map((cls) => ({
     class: cls,
     label: CLASS_LABEL[cls] ?? cls,
