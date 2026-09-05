@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://aqua:aqua@127.0.0.1:5432/aqua_vision"
     model_path: str = str(ROOT / "ml" / "weights" / "sonar-debris-yolo11n.pt")
     storage_dir: str = str(ROOT / "data" / "aqua_storage")
-    cors_origins: str = "http://127.0.0.1:47281,http://localhost:47281"
+    cors_origins: str = "*"
     max_upload_mb: int = 64
     log_level: str = "INFO"
     host: str = "0.0.0.0"

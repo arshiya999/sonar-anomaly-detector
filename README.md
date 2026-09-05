@@ -16,7 +16,26 @@ npm install
 npm run dev:all
 ```
 
-Open http://127.0.0.1:47281
+Open http://127.0.0.1:47281 on this machine.
+
+## Open from any phone or laptop
+
+The dashboard is a normal HTTPS website. Anyone can use it if they have the public URL — they do **not** type `127.0.0.1` on their own device.
+
+While this project is running with a Cloudflare tunnel:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:47281 --protocol http2 --edge-ip-version 4
+```
+
+That prints a link like `https://….trycloudflare.com`. Open that on a phone, tablet, or any PC (Chrome, Safari, Firefox). YOLO stays on the server; the phone only talks to the website.
+
+For a machine that stays online (college lab / VPS):
+
+```bash
+docker compose up --build -d
+# then put nginx or cloudflared in front of port 47281
+```
 
 `dev:all` starts:
 
