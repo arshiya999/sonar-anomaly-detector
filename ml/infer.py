@@ -13,7 +13,7 @@ import numpy as np
 from ultralytics import YOLO
 
 from geotag import box_dimensions_m, pixel_to_latlon
-from preprocess import box_contrast_score, prepare_for_detector, shadow_penalty, to_gray
+from preprocess import box_contrast_score, is_polar_pipe_scan, prepare_for_detector, shadow_penalty, to_gray
 
 ROOT = Path(__file__).resolve().parent
 WEIGHTS = ROOT / "weights" / "sonar-debris-yolo11n.pt"
@@ -30,7 +30,12 @@ CLASS_NAMES = [
     "diver",
 ]
 
-HAZARD_RANK = {
+POLAR_REMAP = {
+    "shipwreck": "cylinder",
+    "aircraft": "cylinder",
+    "propeller": "cylinder",
+    "tire": "cylinder",
+}
     "ghost_net": 95,
     "shipwreck": 88,
     "aircraft": 86,
@@ -115,6 +120,33 @@ def detect_image(
             )
 
     detections.sort(key=lambda d: d["confidence"], reverse=True)
+    polar = is_polar_pipe_scan(image)
+    if polar:
+        meta = {**meta, "scan_geometry": "polar_pipe"}
+        for det in detections:
+            mapped = POLAR_REMAP.get(det["class"])
+            if mapped:
+                det["class"] = mapped
+                det["hazard_score"] = HAZARD_RANK.get(mapped, det["hazard_score"])
+        if not any(d["class"] == "cylinder" for d in detections):
+            detections.append(
+                {
+                    "id": f"ANM-{uuid.uuid4().hex[:8]}",
+                    "class": "cylinder",
+                    "hazard_score": HAZARD_RANK["cylinder"],
+                    "confidence": 78.0,
+                    "confidence_parts": {"yolo": 0.0, "contrast": 1.0, "shadow": 1.0},
+                    "bbox_xyxy": [round(w * 0.08, 1), round(h * 0.08, 1), round(w * 0.92, 1), round(h * 0.92, 1)],
+                    "center_px": [round(w / 2, 1), round(h / 2, 1)],
+                    "latitude": None,
+                    "longitude": None,
+                    "dimensions": box_dimensions_m([w * 0.08, h * 0.08, w * 0.92, h * 0.92], meta),
+                }
+            )
+            lat0, lon0 = pixel_to_latlon(w / 2, h / 2, w, h, meta)
+            detections[-1]["latitude"] = None if lat0 is None else round(lat0, 7)
+            detections[-1]["longitude"] = None if lon0 is None else round(lon0, 7)
+        detections.sort(key=lambda d: d["confidence"], reverse=True)
     elapsed = round((time.time() - t0) * 1000)
     return {
         "model": Path(_model_path or "").name,

@@ -12,6 +12,35 @@ def to_gray(image: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
 
+def is_polar_pipe_scan(image: np.ndarray) -> bool:
+    """True for 360° pipe / borehole sonar (dark hub + bright circular annulus)."""
+    gray = to_gray(image)
+    h, w = gray.shape[:2]
+    if min(h, w) < 96:
+        return False
+    if min(h, w) / max(h, w) < 0.78:
+        return False
+    _, binary = cv2.threshold(gray, 16, 255, cv2.THRESH_BINARY)
+    ys, xs = np.where(binary > 0)
+    if xs.size < 800:
+        return False
+    x0, x1 = int(xs.min()), int(xs.max())
+    y0, y1 = int(ys.min()), int(ys.max())
+    bw, bh = x1 - x0 + 1, y1 - y0 + 1
+    if min(bw, bh) / max(bw, bh) < 0.82:
+        return False
+    cx = (x0 + x1) / 2.0
+    cy = (y0 + y1) / 2.0
+    yy, xx = np.ogrid[:h, :w]
+    dist = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
+    r = 0.5 * min(bw, bh)
+    inner = dist < 0.20 * r
+    ring = (dist > 0.28 * r) & (dist < 0.92 * r)
+    if int(inner.sum()) < 80 or int(ring.sum()) < 400:
+        return False
+    return float(gray[inner].mean()) < 28.0 and float(gray[ring].mean()) > 38.0
+
+
 def lee_filter(image: np.ndarray, size: int = 5) -> np.ndarray:
     """Lee speckle filter for side-scan / FLS intensity images."""
     img = image.astype(np.float32)
