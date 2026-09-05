@@ -8,11 +8,13 @@ export async function GET() {
     const data = await res.json();
     return Response.json(data);
   } catch {
-    return Response.json(
+        return Response.json(
       {
         ok: false,
-        hosted: true,
-        error: "The website is live. The YOLO detector is not running on Vercel.",
+        hosted: Boolean(process.env.VERCEL),
+        error: process.env.VERCEL
+          ? "The website is live. The YOLO detector is not running on Vercel."
+          : "Inference service is not running on port 8765.",
       },
       { status: 200 },
     );
