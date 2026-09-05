@@ -54,8 +54,14 @@ const TOOLTIP_STYLE = {
   color: "#0f172a",
 };
 
-export function SurveyCharts({ entries }: { entries: ScanLogEntry[] }) {
-  const [on, setOn] = useState<GraphId[]>(["mix", "timeline", "confidence"]);
+export function SurveyCharts({
+  entries,
+  defaultGraphs = ["mix", "timeline", "confidence"],
+}: {
+  entries: ScanLogEntry[];
+  defaultGraphs?: GraphId[];
+}) {
+  const [on, setOn] = useState<GraphId[]>(defaultGraphs);
   const [showLog, setShowLog] = useState(true);
   const stats = useMemo(() => buildStats(entries), [entries]);
 
