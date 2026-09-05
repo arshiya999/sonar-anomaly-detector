@@ -53,6 +53,7 @@ import {
 import { SurveyCharts } from "@/components/survey-charts";
 import { ClassMixPie } from "@/components/class-mix-pie";
 import { BrandMark } from "@/components/brand-mark";
+import { PipelineStrip } from "@/components/pipeline-strip";
 import { SonarTheater } from "@/components/sonar-theater";
 
 const SonarMap = dynamic(
