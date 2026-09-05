@@ -8,7 +8,7 @@ export async function GET() {
     const data = await res.json();
     return Response.json(data);
   } catch {
-        return Response.json(
+    return Response.json(
       {
         ok: false,
         hosted: Boolean(process.env.VERCEL),
