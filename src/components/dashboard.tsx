@@ -42,6 +42,14 @@ import { CLASS_COLOR, CLASS_LABEL, confidenceBand, confidenceColor } from "@/lib
 import { MODEL_METRICS } from "@/lib/metrics";
 import { formatIst } from "@/lib/format";
 import type { DetectReport, DetectResponse, Detection, ScanLogEntry, SurveyPin } from "@/lib/types";
+import {
+  detectionsFromLog,
+  geotagReport,
+  mergeLogs,
+  pinsFromLog,
+  placeScan,
+  toLogEntry,
+} from "@/lib/geo";
 import { SurveyCharts } from "@/components/survey-charts";
 import { ClassMixPie } from "@/components/class-mix-pie";
 import { PipelineStrip } from "@/components/pipeline-strip";
@@ -172,37 +180,25 @@ export function Dashboard() {
   const [health, setHealth] = useState<{ ok: boolean; trained?: boolean; weights?: string } | null>(null);
   const [meta, setMeta] = useState<MetaForm>(DEFAULT_META);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
+  const logRef = useRef<ScanLogEntry[]>([]);
+  logRef.current = log;
   const [pipeStep, setPipeStep] = useState(0);
   const [clock, setClock] = useState("");
 
-  const refreshLog = () =>
+  const refreshLog = useCallback(() =>
     fetch("/api/log", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (!Array.isArray(data.entries)) return;
-        setLog(data.entries);
+        setLog((prev) => mergeLogs(data.entries as ScanLogEntry[], prev));
         const latestEntry = data.entries[0] as ScanLogEntry | undefined;
         const overlayFromDb = latestEntry?.overlay_url ?? latestEntry?.detections?.find((d) => d.overlay_url)?.overlay_url;
         if (overlayFromDb) {
           setOverlay((prev) => (prev?.startsWith("data:") ? prev : overlayFromDb));
         }
-        if (latestEntry) {
-          setReport((prev) => {
-            if (prev) return prev;
-            return {
-              model: "sonar-debris-yolo11n.pt",
-              image_size: { width: 0, height: 0 },
-              inference_ms: latestEntry.inference_ms,
-              threshold: latestEntry.threshold,
-              detections: latestEntry.detections,
-              count: latestEntry.count,
-              metadata: {},
-              survey_id: latestEntry.survey,
-            };
-          });
-        }
       })
-      .catch(() => undefined);
+      .catch(() => undefined),
+  []);
 
   useEffect(() => {
     const tick = () =>
@@ -241,12 +237,7 @@ export function Dashboard() {
         .catch(() => setHealth({ ok: false }));
     void ping();
     const id = setInterval(ping, 8000);
-    const logId = setInterval(() => void refreshLog(), 12000);
-    return () => {
-      clearInterval(id);
-      clearInterval(logId);
-    };
-  }, []);
+  }, [refreshLog]);
 
   const runDetect = useCallback(
     async (imageFile: File, nextMeta?: MetaForm) => {
@@ -267,8 +258,9 @@ export function Dashboard() {
       const heading = optionalNumber(used.heading_deg);
       const mppx = optionalNumber(used.meters_per_pixel_x);
       const mppy = optionalNumber(used.meters_per_pixel_y);
-      if (lat != null) metadata.latitude = lat;
-      if (lon != null) metadata.longitude = lon;
+      const [plotLat, plotLon] = placeScan(logRef.current, lat, lon);
+      metadata.latitude = plotLat;
+      metadata.longitude = plotLon;
       if (heading != null) metadata.heading_deg = heading;
       if (mppx != null) metadata.meters_per_pixel_x = mppx;
       if (mppy != null) metadata.meters_per_pixel_y = mppy;
@@ -279,30 +271,48 @@ export function Dashboard() {
         if (!res.ok || data.error) {
           throw new Error(data.error || "Detection failed");
         }
-        setReport(data.report);
-        setOverlay(
-          data.overlay_jpeg_base64 ? `data:image/jpeg;base64,${data.overlay_jpeg_base64}` : null,
-        );
+        const overlayData = data.overlay_jpeg_base64
+          ? `data:image/jpeg;base64,${data.overlay_jpeg_base64}`
+          : null;
+        const geoReport = geotagReport(data.report, plotLat, plotLon);
+        const localEntry = toLogEntry({
+          id: `local-${Date.now()}`,
+          filename: imageFile.name,
+          report: geoReport,
+          lat: plotLat,
+          lon: plotLon,
+          overlay: overlayData,
+        });
+        setReport(geoReport);
+        setOverlay(overlayData);
+        setLog((prev) => mergeLogs(prev, [localEntry]));
+        setMeta((m) => ({
+          ...m,
+          latitude: m.latitude.trim() || String(plotLat.toFixed(5)),
+          longitude: m.longitude.trim() || String(plotLon.toFixed(5)),
+        }));
         toast.success(
-          data.report.count
-            ? `${data.report.count} anomal${data.report.count === 1 ? "y" : "ies"} localized`
-            : "Scan complete — no anomalies above threshold",
+          geoReport.count
+            ? `${geoReport.count} anomal${geoReport.count === 1 ? "y" : "ies"} localized — map, graphs, and report updated`
+            : "Scan logged on the map, graphs, and report (no class above threshold)",
         );
-        await fetch("/api/log", {
+        const persist = await fetch("/api/log", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             filename: imageFile.name,
-            report: data.report,
+            report: geoReport,
             overlay_jpeg_base64: data.overlay_jpeg_base64,
           }),
         });
+        if (persist.ok) {
+          const saved = (await persist.json()) as { entries?: ScanLogEntry[] };
+          if (Array.isArray(saved.entries)) {
+            setLog((prev) => mergeLogs(saved.entries as ScanLogEntry[], prev));
+          }
+        }
         await refreshLog();
-        toast.message(
-          lat != null
-            ? `Plotted on the map at ${Number(lat).toFixed(4)}, ${Number(lon).toFixed(4)}`
-            : "Scan stored. Add latitude/longitude on Upload to move the pin.",
-        );
+        toast.message(`Plotted at ${plotLat.toFixed(4)}, ${plotLon.toFixed(4)}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Detection failed";
         setError(message);
@@ -311,27 +321,27 @@ export function Dashboard() {
         setBusy(false);
       }
     },
-    [meta, threshold],
+    [meta, threshold, refreshLog],
   );
 
   const onFile = async (next: File) => {
     setFile(next);
     setPreview(URL.createObjectURL(next));
     setOverlay(null);
-    setReport(null);
     setPage("analysis");
     await runDetect(next);
   };
 
   const downloadJson = () => {
-    if (!report) return;
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ surveys: log, latest: report }, null, 2)], {
+      type: "application/json",
+    });
     triggerDownload(blob, "anomaly-report.json");
   };
 
   const downloadCsv = () => {
-    if (!report) return;
     const headers = [
+      "scan",
       "id",
       "class",
       "confidence_pct",
@@ -341,8 +351,9 @@ export function Dashboard() {
       "width_m",
       "length_m",
     ];
-    const rows = report.detections.map((d) =>
+    const rows = detectionsFromLog(log).map((d) =>
       [
+        d.source ?? "",
         d.id,
         d.class,
         d.confidence,
@@ -360,43 +371,24 @@ export function Dashboard() {
   };
 
   const downloadBriefing = () => {
-    if (!report) return;
-    const rows = report.detections
+    const rows = detectionsFromLog(log)
       .map(
         (d) =>
-          `<tr><td>${d.id}</td><td>${CLASS_LABEL[d.class] ?? d.class}</td><td>${d.confidence.toFixed(0)}%</td><td>${d.hazard_score}</td><td>${d.latitude ?? "—"}, ${d.longitude ?? "—"}</td></tr>`,
+          `<tr><td>${d.source ?? ""}</td><td>${d.id}</td><td>${CLASS_LABEL[d.class] ?? d.class}</td><td>${d.confidence.toFixed(0)}%</td><td>${d.hazard_score}</td><td>${d.latitude ?? "—"}, ${d.longitude ?? "—"}</td></tr>`,
       )
       .join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Aqua Vision briefing</title>
 <style>body{font-family:ui-sans-serif,system-ui;background:#eef1f6;color:#0f172a;padding:32px}h1{color:#2563eb}table{border-collapse:collapse;width:100%;background:#fff}td,th{border:1px solid #e2e8f0;padding:8px;text-align:left}</style>
-</head><body><p>MoES · NIOT · PS 26057</p><h1>Aqua Vision cleanup briefing</h1>
-<p>${report.survey_id} · ${report.model} · ${report.inference_ms} ms · ${report.count} contacts</p>
-<table><thead><tr><th>ID</th><th>Class</th><th>Conf</th><th>Hazard</th><th>Lat, Lon</th></tr></thead><tbody>${rows}</tbody></table>
+</head><body><h1>Aqua Vision cleanup briefing</h1>
+<p>${log.length} sonar images · ${allDetections.length} contacts</p>
+<table><thead><tr><th>Image</th><th>ID</th><th>Class</th><th>Conf</th><th>Hazard</th><th>Lat, Lon</th></tr></thead><tbody>${rows}</tbody></table>
 <p>Trained YOLO11n mAP@50 74.9% on SCTD + Marine Debris FLS + SeabedObjects-KLSG.</p></body></html>`;
     triggerDownload(new Blob([html], { type: "text/html" }), "aqua-vision-briefing.html");
   };
 
-  const mapped = useMemo(() => {
-    const fromLog = log.flatMap((e) =>
-      e.detections
-        .filter((d) => d.latitude != null && d.longitude != null)
-        .map((d) => ({ ...d, source: e.filename })),
-    );
-    const ids = new Set(fromLog.map((d) => d.id));
-    const extra =
-      report?.detections
-        .filter((d) => d.latitude != null && d.longitude != null && !ids.has(d.id))
-        .map((d) => ({ ...d, source: file?.name })) ?? [];
-    return [...fromLog, ...extra];
-  }, [log, report, file]);
+  const mapped = useMemo(() => detectionsFromLog(log).filter((d) => d.latitude != null && d.longitude != null), [log]);
 
-  const allDetections: Mapped[] = useMemo(() => {
-    const fromLog = log.flatMap((e) => e.detections.map((d) => ({ ...d, source: e.filename })));
-    const ids = new Set(fromLog.map((d) => d.id));
-    const extra =
-      report?.detections.filter((d) => !ids.has(d.id)).map((d) => ({ ...d, source: file?.name })) ?? [];
-    return [...fromLog, ...extra];
-  }, [log, report, file]);
+  const allDetections: Mapped[] = useMemo(() => detectionsFromLog(log), [log]);
 
   const mixRows = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -404,50 +396,8 @@ export function Dashboard() {
     return Object.entries(counts).map(([cls, count]) => ({ class: cls, count }));
   }, [allDetections]);
 
-  const chartLog = useMemo(() => {
-    if (!report) return log;
-    const already = log.some(
-      (e) =>
-        e.filename === (file?.name ?? "") &&
-        e.detections.length === report.detections.length &&
-        e.detections[0]?.class === report.detections[0]?.class,
-    );
-    if (already) return log;
-    return [
-      {
-        id: "live-scan",
-        at: new Date().toISOString(),
-        filename: file?.name || "upload",
-        survey: report.survey_id,
-        count: report.count,
-        inference_ms: report.inference_ms,
-        threshold: report.threshold,
-        detections: report.detections,
-      } satisfies ScanLogEntry,
-      ...log,
-    ];
-  }, [log, report, file]);
-
-  const surveyPins: SurveyPin[] = useMemo(() => {
-    const pins: SurveyPin[] = [];
-    for (const e of log) {
-      const top = [...e.detections].sort((a, b) => b.confidence - a.confidence)[0];
-      const lat = e.latitude ?? top?.latitude ?? null;
-      const lon = e.longitude ?? top?.longitude ?? null;
-      if (lat == null || lon == null) continue;
-      pins.push({
-        id: e.id,
-        filename: e.filename,
-        latitude: lat,
-        longitude: lon,
-        overlay_url: e.overlay_url ?? e.image_url ?? top?.overlay_url ?? null,
-        material: top ? CLASS_LABEL[top.class] ?? top.class : "No detection",
-        classId: top?.class,
-        confidence: top?.confidence ?? null,
-      });
-    }
-    return pins;
-  }, [log]);
+  const chartLog = log;
+  const surveyPins: SurveyPin[] = useMemo(() => pinsFromLog(log), [log]);
 
   const latest = useMemo(() => {
     if (report?.detections.length) {
@@ -600,20 +550,41 @@ export function Dashboard() {
                 complete={Boolean(report) && !busy}
                 hint={busy ? "Processing sonar log" : report ? "Last ping fused and geotagged" : "Standing by"}
               />
-              <SonarTheater
-                preview={preview}
-                overlay={overlay}
-                busy={busy}
-                error={error}
-                report={report}
-                filename={file?.name}
-              />
+              <div className="grid gap-4 xl:grid-cols-2">
+                <SonarTheater
+                  preview={preview}
+                  overlay={overlay}
+                  busy={busy}
+                  error={error}
+                  report={report}
+                  filename={file?.name}
+                />
+                <Card className="overflow-hidden shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Live map</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Every uploaded image is pinned here as soon as inference finishes.
+                    </p>
+                  </CardHeader>
+                  <CardContent className="relative h-[420px] p-0">
+                    <SonarMap
+                      key={`analysis-map-${surveyPins.length}-${surveyPins[0]?.id ?? "none"}`}
+                      detections={mapped}
+                      surveys={surveyPins}
+                    />
+                    <MapLegend count={surveyPins.length} />
+                  </CardContent>
+                </Card>
+              </div>
               <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>Session analytics</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    These graphs include every image in this session, including the one you just uploaded.
+                  </p>
                 </CardHeader>
                 <CardContent>
-                  <SurveyCharts entries={chartLog} />
+                  <SurveyCharts key={`charts-${chartLog.length}-${chartLog[0]?.id ?? "none"}`} entries={chartLog} />
                 </CardContent>
               </Card>
             </div>
@@ -630,14 +601,19 @@ export function Dashboard() {
                 </p>
               </CardHeader>
               <CardContent className="relative h-[620px] p-0">
-                <SonarMap key="full-map" detections={mapped} surveys={surveyPins} />
+                <SonarMap
+                  key={`full-map-${surveyPins.length}-${surveyPins[0]?.id ?? "none"}`}
+                  detections={mapped}
+                  surveys={surveyPins}
+                />
                 <MapLegend count={surveyPins.length} />
               </CardContent>
             </Card>
           )}
           {page === "report" && (
             <ReportPage
-              report={report}
+              log={log}
+              detections={allDetections}
               downloadJson={downloadJson}
               downloadCsv={downloadCsv}
               downloadBriefing={downloadBriefing}
@@ -740,13 +716,29 @@ function HomePage({
         />
       </div>
 
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Live survey graphs</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Counts, class mix, and hazard scores refresh as soon as a sonar file is processed.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <SurveyCharts key={`home-charts-${log.length}-${log[0]?.id ?? "none"}`} entries={log} />
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 xl:grid-cols-12">
         <Card className="overflow-hidden shadow-sm xl:col-span-6">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Global Detections Map</CardTitle>
           </CardHeader>
           <CardContent className="relative h-[380px] p-0">
-            <SonarMap key="home-map" detections={mapped} surveys={surveys} />
+            <SonarMap
+              key={`home-map-${surveys.length}-${surveys[0]?.id ?? "none"}`}
+              detections={mapped}
+              surveys={surveys}
+            />
             <MapLegend count={surveys.length} />
           </CardContent>
         </Card>
@@ -1114,81 +1106,133 @@ function DetectionsPage({
 }
 
 function ReportPage({
-  report,
+  log,
+  detections,
   downloadJson,
   downloadCsv,
   downloadBriefing,
 }: {
-  report: DetectReport | null;
+  log: ScanLogEntry[];
+  detections: Mapped[];
   downloadJson: () => void;
   downloadCsv: () => void;
   downloadBriefing: () => void;
 }) {
+  const hasData = log.length > 0;
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <div>
-          <CardTitle>Cleanup report</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">Export JSON, CSV, or an HTML briefing for operations.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={downloadJson} disabled={!report}>
-            JSON
-          </Button>
-          <Button size="sm" variant="outline" onClick={downloadCsv} disabled={!report}>
-            CSV
-          </Button>
-          <Button size="sm" variant="outline" onClick={downloadBriefing} disabled={!report}>
-            Briefing
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {!report ? (
-          <EmptyNote text="Upload a sonar image, then return here for the structured order." />
-        ) : report.count === 0 ? (
-          <EmptyNote text="No man-made anomalies above the current confidence gate." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Conf.</TableHead>
-                  <TableHead>Hazard</TableHead>
-                  <TableHead>Lat / Lon</TableHead>
-                  <TableHead>Size (m)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.detections.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell className="font-mono text-xs">{d.id}</TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="size-2 rounded-full" style={{ background: CLASS_COLOR[d.class] }} />
-                        {CLASS_LABEL[d.class] ?? d.class}
-                      </span>
-                    </TableCell>
-                    <TableCell>{d.confidence.toFixed(0)}%</TableCell>
-                    <TableCell>{d.hazard_score}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {d.latitude != null && d.longitude != null
-                        ? `${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {d.dimensions.width_m} × {d.dimensions.length_m}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+    <div className="space-y-4">
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <div>
+            <CardTitle>Cleanup report</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {log.length} image{log.length === 1 ? "" : "s"} · {detections.length} contact
+              {detections.length === 1 ? "" : "s"} — updates with every upload.
+            </p>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={downloadJson} disabled={!hasData}>
+              JSON
+            </Button>
+            <Button size="sm" variant="outline" onClick={downloadCsv} disabled={!hasData}>
+              CSV
+            </Button>
+            <Button size="sm" variant="outline" onClick={downloadBriefing} disabled={!hasData}>
+              Briefing
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!hasData ? (
+            <EmptyNote text="Upload a sonar image. Each file is appended here immediately." />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When (IST)</TableHead>
+                    <TableHead>Image</TableHead>
+                    <TableHead>Material</TableHead>
+                    <TableHead>Hits</TableHead>
+                    <TableHead>Lat / Lon</TableHead>
+                    <TableHead>ms</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {log.map((e) => {
+                    const top = [...e.detections].sort((a, b) => b.confidence - a.confidence)[0];
+                    return (
+                      <TableRow key={e.id}>
+                        <TableCell className="font-mono text-xs">{formatIst(e.at)}</TableCell>
+                        <TableCell className="max-w-[220px] truncate text-xs">{e.filename}</TableCell>
+                        <TableCell className="text-xs">
+                          {top ? CLASS_LABEL[top.class] ?? top.class : "No detection"}
+                        </TableCell>
+                        <TableCell className="font-medium">{e.count}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {e.latitude != null && e.longitude != null
+                            ? `${e.latitude.toFixed(5)}, ${e.longitude.toFixed(5)}`
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{e.inference_ms}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Contacts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {detections.length === 0 ? (
+            <EmptyNote text="Logged images with no class above the gate still appear in the table above." />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Image</TableHead>
+                    <TableHead>Class</TableHead>
+                    <TableHead>Conf.</TableHead>
+                    <TableHead>Hazard</TableHead>
+                    <TableHead>Lat / Lon</TableHead>
+                    <TableHead>Size (m)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detections.map((d) => (
+                    <TableRow key={`${d.source}-${d.id}`}>
+                      <TableCell className="max-w-[180px] truncate text-xs">{d.source ?? "—"}</TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="size-2 rounded-full" style={{ background: CLASS_COLOR[d.class] }} />
+                          {CLASS_LABEL[d.class] ?? d.class}
+                        </span>
+                      </TableCell>
+                      <TableCell>{d.confidence.toFixed(0)}%</TableCell>
+                      <TableCell>{d.hazard_score}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {d.latitude != null && d.longitude != null
+                          ? `${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {d.dimensions.width_m} × {d.dimensions.length_m}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

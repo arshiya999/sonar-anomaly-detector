@@ -57,6 +57,18 @@ def _is_seed_raster(name: str) -> bool:
     return n.startswith("sctd_") or n.startswith("wt_marine-debris")
 
 
+def _coord(value) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not (n == n) or abs(n) > 180:
+        return None
+    return n
+
+
 def _survey_title(report: dict, filename: str) -> str:
     raw = str(report.get("survey_id") or "")
     if not raw or raw in {"unspecified", "undefined"} or "demo transect" in raw.lower():
@@ -128,12 +140,12 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
     size = report.get("image_size") or {}
     w = int(size.get("width") or 0)
     h = int(size.get("height") or 0)
-    lat0 = meta.get("latitude")
-    lon0 = meta.get("longitude")
+    lat0 = _coord(meta.get("latitude"))
+    lon0 = _coord(meta.get("longitude"))
     if lat0 is None or lon0 is None:
         last = db.query(GpsTrack).order_by(GpsTrack.timestamp.desc()).first()
         n = db.query(Survey).count()
-        if last is not None:
+        if last is not None and last.latitude is not None and last.longitude is not None:
             lat0 = float(last.latitude) + 0.04 * ((n % 6) - 2.5)
             lon0 = float(last.longitude) + 0.045 * ((n % 5) - 2)
         else:
@@ -223,7 +235,14 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
         )
     db.add(Report(survey_id=survey.id))
     db.commit()
-    return {"ok": True, "survey_id": survey.id, "deduped": False, "image_size": {"width": w, "height": h}}
+    return {
+        "ok": True,
+        "survey_id": survey.id,
+        "deduped": False,
+        "image_size": {"width": w, "height": h},
+        "latitude": lat0,
+        "longitude": lon0,
+    }
 
 
 @router.get("/ops/log")
@@ -246,6 +265,17 @@ def ops_log(db: Session = Depends(get_db)):
             geo = next((d for d in dets if d.latitude is not None), None)
             if geo:
                 frame_lat, frame_lon = geo.latitude, geo.longitude
+        if frame_lat is None:
+            ping = db.query(GpsTrack).filter(GpsTrack.survey_id == s.id).first()
+            if ping is not None:
+                frame_lat, frame_lon = ping.latitude, ping.longitude
+        if frame_lat is None:
+            last = db.query(GpsTrack).order_by(GpsTrack.timestamp.desc()).first()
+            if last is not None:
+                frame_lat = float(last.latitude) + 0.02
+                frame_lon = float(last.longitude) + 0.02
+            else:
+                frame_lat, frame_lon = 21.1466, 79.0882
         packed = []
         for d in dets:
             packed.append(
@@ -257,8 +287,8 @@ def ops_log(db: Session = Depends(get_db)):
                     "confidence_parts": {"yolo": d.raw_confidence / 100, "contrast": 1, "shadow": 1},
                     "bbox_xyxy": [d.x, d.y, d.x + d.width, d.y + d.height],
                     "center_px": [d.x + d.width / 2, d.y + d.height / 2],
-                    "latitude": d.latitude,
-                    "longitude": d.longitude,
+                    "latitude": d.latitude if d.latitude is not None else frame_lat,
+                    "longitude": d.longitude if d.longitude is not None else frame_lon,
                     "dimensions": {
                         "width_m": d.width_m,
                         "length_m": d.length_m,
