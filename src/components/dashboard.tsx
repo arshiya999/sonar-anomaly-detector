@@ -52,7 +52,7 @@ import {
 } from "@/lib/geo";
 import { SurveyCharts } from "@/components/survey-charts";
 import { ClassMixPie } from "@/components/class-mix-pie";
-import { PipelineStrip } from "@/components/pipeline-strip";
+import { BrandMark } from "@/components/brand-mark";
 import { SonarTheater } from "@/components/sonar-theater";
 
 const SonarMap = dynamic(
@@ -441,16 +441,8 @@ export function Dashboard() {
           navOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-start gap-3 border-b border-white/10 px-5 py-5">
-          <div className="mt-0.5 grid size-9 place-items-center rounded-lg bg-[#2563eb]">
-            <Waves className="size-5 text-white" />
-          </div>
-          <div>
-            <p className="font-heading text-lg font-semibold tracking-[0.14em] text-white uppercase">
-              Aqua Vision
-            </p>
-            <p className="mt-1 text-[11px] tracking-wide text-slate-400">Side-Scan Sonar Intelligence</p>
-          </div>
+        <div className="border-b border-white/10 px-4 py-5">
+          <BrandMark />
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
           {NAV.map((item) => {
@@ -634,7 +626,8 @@ export function Dashboard() {
         </main>
 
         <footer className="flex flex-col gap-1 bg-[#0b1c33] px-4 py-2 text-[11px] text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-          <span>Aqua Vision v1.0.0</span>
+          <span className="font-display italic text-sm text-white">Aqua Vision</span>
+          <span>v1.0.0</span>
           <span className="text-center">AI-Powered Underwater Debris &amp; Anomaly Detection using Side-Scan Sonar</span>
           <span>Last updated {clock ? `${clock} IST` : "—"}</span>
         </footer>
@@ -1375,14 +1368,18 @@ function SettingsPage({
 function AboutPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle>Aqua Vision</CardTitle>
+      <Card className="overflow-hidden shadow-sm">
+        <CardHeader className="bg-gradient-to-br from-[#0b1c33] via-[#123056] to-[#0b1c33] pb-8 pt-8">
+          <BrandMark size="hero" />
         </CardHeader>
-        <CardContent className="space-y-3 text-sm leading-relaxed text-slate-600">
+        <CardContent className="space-y-3 pt-6 text-sm leading-relaxed text-slate-600">
           <p>
-            Aqua Vision is an operations console for {MODEL_METRICS.org} problem {MODEL_METRICS.problem}: detect ghost gear,
-            wrecks, and man-made debris in side-scan sonar and issue geotagged cleanup reports.
+            The ocean does not offer a photograph. It offers a ping — a grey waterfall of returns that hide nets,
+            hulls, tyres, and pipes in speckle. Aqua Vision is built to read that language.
+          </p>
+          <p>
+            It is the operations console for {MODEL_METRICS.org} problem {MODEL_METRICS.problem}: detect ghost gear,
+            wrecks, and man-made debris in side-scan sonar, then pin each contact so a cleanup crew can steam to it.
           </p>
           <p>
             The detector is YOLO11n ({MODEL_METRICS.params}) trained on SCTD 1.0, Marine Debris FLS, and

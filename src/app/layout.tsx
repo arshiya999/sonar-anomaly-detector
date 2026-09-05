@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Syne } from "next/font/google";
+import { Geist, Geist_Mono, Syne, Instrument_Serif } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -16,13 +16,19 @@ const geistMono = Geist_Mono({
 const syne = Syne({
   variable: "--font-syne",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["500", "600", "700", "800"],
+});
+
+const instrument = Instrument_Serif({
+  variable: "--font-instrument",
+  subsets: ["latin"],
+  weight: "400",
 });
 
 export const metadata: Metadata = {
-  title: "Aqua Vision · Side-Scan Sonar Intelligence",
+  title: "AQUA VISION · See what the seafloor hides",
   description:
-    "Aqua Vision detects ghost gear, wrecks, and man-made debris in side-scan sonar and issues geotagged cleanup reports.",
+    "Aqua Vision reads side-scan sonar the way an operator would: ghost gear, wrecks, and man-made debris, then pins each contact for cleanup.",
   icons: { icon: "/favicon.svg" },
 };
 
@@ -31,7 +37,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${syne.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${syne.variable} ${instrument.variable} h-full antialiased`}
     >
         <body className="min-h-full flex flex-col bg-[#eef1f6] text-foreground">
         {children}
