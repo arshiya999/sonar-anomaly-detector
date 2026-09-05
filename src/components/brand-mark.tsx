@@ -7,44 +7,24 @@ export function BrandMark({
   onDark?: boolean;
   size?: "nav" | "hero";
 }) {
-  const aqua = onDark ? "text-cyan-300" : "text-sky-700";
-  const vision = onDark
-    ? "bg-gradient-to-r from-white via-sky-100 to-cyan-300 bg-clip-text text-transparent"
-    : "bg-gradient-to-r from-slate-900 via-sky-800 to-cyan-700 bg-clip-text text-transparent";
-  const tag = onDark ? "text-slate-400" : "text-slate-500";
   const hero = size === "hero";
+  const name = onDark ? "text-white" : "text-slate-900";
+  const sub = onDark ? "text-slate-400" : "text-slate-500";
 
   return (
-    <div className={`flex items-start gap-3 ${hero ? "gap-4" : ""}`}>
+    <div className={`flex items-center gap-3 ${hero ? "gap-4" : ""}`}>
       <div
-        className={`sonar-logo mt-0.5 grid shrink-0 place-items-center rounded-lg bg-[#2563eb] shadow-[0_0_24px_rgba(56,189,248,0.35)] ${
-          hero ? "size-12" : "size-9"
-        }`}
+        className={`grid shrink-0 place-items-center rounded-md bg-[#2563eb] ${hero ? "size-11" : "size-9"}`}
       >
-        <Waves className={hero ? "size-6 text-white" : "size-5 text-white"} />
+        <Waves className={hero ? "size-5 text-white" : "size-4 text-white"} />
       </div>
-      <div className="min-w-0 leading-none">
+      <div className="min-w-0">
         <p
-          className={`font-heading font-semibold uppercase ${aqua} ${
-            hero ? "text-xs tracking-[0.55em]" : "text-[10px] tracking-[0.48em]"
-          }`}
+          className={`font-heading font-bold tracking-tight ${name} ${hero ? "text-3xl" : "text-lg"}`}
         >
-          Aqua
+          Aqua Vision
         </p>
-        <p
-          className={`font-display italic ${vision} ${
-            hero ? "mt-1 text-5xl" : "mt-0.5 text-[1.65rem]"
-          }`}
-        >
-          Vision
-        </p>
-        <p
-          className={`mt-1.5 font-heading uppercase ${tag} ${
-            hero ? "text-xs tracking-[0.28em]" : "hidden"
-          }`}
-        >
-          See what the seafloor hides
-        </p>
+        <p className={`text-xs ${sub}`}>Side-scan sonar</p>
       </div>
     </div>
   );
