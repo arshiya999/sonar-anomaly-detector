@@ -154,3 +154,17 @@
     opacity: 0;
   }
 }
+
+.leaflet-tooltip.sonar-material-label {
+  background: #0b1c33;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 0.25);
+}
+.leaflet-tooltip.sonar-material-label::before {
+  border-top-color: #0b1c33;
+}

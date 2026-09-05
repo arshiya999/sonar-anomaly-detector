@@ -431,16 +431,19 @@ export function Dashboard() {
   const surveyPins: SurveyPin[] = useMemo(() => {
     const pins: SurveyPin[] = [];
     for (const e of log) {
-      if (e.detections.some((d) => d.latitude != null && d.longitude != null)) continue;
-      const lat = e.latitude ?? null;
-      const lon = e.longitude ?? null;
+      const top = [...e.detections].sort((a, b) => b.confidence - a.confidence)[0];
+      const lat = e.latitude ?? top?.latitude ?? null;
+      const lon = e.longitude ?? top?.longitude ?? null;
       if (lat == null || lon == null) continue;
       pins.push({
         id: e.id,
         filename: e.filename,
         latitude: lat,
         longitude: lon,
-        overlay_url: e.overlay_url ?? e.image_url ?? null,
+        overlay_url: e.overlay_url ?? e.image_url ?? top?.overlay_url ?? null,
+        material: top ? CLASS_LABEL[top.class] ?? top.class : "No detection",
+        classId: top?.class,
+        confidence: top?.confidence ?? null,
       });
     }
     return pins;
@@ -628,7 +631,7 @@ export function Dashboard() {
               </CardHeader>
               <CardContent className="relative h-[620px] p-0">
                 <SonarMap key="full-map" detections={mapped} surveys={surveyPins} />
-                <MapLegend count={mapped.length + surveyPins.length} />
+                <MapLegend count={surveyPins.length} />
               </CardContent>
             </Card>
           )}
@@ -744,7 +747,7 @@ function HomePage({
           </CardHeader>
           <CardContent className="relative h-[380px] p-0">
             <SonarMap key="home-map" detections={mapped} surveys={surveys} />
-            <MapLegend count={mapped.length + surveys.length} />
+            <MapLegend count={surveys.length} />
           </CardContent>
         </Card>
 

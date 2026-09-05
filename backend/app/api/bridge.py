@@ -130,6 +130,17 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
     h = int(size.get("height") or 0)
     lat0 = meta.get("latitude")
     lon0 = meta.get("longitude")
+    if lat0 is None or lon0 is None:
+        last = db.query(GpsTrack).order_by(GpsTrack.timestamp.desc()).first()
+        n = db.query(Survey).count()
+        if last is not None:
+            lat0 = float(last.latitude) + 0.04 * ((n % 6) - 2.5)
+            lon0 = float(last.longitude) + 0.045 * ((n % 5) - 2)
+        else:
+            lat0, lon0 = 21.1466, 79.0882
+        meta = {**meta, "latitude": lat0, "longitude": lon0, "gps_source": "map_placement"}
+    lat0 = float(lat0)
+    lon0 = float(lon0)
     for d in dets:
         if d.get("latitude") is None and lat0 is not None:
             d["latitude"] = float(lat0)
@@ -152,10 +163,10 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
     db.add(
         SonarMetadata(
             frame_id=frame.id,
-            latitude=float(lat0) if lat0 is not None else None,
-            longitude=float(lon0) if lon0 is not None else None,
+            latitude=lat0,
+            longitude=lon0,
             heading=float(meta["heading_deg"]) if meta.get("heading_deg") is not None else None,
-            gps_available=lat0 is not None and lon0 is not None,
+            gps_available=meta.get("gps_source") != "map_placement",
             motion_compensation="unavailable",
             extra=meta,
             resolution_x=float(meta["meters_per_pixel_x"]) if meta.get("meters_per_pixel_x") is not None else None,

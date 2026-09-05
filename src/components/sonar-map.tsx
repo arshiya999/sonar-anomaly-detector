@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import L from "leaflet";
-import { CircleMarker, ImageOverlay, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
+import { CircleMarker, ImageOverlay, MapContainer, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { CLASS_LABEL, confidenceColor } from "@/lib/labels";
 import type { Detection, SurveyPin } from "@/lib/types";
 import "leaflet/dist/leaflet.css";
@@ -117,24 +117,37 @@ export function SonarMap({
         <CircleMarker
           key={`${s.id}-survey`}
           center={[s.latitude, s.longitude]}
-          radius={10}
-          pathOptions={{ color: "#1d4ed8", fillColor: "#2563eb", fillOpacity: 0.85, weight: 2 }}
+          radius={14}
+          pathOptions={{
+            color: "#ffffff",
+            fillColor: s.classId ? confidenceColor(s.confidence ?? 55) : "#2563eb",
+            fillOpacity: 0.95,
+            weight: 2,
+          }}
         >
+          <Tooltip permanent direction="top" offset={[0, -12]} className="sonar-material-label">
+            {s.material}
+          </Tooltip>
           <Popup>
-            <div className="max-w-[220px] text-sm text-slate-900">
-              <strong>{s.filename}</strong>
-              <br />
-              {s.latitude.toFixed(5)}, {s.longitude.toFixed(5)}
+            <div className="max-w-[240px] text-sm text-slate-900">
+              <p className="font-semibold">{s.material}</p>
+              <p className="text-xs text-slate-600">{s.filename}</p>
+              <p className="font-mono text-[11px]">
+                {s.latitude.toFixed(5)}, {s.longitude.toFixed(5)}
+              </p>
+              {s.confidence != null ? <p className="text-xs">{s.confidence.toFixed(0)}% confidence</p> : null}
               {s.overlay_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={s.overlay_url} alt="" className="mt-2 max-h-36 w-full rounded object-cover" />
+                <img src={s.overlay_url} alt={s.material} className="mt-2 max-h-40 w-full rounded object-cover" />
               ) : null}
             </div>
           </Popup>
         </CircleMarker>
       ))}
-      {detections.map((d) =>
-        d.latitude != null && d.longitude != null ? (
+      {detections
+        .filter((d) => d.latitude != null && d.longitude != null)
+        .filter((d) => !surveys.some((s) => Math.abs(s.latitude - (d.latitude as number)) < 1e-4 && Math.abs(s.longitude - (d.longitude as number)) < 1e-4))
+        .map((d) => (
           <CircleMarker
             key={d.id}
             center={[d.latitude, d.longitude]}
@@ -146,6 +159,9 @@ export function SonarMap({
               weight: 2,
             }}
           >
+            <Tooltip permanent direction="top" offset={[0, -10]} className="sonar-material-label">
+              {CLASS_LABEL[d.class] ?? d.class}
+            </Tooltip>
             <Popup>
               <div className="max-w-[220px] text-sm text-slate-900">
                 <strong>{CLASS_LABEL[d.class] ?? d.class}</strong> · {d.confidence.toFixed(0)}%
@@ -160,8 +176,7 @@ export function SonarMap({
               </div>
             </Popup>
           </CircleMarker>
-        ) : null,
-      )}
+        ))}
     </MapContainer>
   );
 }
