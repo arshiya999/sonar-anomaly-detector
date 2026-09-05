@@ -626,8 +626,10 @@ export function Dashboard() {
         </main>
 
         <footer className="flex flex-col gap-1 bg-[#0b1c33] px-4 py-2 text-[11px] text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-          <span className="font-display italic text-sm text-white">Aqua Vision</span>
-          <span>v1.0.0</span>
+          <span className="flex items-baseline gap-2">
+            <span className="font-display text-sm italic text-white">Aqua Vision</span>
+            <span>v1.0.0</span>
+          </span>
           <span className="text-center">AI-Powered Underwater Debris &amp; Anomaly Detection using Side-Scan Sonar</span>
           <span>Last updated {clock ? `${clock} IST` : "—"}</span>
         </footer>
