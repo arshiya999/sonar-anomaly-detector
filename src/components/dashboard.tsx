@@ -407,15 +407,16 @@ export function Dashboard() {
   const surveyPins: SurveyPin[] = useMemo(() => {
     const pins: SurveyPin[] = [];
     for (const e of log) {
-      const lat = e.latitude ?? e.detections.find((d) => d.latitude != null)?.latitude ?? null;
-      const lon = e.longitude ?? e.detections.find((d) => d.longitude != null)?.longitude ?? null;
+      if (e.detections.some((d) => d.latitude != null && d.longitude != null)) continue;
+      const lat = e.latitude ?? null;
+      const lon = e.longitude ?? null;
       if (lat == null || lon == null) continue;
       pins.push({
         id: e.id,
         filename: e.filename,
         latitude: lat,
         longitude: lon,
-        overlay_url: e.overlay_url ?? e.image_url ?? e.detections.find((d) => d.overlay_url)?.overlay_url ?? null,
+        overlay_url: e.overlay_url ?? e.image_url ?? null,
       });
     }
     return pins;

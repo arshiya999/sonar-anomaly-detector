@@ -11,7 +11,18 @@ from sqlalchemy.orm import Session
 
 from app.config import STORAGE
 from app.database import get_db
-from app.models import Detection, DetectionValidation, GpsTrack, Report, SonarFrame, SonarMetadata, Survey
+from app.models import (
+    Alert,
+    Detection,
+    DetectionValidation,
+    GpsTrack,
+    ModelRun,
+    OperatorReview,
+    Report,
+    SonarFrame,
+    SonarMetadata,
+    Survey,
+)
 from app.services.processor import media_url
 
 router = APIRouter()
@@ -53,7 +64,29 @@ def _survey_title(report: dict, filename: str) -> str:
     return raw
 
 
-class MlIngest(BaseModel):
+def _delete_survey(db: Session, survey_id: str) -> None:
+    fids = [f.id for f in db.query(SonarFrame).filter(SonarFrame.survey_id == survey_id).all()]
+    dids = [d.id for d in db.query(Detection).filter(Detection.survey_id == survey_id).all()]
+    if dids:
+        db.query(OperatorReview).filter(OperatorReview.detection_id.in_(dids)).delete(synchronize_session=False)
+        db.query(DetectionValidation).filter(DetectionValidation.detection_id.in_(dids)).delete(synchronize_session=False)
+        db.query(Alert).filter(Alert.detection_id.in_(dids)).delete(synchronize_session=False)
+    db.query(Alert).filter(Alert.survey_id == survey_id).delete(synchronize_session=False)
+    db.query(Detection).filter(Detection.survey_id == survey_id).delete(synchronize_session=False)
+    if fids:
+        db.query(SonarMetadata).filter(SonarMetadata.frame_id.in_(fids)).delete(synchronize_session=False)
+    db.query(GpsTrack).filter(GpsTrack.survey_id == survey_id).delete(synchronize_session=False)
+    db.query(Report).filter(Report.survey_id == survey_id).delete(synchronize_session=False)
+    db.query(ModelRun).filter(ModelRun.survey_id == survey_id).delete(synchronize_session=False)
+    db.query(SonarFrame).filter(SonarFrame.survey_id == survey_id).delete(synchronize_session=False)
+    db.query(Survey).filter(Survey.id == survey_id).delete(synchronize_session=False)
+
+
+def _replace_same_file(db: Session, filename: str) -> None:
+    rows = db.query(Survey).filter(Survey.source_name == filename).all()
+    for row in rows:
+        _delete_survey(db, row.id)
+    db.flush()
     filename: str
     report: dict
     overlay_jpeg_base64: str | None = None
@@ -80,6 +113,7 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
     meta = report.get("metadata") if isinstance(report.get("metadata"), dict) else {}
     dets = report.get("detections") or []
     stamp = _now()
+    _replace_same_file(db, body.filename)
     survey = Survey(
         name=_survey_title(report, body.filename),
         source_type="upload",
@@ -101,11 +135,6 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
     h = int(size.get("height") or 0)
     lat0 = meta.get("latitude")
     lon0 = meta.get("longitude")
-    if lat0 is None or lon0 is None:
-        last = db.query(GpsTrack).order_by(GpsTrack.timestamp.desc()).first()
-        if last:
-            lat0, lon0 = last.latitude, last.longitude
-            meta = {**meta, "latitude": lat0, "longitude": lon0, "gps_source": meta.get("gps_source") or "last_survey"}
     for d in dets:
         if d.get("latitude") is None and lat0 is not None:
             d["latitude"] = float(lat0)
