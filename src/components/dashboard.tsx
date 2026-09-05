@@ -716,64 +716,50 @@ function HomePage({
         />
       </div>
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base">Live survey graphs</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Counts, class mix, and hazard scores refresh as soon as a sonar file is processed.
-          </p>
+      <Card className="overflow-hidden shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Global Detections Map</CardTitle>
         </CardHeader>
-        <CardContent>
-          <SurveyCharts key={`home-charts-${log.length}-${log[0]?.id ?? "none"}`} entries={log} />
+        <CardContent className="relative h-[420px] p-0">
+          <SonarMap
+            key={`home-map-${surveys.length}-${surveys[0]?.id ?? "none"}`}
+            detections={mapped}
+            surveys={surveys}
+          />
+          <MapLegend count={surveys.length} />
         </CardContent>
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-12">
-        <Card className="overflow-hidden shadow-sm xl:col-span-6">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Global Detections Map</CardTitle>
+        <Card className="shadow-sm xl:col-span-6">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-base">Debris pie chart</CardTitle>
+            <p className="text-sm text-muted-foreground">Class mix across every uploaded sonar image.</p>
           </CardHeader>
-          <CardContent className="relative h-[380px] p-0">
-            <SonarMap
-              key={`home-map-${surveys.length}-${surveys[0]?.id ?? "none"}`}
-              detections={mapped}
-              surveys={surveys}
-            />
-            <MapLegend count={surveys.length} />
+          <CardContent>
+            {mixRows.length === 0 ? (
+              <EmptyNote text="No detections yet. Upload a sonar image to run the detector." />
+            ) : (
+              <ClassMixPie rows={mixRows} height={280} />
+            )}
           </CardContent>
         </Card>
-
-        <div className="flex flex-col gap-4 xl:col-span-3">
-          <Card className="flex-1 shadow-sm">
-            <CardHeader className="pb-1">
-              <CardTitle className="text-base">Detections by Class</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {mixRows.length === 0 ? (
-                <EmptyNote text="No detections yet. Upload a sonar image to run the detector." />
-              ) : (
-                <ClassMixPie rows={mixRows} height={220} />
-              )}
-            </CardContent>
-          </Card>
-          <Card className="shadow-sm">
-            <CardHeader className="pb-1">
-              <CardTitle className="text-base">Confidence Distribution</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {allDetections.length === 0 ? (
-                <EmptyNote text="Confidence bands appear after the first fused scan." />
-              ) : (
-                <>
-                  <StackedBand label="High (>80%)" count={bands.high} color="#ef4444" share={bands.high / bandTotal} />
-                  <StackedBand label="Medium (50–80%)" count={bands.medium} color="#f97316" share={bands.medium / bandTotal} />
-                  <StackedBand label="Low (<50%)" count={bands.low} color="#22c55e" share={bands.low / bandTotal} />
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
+        <Card className="shadow-sm xl:col-span-3">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-base">Confidence Distribution</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {allDetections.length === 0 ? (
+              <EmptyNote text="Confidence bands appear after the first fused scan." />
+            ) : (
+              <>
+                <StackedBand label="High (>80%)" count={bands.high} color="#ef4444" share={bands.high / bandTotal} />
+                <StackedBand label="Medium (50–80%)" count={bands.medium} color="#f97316" share={bands.medium / bandTotal} />
+                <StackedBand label="Low (<50%)" count={bands.low} color="#22c55e" share={bands.low / bandTotal} />
+              </>
+            )}
+          </CardContent>
+        </Card>
         <Card className="shadow-sm xl:col-span-3">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Latest Detection</CardTitle>
@@ -819,6 +805,22 @@ function HomePage({
           </CardContent>
         </Card>
       </div>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Live survey graphs</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Counts and hazard scores refresh as soon as a sonar file is processed.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <SurveyCharts
+            key={`home-charts-${log.length}-${log[0]?.id ?? "none"}`}
+            entries={log}
+            defaultGraphs={["timeline", "confidence", "risk"]}
+          />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <Card className="shadow-sm">
