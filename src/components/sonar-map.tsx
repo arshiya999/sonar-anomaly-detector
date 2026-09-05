@@ -74,7 +74,24 @@ export function SonarMap({
     const fromSurvey = surveys.map((s) => [s.latitude, s.longitude] as [number, number]);
     return [...fromSurvey, ...fromDet];
   }, [detections, surveys]);
-  const center = points[0] ?? ([15, 75] as [number, number]);
+  const sonarFrames = useMemo(() => {
+    const seen = new Set<string>();
+    const frames: { id: string; lat: number; lon: number; url: string }[] = [];
+    for (const s of surveys) {
+      if (!s.overlay_url) continue;
+      const key = s.overlay_url;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      frames.push({ id: s.id, lat: s.latitude, lon: s.longitude, url: s.overlay_url });
+    }
+    for (const d of detections) {
+      if (d.latitude == null || d.longitude == null || !d.overlay_url) continue;
+      if (seen.has(d.overlay_url)) continue;
+      seen.add(d.overlay_url);
+      frames.push({ id: d.id, lat: d.latitude, lon: d.longitude, url: d.overlay_url });
+    }
+    return frames;
+  }, [detections, surveys]);
   const zoom = points.length ? 13 : 3;
 
   return (
@@ -92,11 +109,9 @@ export function SonarMap({
       )}
       <ResizeGuard />
       <FitPins points={points} />
-      {surveys.map((s) =>
-        s.overlay_url ? (
-          <ImageOverlay key={`${s.id}-img`} url={s.overlay_url} bounds={overlayBounds(s.latitude, s.longitude)} opacity={0.88} />
-        ) : null,
-      )}
+      {sonarFrames.map((f) => (
+        <ImageOverlay key={`${f.id}-img`} url={f.url} bounds={overlayBounds(f.lat, f.lon)} opacity={0.88} />
+      ))}
       {surveys.map((s) => (
         <CircleMarker
           key={`${s.id}-survey`}
