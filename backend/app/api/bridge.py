@@ -82,11 +82,7 @@ def _delete_survey(db: Session, survey_id: str) -> None:
     db.query(Survey).filter(Survey.id == survey_id).delete(synchronize_session=False)
 
 
-def _replace_same_file(db: Session, filename: str) -> None:
-    rows = db.query(Survey).filter(Survey.source_name == filename).all()
-    for row in rows:
-        _delete_survey(db, row.id)
-    db.flush()
+class MlIngest(BaseModel):
     filename: str
     report: dict
     overlay_jpeg_base64: str | None = None
@@ -113,7 +109,6 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
     meta = report.get("metadata") if isinstance(report.get("metadata"), dict) else {}
     dets = report.get("detections") or []
     stamp = _now()
-    _replace_same_file(db, body.filename)
     survey = Survey(
         name=_survey_title(report, body.filename),
         source_type="upload",
