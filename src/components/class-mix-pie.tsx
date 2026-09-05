@@ -21,14 +21,18 @@ export function ClassMixPie({
   height?: number;
 }) {
   const live = rows.filter((r) => r.count > 0);
-  const preview = live.length === 0;
-  const data = (preview ? Object.keys(CLASS_LABEL).map((cls) => ({ class: cls, count: 1 })) : live).map(
-    (r) => ({
-      class: r.class,
-      count: r.count,
-      label: CLASS_LABEL[r.class] ?? r.class,
-    }),
-  );
+  if (live.length === 0) {
+    return (
+      <div className="grid h-full min-h-[180px] place-items-center px-4 text-center text-sm text-muted-foreground">
+        Pie slices appear as soon as a sonar image is classified.
+      </div>
+    );
+  }
+  const data = live.map((r) => ({
+    class: r.class,
+    count: r.count,
+    label: CLASS_LABEL[r.class] ?? r.class,
+  }));
   const total = live.reduce((s, r) => s + r.count, 0);
 
   return (
@@ -56,10 +60,10 @@ export function ClassMixPie({
                 return (
                   <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
                     <tspan x={viewBox.cx} dy="-0.2em" fill="#0f172a" fontSize="22" fontWeight={700}>
-                      {preview ? "8" : total}
+                      {total}
                     </tspan>
                     <tspan x={viewBox.cx} dy="1.4em" fill="#64748b" fontSize="10">
-                      {preview ? "classes" : "contacts"}
+                      contacts
                     </tspan>
                   </text>
                 );
