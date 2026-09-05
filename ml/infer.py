@@ -36,6 +36,8 @@ POLAR_REMAP = {
     "propeller": "cylinder",
     "tire": "cylinder",
 }
+
+HAZARD_RANK = {
     "ghost_net": 95,
     "shipwreck": 88,
     "aircraft": 86,
