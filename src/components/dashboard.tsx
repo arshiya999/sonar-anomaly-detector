@@ -516,9 +516,6 @@ export function Dashboard() {
             </button>
             <div>
               <p className="text-sm font-semibold text-slate-900">{pageTitle[page]}</p>
-              <p className="hidden text-[11px] text-slate-500 sm:block">
-                {MODEL_METRICS.org} · {MODEL_METRICS.problem}
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
