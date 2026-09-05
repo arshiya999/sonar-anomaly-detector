@@ -92,6 +92,7 @@ export function SonarMap({
     }
     return frames;
   }, [detections, surveys]);
+  const center = points[0] ?? ([15, 75] as [number, number]);
   const zoom = points.length ? 13 : 3;
 
   return (
