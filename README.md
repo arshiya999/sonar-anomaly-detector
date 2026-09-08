@@ -3,7 +3,7 @@
 **Side-Scan Sonar Intelligence** for Smart India Hackathon 2026 problem **SIH26057**  
 Ministry of Earth Sciences (MoES) · National Institute of Ocean Technology (NIOT)
 
-Operator console (navy sidebar, light cards, OSM map) is a **Next.js** app. YOLO inference, PostgreSQL, and the ops API are wired behind it. Coordinates and detections come from real sonar rasters + sidecar ping metadata — GPS is never invented.
+Operator console (navy sidebar, light cards, OSM map) is a **Next.js** app. YOLO inference, PostgreSQL, and the ops API are wired behind it. Each ping is inferred as soon as it is uploaded. Map coordinates come only from JPEG EXIF, operator-entered survey origin, or optional live device GPS. Missing GPS leaves contacts **unmapped** — the console does not invent a city.
 
 ## Run locally
 

@@ -1,8 +1,6 @@
 import type { DetectReport, Detection, ScanLogEntry, SurveyPin } from "@/lib/types";
 import { CLASS_LABEL } from "@/lib/labels";
 
-const FALLBACK: [number, number] = [21.1466, 79.0882];
-
 export function isFiniteCoord(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
@@ -16,25 +14,18 @@ export function asCoord(value: unknown): number | null {
   return null;
 }
 
-export function lastKnownPosition(entries: ScanLogEntry[]): [number, number] {
-  for (const e of entries) {
-    const lat = asCoord(e.latitude) ?? asCoord(e.detections[0]?.latitude);
-    const lon = asCoord(e.longitude) ?? asCoord(e.detections[0]?.longitude);
-    if (lat != null && lon != null) return [lat, lon];
-  }
-  return FALLBACK;
+/** Operator-entered or EXIF/model coordinates only — never a placeholder city. */
+export function coordsFromReport(report: DetectReport): [number | null, number | null] {
+  const fromMetaLat = asCoord(report.metadata?.latitude);
+  const fromMetaLon = asCoord(report.metadata?.longitude);
+  if (fromMetaLat != null && fromMetaLon != null) return [fromMetaLat, fromMetaLon];
+  const hit = report.detections.find((d) => asCoord(d.latitude) != null && asCoord(d.longitude) != null);
+  if (hit) return [asCoord(hit.latitude), asCoord(hit.longitude)];
+  return [null, null];
 }
 
-export function placeScan(entries: ScanLogEntry[], lat?: number | null, lon?: number | null): [number, number] {
-  if (lat != null && lon != null && Number.isFinite(lat) && Number.isFinite(lon)) {
-    return [lat, lon];
-  }
-  const [baseLat, baseLon] = lastKnownPosition(entries);
-  const n = entries.length + 1;
-  return [baseLat + 0.035 * ((n % 6) - 2.5), baseLon + 0.04 * ((n % 5) - 2)];
-}
-
-export function geotagReport(report: DetectReport, lat: number, lon: number): DetectReport {
+export function geotagReport(report: DetectReport, lat: number | null, lon: number | null): DetectReport {
+  if (lat == null || lon == null) return report;
   const detections = report.detections.map((d) => ({
     ...d,
     latitude: asCoord(d.latitude) ?? lat,
@@ -51,8 +42,8 @@ export function toLogEntry(opts: {
   id: string;
   filename: string;
   report: DetectReport;
-  lat: number;
-  lon: number;
+  lat: number | null;
+  lon: number | null;
   overlay?: string | null;
 }): ScanLogEntry {
   return {

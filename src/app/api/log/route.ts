@@ -63,6 +63,8 @@ export async function POST(req: NextRequest) {
     inference_ms: body.report.inference_ms,
     threshold: body.report.threshold,
     detections: body.report.detections,
+    latitude: body.report.detections[0]?.latitude ?? (body.report.metadata?.latitude as number | null | undefined) ?? null,
+    longitude: body.report.detections[0]?.longitude ?? (body.report.metadata?.longitude as number | null | undefined) ?? null,
   });
   return Response.json({ ok: true, entries, source: "file" });
 }

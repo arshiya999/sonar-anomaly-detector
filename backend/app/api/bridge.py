@@ -142,19 +142,8 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
     h = int(size.get("height") or 0)
     lat0 = _coord(meta.get("latitude"))
     lon0 = _coord(meta.get("longitude"))
-    if lat0 is None or lon0 is None:
-        last = db.query(GpsTrack).order_by(GpsTrack.timestamp.desc()).first()
-        n = db.query(Survey).count()
-        if last is not None and last.latitude is not None and last.longitude is not None:
-            lat0 = float(last.latitude) + 0.04 * ((n % 6) - 2.5)
-            lon0 = float(last.longitude) + 0.045 * ((n % 5) - 2)
-        else:
-            lat0, lon0 = 21.1466, 79.0882
-        meta = {**meta, "latitude": lat0, "longitude": lon0, "gps_source": "map_placement"}
-    lat0 = float(lat0)
-    lon0 = float(lon0)
     for d in dets:
-        if d.get("latitude") is None and lat0 is not None:
+        if d.get("latitude") is None and lat0 is not None and lon0 is not None:
             d["latitude"] = float(lat0)
             d["longitude"] = float(lon0)
     frame = SonarFrame(
@@ -178,7 +167,7 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
             latitude=lat0,
             longitude=lon0,
             heading=float(meta["heading_deg"]) if meta.get("heading_deg") is not None else None,
-            gps_available=meta.get("gps_source") != "map_placement",
+            gps_available=lat0 is not None and lon0 is not None,
             motion_compensation="unavailable",
             extra=meta,
             resolution_x=float(meta["meters_per_pixel_x"]) if meta.get("meters_per_pixel_x") is not None else None,
@@ -269,13 +258,6 @@ def ops_log(db: Session = Depends(get_db)):
             ping = db.query(GpsTrack).filter(GpsTrack.survey_id == s.id).first()
             if ping is not None:
                 frame_lat, frame_lon = ping.latitude, ping.longitude
-        if frame_lat is None:
-            last = db.query(GpsTrack).order_by(GpsTrack.timestamp.desc()).first()
-            if last is not None:
-                frame_lat = float(last.latitude) + 0.02
-                frame_lon = float(last.longitude) + 0.02
-            else:
-                frame_lat, frame_lon = 21.1466, 79.0882
         packed = []
         for d in dets:
             packed.append(
@@ -287,8 +269,8 @@ def ops_log(db: Session = Depends(get_db)):
                     "confidence_parts": {"yolo": d.raw_confidence / 100, "contrast": 1, "shadow": 1},
                     "bbox_xyxy": [d.x, d.y, d.x + d.width, d.y + d.height],
                     "center_px": [d.x + d.width / 2, d.y + d.height / 2],
-                    "latitude": d.latitude if d.latitude is not None else frame_lat,
-                    "longitude": d.longitude if d.longitude is not None else frame_lon,
+                    "latitude": d.latitude,
+                    "longitude": d.longitude,
                     "dimensions": {
                         "width_m": d.width_m,
                         "length_m": d.length_m,
