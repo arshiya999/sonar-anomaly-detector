@@ -43,11 +43,11 @@ import { MODEL_METRICS } from "@/lib/metrics";
 import { formatIst } from "@/lib/format";
 import type { DetectReport, DetectResponse, Detection, ScanLogEntry, SurveyPin } from "@/lib/types";
 import {
+  coordsFromReport,
   detectionsFromLog,
   geotagReport,
   mergeLogs,
   pinsFromLog,
-  placeScan,
   toLogEntry,
 } from "@/lib/geo";
 import { SurveyCharts } from "@/components/survey-charts";
@@ -144,25 +144,31 @@ async function resolveGps(used: MetaForm): Promise<MetaForm> {
   } catch {
     /* ignore */
   }
-  const geo = await new Promise<GeolocationPosition | null>((resolve) => {
-    if (!navigator.geolocation) {
-      resolve(null);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      resolve,
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 4000, maximumAge: 60_000 },
-    );
-  });
-  if (geo) {
-    next.latitude = String(geo.coords.latitude);
-    next.longitude = String(geo.coords.longitude);
-    if (!next.heading_deg.trim()) next.heading_deg = "0";
-    if (!next.meters_per_pixel_x.trim()) next.meters_per_pixel_x = "0.08";
-    if (!next.meters_per_pixel_y.trim()) next.meters_per_pixel_y = "0.05";
-  }
   return next;
+}
+
+function applyDeviceGps(setMeta: (m: MetaForm) => void, meta: MetaForm) {
+  if (!navigator.geolocation) {
+    toast.error("This browser has no geolocation API");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const next = {
+        ...meta,
+        latitude: String(pos.coords.latitude),
+        longitude: String(pos.coords.longitude),
+        heading_deg: meta.heading_deg.trim() || "0",
+        meters_per_pixel_x: meta.meters_per_pixel_x.trim() || "0.08",
+        meters_per_pixel_y: meta.meters_per_pixel_y.trim() || "0.05",
+      };
+      setMeta(next);
+      saveOrigin(next);
+      toast.success("Live origin set from this device GPS");
+    },
+    () => toast.error("Device GPS denied or timed out"),
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 5_000 },
+  );
 }
 
 type Mapped = Detection & { source?: string };
@@ -187,8 +193,6 @@ export function Dashboard() {
   } | null>(null);
   const [meta, setMeta] = useState<MetaForm>(DEFAULT_META);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
-  const logRef = useRef<ScanLogEntry[]>([]);
-  logRef.current = log;
   const [pipeStep, setPipeStep] = useState(0);
   const [clock, setClock] = useState("");
 
@@ -265,9 +269,10 @@ export function Dashboard() {
       const heading = optionalNumber(used.heading_deg);
       const mppx = optionalNumber(used.meters_per_pixel_x);
       const mppy = optionalNumber(used.meters_per_pixel_y);
-      const [plotLat, plotLon] = placeScan(logRef.current, lat, lon);
-      metadata.latitude = plotLat;
-      metadata.longitude = plotLon;
+      if (lat != null && lon != null) {
+        metadata.latitude = lat;
+        metadata.longitude = lon;
+      }
       if (heading != null) metadata.heading_deg = heading;
       if (mppx != null) metadata.meters_per_pixel_x = mppx;
       if (mppy != null) metadata.meters_per_pixel_y = mppy;
@@ -281,6 +286,7 @@ export function Dashboard() {
         const overlayData = data.overlay_jpeg_base64
           ? `data:image/jpeg;base64,${data.overlay_jpeg_base64}`
           : null;
+        const [plotLat, plotLon] = coordsFromReport(data.report);
         const geoReport = geotagReport(data.report, plotLat, plotLon);
         const localEntry = toLogEntry({
           id: `local-${Date.now()}`,
@@ -293,15 +299,17 @@ export function Dashboard() {
         setReport(geoReport);
         setOverlay(overlayData);
         setLog((prev) => mergeLogs(prev, [localEntry]));
-        setMeta((m) => ({
-          ...m,
-          latitude: m.latitude.trim() || String(plotLat.toFixed(5)),
-          longitude: m.longitude.trim() || String(plotLon.toFixed(5)),
-        }));
+        if (plotLat != null && plotLon != null) {
+          setMeta((m) => ({
+            ...m,
+            latitude: m.latitude.trim() || String(plotLat.toFixed(5)),
+            longitude: m.longitude.trim() || String(plotLon.toFixed(5)),
+          }));
+        }
         toast.success(
           geoReport.count
-            ? `${geoReport.count} anomal${geoReport.count === 1 ? "y" : "ies"} localized — map, graphs, and report updated`
-            : "Scan logged on the map, graphs, and report (no class above threshold)",
+            ? `${geoReport.count} anomal${geoReport.count === 1 ? "y" : "ies"} scored in real time`
+            : "Ping processed in real time (no class above threshold)",
         );
         const persist = await fetch("/api/log", {
           method: "POST",
@@ -319,7 +327,11 @@ export function Dashboard() {
           }
         }
         await refreshLog();
-        toast.message(`Plotted at ${plotLat.toFixed(4)}, ${plotLon.toFixed(4)}`);
+        if (plotLat != null && plotLon != null) {
+          toast.message(`Mapped at ${plotLat.toFixed(4)}, ${plotLon.toFixed(4)}`);
+        } else {
+          toast.message("GPS unavailable — contacts logged, map left unmapped");
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Detection failed";
         setError(message);
@@ -974,8 +986,21 @@ function UploadPage({
               if (f) void onFile(f);
             }}
           />
+          <p className="text-xs text-slate-600">
+            Each file is inferred immediately (live). Pins appear only when this ping has GPS: type survey origin,
+            JPEG EXIF, or device GPS. No placeholder city is used.
+          </p>
           <Button className="h-10 w-full" onClick={onPick} disabled={busy}>
             <Upload /> Upload sonar image
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={busy}
+            onClick={() => applyDeviceGps(setMeta, meta)}
+          >
+            Use live device GPS
           </Button>
           <div>
             <div className="mb-2 flex items-center justify-between text-xs text-slate-600">
@@ -1027,8 +1052,8 @@ function UploadPage({
         <CardHeader>
           <CardTitle>Map position</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Every upload is drawn on the map. Use ping GPS from the file (EXIF) or type latitude and longitude
-            here. If both are empty, the last survey position or this device location is used.
+            Real-time geotag uses JPEG EXIF GPS if present, otherwise the latitude/longitude you type (or live
+            device GPS). Empty GPS → detection still runs; the contact stays unmapped.
           </p>
         </CardHeader>
         <CardContent>
@@ -1400,9 +1425,9 @@ function AboutPage() {
             wrecks, and man-made debris in side-scan sonar and issue geotagged cleanup reports.
           </p>
           <p>
-            The detector is YOLO11n ({MODEL_METRICS.params}) trained on SCTD 1.0, Marine Debris FLS, and
-            SeabedObjects-KLSG. Inference fuses box score with local contrast and an acoustic-shadow penalty, then
-            projects pixel centres to latitude/longitude from ping metadata.
+            Each sonar image is scored as soon as it arrives (live YOLO11n, {MODEL_METRICS.params}). Confidence
+            fuses the box score with contrast and an acoustic-shadow penalty. Latitude/longitude are taken only from
+            ping metadata, JPEG EXIF, or an origin the operator sets — never a dummy map location.
           </p>
         </CardContent>
       </Card>
