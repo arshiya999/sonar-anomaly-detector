@@ -670,9 +670,8 @@ export function Dashboard() {
               <CardHeader>
                 <CardTitle>Global detections map</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  One uploaded image is one pin at that ping’s latitude/longitude. Extra boxes in the same
-                  file stay on the waterfall and in the pin popup — they are not extra wrecks. Gold ring is
-                  the latest upload; grey pins are earlier finds and stay on the map.
+                  Every class keeps its sonar photo on the pin — ghost net, propeller, tire, wreck, aircraft.
+                  Click a pin to open that ping’s image at its latitude and longitude. Earlier uploads stay.
                 </p>
               </CardHeader>
               <CardContent className="relative h-[620px] p-0">
@@ -805,7 +804,7 @@ function HomePage({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Survey map</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Latest ping plus earlier finds. One image, one pin.
+            Latest ping plus earlier finds. Click any pin — tire, net, propeller, wreck — to see that sonar photo.
           </p>
         </CardHeader>
         <CardContent className="relative h-[420px] p-0">

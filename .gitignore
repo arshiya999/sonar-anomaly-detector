@@ -27,6 +27,7 @@ backend/**/__pycache__/
 .vercel
 *.tsbuildinfo
 /data/survey-log.json
+/data/overlays/
 
 # training bulk (keep weights + public samples)
 ml/raw/
