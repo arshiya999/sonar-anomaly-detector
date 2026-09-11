@@ -65,5 +65,7 @@ export type SurveyPin = {
   material: string;
   classId?: string;
   confidence?: number | null;
+  latest?: boolean;
+  ageLabel?: string;
 };
 

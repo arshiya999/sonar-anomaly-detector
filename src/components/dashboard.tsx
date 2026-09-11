@@ -7,7 +7,8 @@ import {
   Activity,
   Bell,
   CheckCircle2,
-  Cpu,
+  ChevronDown,
+  Download,
   Eye,
   FileSpreadsheet,
   History,
@@ -41,6 +42,7 @@ import {
 import { CLASS_COLOR, CLASS_LABEL, confidenceBand, confidenceColor } from "@/lib/labels";
 import { MODEL_METRICS } from "@/lib/metrics";
 import { formatIst } from "@/lib/format";
+import { textLinesToPdf } from "@/lib/pdf";
 import type { DetectReport, DetectResponse, Detection, ScanLogEntry, SurveyPin } from "@/lib/types";
 import {
   coordsFromReport,
@@ -405,6 +407,34 @@ export function Dashboard() {
     triggerDownload(new Blob([html], { type: "text/html" }), "aqua-vision-briefing.html");
   };
 
+  const downloadPdf = () => {
+    const rows = detectionsFromLog(log);
+    const lines = [
+      `Generated ${new Date().toISOString()}`,
+      `${log.length} sonar images · ${rows.length} contacts`,
+      "",
+      ...log.map((e) => {
+        const top = [...e.detections].sort((a, b) => b.confidence - a.confidence)[0];
+        const cls = top ? CLASS_LABEL[top.class] ?? top.class : "no detection";
+        const gps =
+          e.latitude != null && e.longitude != null
+            ? `${e.latitude.toFixed(5)}, ${e.longitude.toFixed(5)}`
+            : "unmapped";
+        return `${formatIst(e.at)} | ${e.filename} | ${cls} | hits ${e.count} | ${gps}`;
+      }),
+      "",
+      "Contacts",
+      ...rows.map((d) => {
+        const gps =
+          d.latitude != null && d.longitude != null
+            ? `${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}`
+            : "unmapped";
+        return `${d.source ?? ""} | ${CLASS_LABEL[d.class] ?? d.class} | ${d.confidence.toFixed(0)}% | hazard ${d.hazard_score} | ${gps}`;
+      }),
+    ];
+    triggerDownload(textLinesToPdf("Aqua Vision cleanup report", lines), "aqua-vision-report.pdf");
+  };
+
   const mapped = useMemo(() => detectionsFromLog(log).filter((d) => d.latitude != null && d.longitude != null), [log]);
 
   const allDetections: Mapped[] = useMemo(() => detectionsFromLog(log), [log]);
@@ -515,7 +545,6 @@ export function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <StatusPill ok={ready} warn={hostedNoMl} label={`Model: ${ready ? "Ready" : hostedNoMl ? "Not on this host" : "Offline"}`} />
             <StatusPill ok={siteLive && !busy} warn={hostedNoMl && !busy} label={`Site: ${busy ? "Scanning" : siteLive ? "Live" : "Down"}`} />
             <button type="button" className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100" onClick={() => go("detections")}>
               <Bell className="size-4" />
@@ -617,7 +646,8 @@ export function Dashboard() {
               <CardHeader>
                 <CardTitle>Global detections map</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Pins are colored by fused confidence: red high, orange medium, green low.
+                  Gold ring + “Latest” is the ping you just uploaded. Grey “Earlier” pins are previous finds.
+                  If two contacts share the same GPS, older pins are offset so they do not sit on top of each other.
                 </p>
               </CardHeader>
               <CardContent className="relative h-[620px] p-0">
@@ -637,9 +667,19 @@ export function Dashboard() {
               downloadJson={downloadJson}
               downloadCsv={downloadCsv}
               downloadBriefing={downloadBriefing}
+              downloadPdf={downloadPdf}
             />
           )}
-          {page === "history" && <HistoryPage log={log} go={go} />}
+          {page === "history" && (
+            <HistoryPage
+              log={log}
+              go={go}
+              downloadJson={downloadJson}
+              downloadCsv={downloadCsv}
+              downloadBriefing={downloadBriefing}
+              downloadPdf={downloadPdf}
+            />
+          )}
           {page === "settings" && (
             <SettingsPage
               threshold={threshold}
@@ -705,19 +745,12 @@ function HomePage({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title="System Status"
           value={busy ? "Scanning" : ready || hostedNoMl ? "Live" : "Offline"}
           tone={ready || hostedNoMl ? "green" : "red"}
           icon={<Activity className="size-5" />}
-        />
-        <MetricCard
-          title="Model Status"
-          value={ready ? "Ready" : hostedNoMl ? "Local only" : "Offline"}
-          hint={hostedNoMl ? "YOLO is not hosted on Vercel" : `YOLO11n · ${MODEL_METRICS.params}`}
-          tone="purple"
-          icon={<Cpu className="size-5" />}
         />
         <MetricCard
           title="Total Detections"
@@ -1144,18 +1177,79 @@ function DetectionsPage({
   );
 }
 
+function DownloadMenu({
+  disabled,
+  downloadJson,
+  downloadCsv,
+  downloadBriefing,
+  downloadPdf,
+}: {
+  disabled: boolean;
+  downloadJson: () => void;
+  downloadCsv: () => void;
+  downloadBriefing: () => void;
+  downloadPdf: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <Button
+        size="sm"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+      >
+        <Download />
+        Download
+        <ChevronDown className={`size-3.5 transition ${open ? "rotate-180" : ""}`} />
+      </Button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 z-40 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+        >
+          {(
+            [
+              ["CSV", downloadCsv],
+              ["JSON", downloadJson],
+              ["Briefing", downloadBriefing],
+              ["PDF", downloadPdf],
+            ] as const
+          ).map(([label, fn]) => (
+            <button
+              key={label}
+              type="button"
+              role="menuitem"
+              className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              onClick={() => {
+                fn();
+                setOpen(false);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ReportPage({
   log,
   detections,
   downloadJson,
   downloadCsv,
   downloadBriefing,
+  downloadPdf,
 }: {
   log: ScanLogEntry[];
   detections: Mapped[];
   downloadJson: () => void;
   downloadCsv: () => void;
   downloadBriefing: () => void;
+  downloadPdf: () => void;
 }) {
   const hasData = log.length > 0;
   return (
@@ -1169,17 +1263,13 @@ function ReportPage({
               {detections.length === 1 ? "" : "s"} — updates with every upload.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={downloadJson} disabled={!hasData}>
-              JSON
-            </Button>
-            <Button size="sm" variant="outline" onClick={downloadCsv} disabled={!hasData}>
-              CSV
-            </Button>
-            <Button size="sm" variant="outline" onClick={downloadBriefing} disabled={!hasData}>
-              Briefing
-            </Button>
-          </div>
+          <DownloadMenu
+            disabled={!hasData}
+            downloadJson={downloadJson}
+            downloadCsv={downloadCsv}
+            downloadBriefing={downloadBriefing}
+            downloadPdf={downloadPdf}
+          />
         </CardHeader>
         <CardContent>
           {!hasData ? (
@@ -1275,11 +1365,32 @@ function ReportPage({
   );
 }
 
-function HistoryPage({ log, go }: { log: ScanLogEntry[]; go: (p: PageId) => void }) {
+function HistoryPage({
+  log,
+  go,
+  downloadJson,
+  downloadCsv,
+  downloadBriefing,
+  downloadPdf,
+}: {
+  log: ScanLogEntry[];
+  go: (p: PageId) => void;
+  downloadJson: () => void;
+  downloadCsv: () => void;
+  downloadBriefing: () => void;
+  downloadPdf: () => void;
+}) {
   return (
     <Card className="shadow-sm">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle>Survey history</CardTitle>
+        <DownloadMenu
+          disabled={log.length === 0}
+          downloadJson={downloadJson}
+          downloadCsv={downloadCsv}
+          downloadBriefing={downloadBriefing}
+          downloadPdf={downloadPdf}
+        />
       </CardHeader>
       <CardContent>
         {log.length === 0 ? (
@@ -1502,6 +1613,14 @@ function MapLegend({ count }: { count: number }) {
   return (
     <div className="pointer-events-none absolute right-3 bottom-3 z-[1000] rounded-md bg-white/95 px-2 py-1.5 text-[11px] text-slate-700 shadow">
       <div className="mb-1 font-medium">{count ? `${count} mapped pings` : "Upload a sonar image to plot"}</div>
+      <div className="mb-1 flex gap-2">
+        <span className="flex items-center gap-1">
+          <i className="size-2 rounded-full ring-2 ring-amber-400 bg-blue-600" /> Latest
+        </span>
+        <span className="flex items-center gap-1">
+          <i className="size-2 rounded-full bg-slate-400" /> Earlier
+        </span>
+      </div>
       <div className="flex gap-2">
         <span className="flex items-center gap-1">
           <i className="size-2 rounded-full bg-red-500" /> High

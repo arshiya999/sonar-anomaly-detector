@@ -116,23 +116,42 @@ export function mergeLogs(server: ScanLogEntry[], local: ScanLogEntry[]): ScanLo
 }
 
 export function pinsFromLog(entries: ScanLogEntry[]): SurveyPin[] {
-  return entries.flatMap((e) => {
+  const pins = entries.flatMap((e, index) => {
     const top = [...e.detections].sort((a, b) => b.confidence - a.confidence)[0];
     const lat = asCoord(e.latitude) ?? asCoord(top?.latitude);
     const lon = asCoord(e.longitude) ?? asCoord(top?.longitude);
     if (lat == null || lon == null) return [];
+    const latest = index === 0;
     return [
       {
         id: e.id,
         filename: e.filename,
         latitude: lat,
         longitude: lon,
-        overlay_url: e.overlay_url ?? e.image_url ?? top?.overlay_url ?? null,
+        overlay_url: latest ? (e.overlay_url ?? e.image_url ?? top?.overlay_url ?? null) : null,
         material: top ? CLASS_LABEL[top.class] ?? top.class : e.filename.replace(/\.[^.]+$/, ""),
         classId: top?.class,
         confidence: top?.confidence ?? null,
+        latest,
+        ageLabel: latest ? "Latest ping" : "Earlier ping",
       } satisfies SurveyPin,
     ];
+  });
+  const groups = new Map<string, SurveyPin[]>();
+  for (const p of pins) {
+    const key = `${p.latitude.toFixed(4)},${p.longitude.toFixed(4)}`;
+    const list = groups.get(key) ?? [];
+    list.push(p);
+    groups.set(key, list);
+  }
+  return pins.map((p) => {
+    const key = `${p.latitude.toFixed(4)},${p.longitude.toFixed(4)}`;
+    const list = groups.get(key) ?? [p];
+    if (list.length < 2 || p.latest) return p;
+    const slot = list.filter((x) => !x.latest).findIndex((x) => x.id === p.id) + 1;
+    const dlat = 0.0045 * slot;
+    const dlon = 0.0055 * ((slot % 2 === 0 ? 1 : -1) * Math.ceil(slot / 2));
+    return { ...p, latitude: p.latitude + dlat, longitude: p.longitude + dlon };
   });
 }
 

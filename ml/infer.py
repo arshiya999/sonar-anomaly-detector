@@ -12,8 +12,9 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
+from classify import geometry_votes, nms_detections, refine_class
 from geotag import box_dimensions_m, pixel_to_latlon
-from preprocess import box_contrast_score, is_polar_pipe_scan, prepare_for_detector, shadow_penalty, to_gray
+from preprocess import box_contrast_score, prepare_for_detector, shadow_penalty, to_gray
 
 ROOT = Path(__file__).resolve().parent
 WEIGHTS = ROOT / "weights" / "sonar-debris-yolo11n.pt"
@@ -29,13 +30,6 @@ CLASS_NAMES = [
     "cylinder",
     "diver",
 ]
-
-POLAR_REMAP = {
-    "shipwreck": "cylinder",
-    "aircraft": "cylinder",
-    "propeller": "cylinder",
-    "tire": "cylinder",
-}
 
 HAZARD_RANK = {
     "ghost_net": 95,
@@ -74,6 +68,7 @@ def fused_confidence(yolo_conf: float, gray: np.ndarray, xyxy: list[float]) -> t
     contrast = box_contrast_score(gray, xyxy)
     shadow = shadow_penalty(gray, xyxy)
     fused = float(np.clip(yolo_conf * (0.55 + 0.45 * contrast) * shadow, 0.0, 0.99))
+    fused = max(fused, float(yolo_conf) * 0.85)
     return fused, {"yolo": round(yolo_conf, 4), "contrast": round(contrast, 4), "shadow": round(shadow, 4)}
 
 
@@ -89,6 +84,8 @@ def detect_image(
     gray = to_gray(image)
     h, w = gray.shape[:2]
     model = get_model()
+    names = model.names if isinstance(model.names, dict) else {i: n for i, n in enumerate(model.names)}
+    frame_votes = geometry_votes(gray)
     results = model.predict(prepared, conf=0.12, iou=iou, verbose=False, imgsz=320, device="cpu")
     detections = []
     for r in results:
@@ -97,9 +94,11 @@ def detect_image(
         for box in r.boxes:
             xyxy = [float(v) for v in box.xyxy[0].tolist()]
             cls_id = int(box.cls[0])
-            name = CLASS_NAMES[cls_id] if 0 <= cls_id < len(CLASS_NAMES) else f"class_{cls_id}"
+            yolo_name = str(names.get(cls_id, CLASS_NAMES[cls_id] if 0 <= cls_id < len(CLASS_NAMES) else f"class_{cls_id}"))
             yolo_conf = float(box.conf[0])
+            name, extra = refine_class(yolo_name, yolo_conf, gray, xyxy, frame_votes)
             fused, parts = fused_confidence(yolo_conf, gray, xyxy)
+            parts = {**parts, "yolo_class": extra.get("yolo_class", yolo_name)}
             if fused < conf_threshold:
                 continue
             cx = (xyxy[0] + xyxy[2]) / 2
@@ -121,34 +120,8 @@ def detect_image(
                 }
             )
 
+    detections = nms_detections(detections)
     detections.sort(key=lambda d: d["confidence"], reverse=True)
-    polar = is_polar_pipe_scan(image)
-    if polar:
-        meta = {**meta, "scan_geometry": "polar_pipe"}
-        for det in detections:
-            mapped = POLAR_REMAP.get(det["class"])
-            if mapped:
-                det["class"] = mapped
-                det["hazard_score"] = HAZARD_RANK.get(mapped, det["hazard_score"])
-        if not any(d["class"] == "cylinder" for d in detections):
-            detections.append(
-                {
-                    "id": f"ANM-{uuid.uuid4().hex[:8]}",
-                    "class": "cylinder",
-                    "hazard_score": HAZARD_RANK["cylinder"],
-                    "confidence": 78.0,
-                    "confidence_parts": {"yolo": 0.0, "contrast": 1.0, "shadow": 1.0},
-                    "bbox_xyxy": [round(w * 0.08, 1), round(h * 0.08, 1), round(w * 0.92, 1), round(h * 0.92, 1)],
-                    "center_px": [round(w / 2, 1), round(h / 2, 1)],
-                    "latitude": None,
-                    "longitude": None,
-                    "dimensions": box_dimensions_m([w * 0.08, h * 0.08, w * 0.92, h * 0.92], meta),
-                }
-            )
-            lat0, lon0 = pixel_to_latlon(w / 2, h / 2, w, h, meta)
-            detections[-1]["latitude"] = None if lat0 is None else round(lat0, 7)
-            detections[-1]["longitude"] = None if lon0 is None else round(lon0, 7)
-        detections.sort(key=lambda d: d["confidence"], reverse=True)
     elapsed = round((time.time() - t0) * 1000)
     return {
         "model": Path(_model_path or "").name,

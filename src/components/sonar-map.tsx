@@ -117,19 +117,22 @@ export function SonarMap({
         <CircleMarker
           key={`${s.id}-survey`}
           center={[s.latitude, s.longitude]}
-          radius={14}
+          radius={s.latest ? 16 : 10}
           pathOptions={{
-            color: "#ffffff",
-            fillColor: s.classId ? confidenceColor(s.confidence ?? 55) : "#2563eb",
-            fillOpacity: 0.95,
-            weight: 2,
+            color: s.latest ? "#fbbf24" : "#ffffff",
+            fillColor: s.latest ? "#2563eb" : s.classId ? confidenceColor(s.confidence ?? 55) : "#64748b",
+            fillOpacity: s.latest ? 1 : 0.72,
+            weight: s.latest ? 4 : 2,
           }}
         >
-          <Tooltip permanent direction="top" offset={[0, -12]} className="sonar-material-label">
-            {s.material}
+          <Tooltip permanent direction="top" offset={[0, s.latest ? -14 : -10]} className="sonar-material-label">
+            {s.latest ? `Latest · ${s.material}` : `Earlier · ${s.material}`}
           </Tooltip>
           <Popup>
             <div className="max-w-[240px] text-sm text-slate-900">
+              <p className="text-[10px] font-semibold tracking-wide text-blue-700 uppercase">
+                {s.latest ? "Latest ping (just uploaded)" : "Earlier ping"}
+              </p>
               <p className="font-semibold">{s.material}</p>
               <p className="text-xs text-slate-600">{s.filename}</p>
               <p className="font-mono text-[11px]">
