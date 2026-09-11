@@ -50,6 +50,7 @@ import {
   geotagReport,
   mergeLogs,
   pinsFromLog,
+  plotPosition,
   toLogEntry,
 } from "@/lib/geo";
 import { SurveyCharts } from "@/components/survey-charts";
@@ -195,6 +196,8 @@ export function Dashboard() {
   } | null>(null);
   const [meta, setMeta] = useState<MetaForm>(DEFAULT_META);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
+  const logRef = useRef<ScanLogEntry[]>([]);
+  logRef.current = log;
   const [pipeStep, setPipeStep] = useState(0);
   const [clock, setClock] = useState("");
 
@@ -288,30 +291,35 @@ export function Dashboard() {
         const overlayData = data.overlay_jpeg_base64
           ? `data:image/jpeg;base64,${data.overlay_jpeg_base64}`
           : null;
-        const [plotLat, plotLon] = coordsFromReport(data.report);
-        const geoReport = geotagReport(data.report, plotLat, plotLon);
+        const [reportLat, reportLon] = coordsFromReport(data.report);
+        const placed = plotPosition(
+          logRef.current,
+          lat ?? reportLat,
+          lon ?? reportLon,
+        );
+        const geoReport = geotagReport(data.report, placed.lat, placed.lon);
         const localEntry = toLogEntry({
           id: `local-${Date.now()}`,
           filename: imageFile.name,
           report: geoReport,
-          lat: plotLat,
-          lon: plotLon,
+          lat: placed.lat,
+          lon: placed.lon,
           overlay: overlayData,
         });
         setReport(geoReport);
         setOverlay(overlayData);
         setLog((prev) => mergeLogs(prev, [localEntry]));
-        if (plotLat != null && plotLon != null) {
+        if (placed.gnss) {
           setMeta((m) => ({
             ...m,
-            latitude: m.latitude.trim() || String(plotLat.toFixed(5)),
-            longitude: m.longitude.trim() || String(plotLon.toFixed(5)),
+            latitude: m.latitude.trim() || String(placed.lat.toFixed(5)),
+            longitude: m.longitude.trim() || String(placed.lon.toFixed(5)),
           }));
         }
         toast.success(
           geoReport.count
-            ? `${geoReport.count} anomal${geoReport.count === 1 ? "y" : "ies"} scored in real time`
-            : "Ping processed in real time (no class above threshold)",
+            ? `${geoReport.count} anomal${geoReport.count === 1 ? "y" : "ies"} scored — pin on map`
+            : "Ping processed — pin on map (no class above threshold)",
         );
         const persist = await fetch("/api/log", {
           method: "POST",
@@ -329,11 +337,11 @@ export function Dashboard() {
           }
         }
         await refreshLog();
-        if (plotLat != null && plotLon != null) {
-          toast.message(`Mapped at ${plotLat.toFixed(4)}, ${plotLon.toFixed(4)}`);
-        } else {
-          toast.message("GPS unavailable — contacts logged, map left unmapped");
-        }
+        toast.message(
+          placed.gnss
+            ? `Pinned at ${placed.lat.toFixed(4)}, ${placed.lon.toFixed(4)}`
+            : `Pinned on survey plot ${placed.lat.toFixed(4)}, ${placed.lon.toFixed(4)} — click the map or type GPS for true position`,
+        );
       } catch (err) {
         const message = err instanceof Error ? err.message : "Detection failed";
         setError(message);
@@ -344,6 +352,20 @@ export function Dashboard() {
     },
     [meta, threshold, refreshLog],
   );
+
+  const pickMapOrigin = useCallback((lat: number, lon: number) => {
+    const next: MetaForm = {
+      ...meta,
+      latitude: lat.toFixed(5),
+      longitude: lon.toFixed(5),
+      heading_deg: meta.heading_deg.trim() || "0",
+      meters_per_pixel_x: meta.meters_per_pixel_x.trim() || "0.08",
+      meters_per_pixel_y: meta.meters_per_pixel_y.trim() || "0.05",
+    };
+    setMeta(next);
+    saveOrigin(next);
+    toast.success(`Survey origin set to ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+  }, [meta]);
 
   const onFile = async (next: File) => {
     setFile(next);
@@ -576,6 +598,7 @@ export function Dashboard() {
               preview={preview}
               log={log}
               go={go}
+              onPickOrigin={pickMapOrigin}
             />
           )}
           {page === "upload" && (
@@ -620,6 +643,7 @@ export function Dashboard() {
                       key={`analysis-map-${surveyPins.length}-${surveyPins[0]?.id ?? "none"}`}
                       detections={mapped}
                       surveys={surveyPins}
+                      onPickOrigin={pickMapOrigin}
                     />
                     <MapLegend count={surveyPins.length} />
                   </CardContent>
@@ -655,6 +679,7 @@ export function Dashboard() {
                   key={`full-map-${surveyPins.length}-${surveyPins[0]?.id ?? "none"}`}
                   detections={mapped}
                   surveys={surveyPins}
+                  onPickOrigin={pickMapOrigin}
                 />
                 <MapLegend count={surveyPins.length} />
               </CardContent>
@@ -719,6 +744,7 @@ function HomePage({
   preview,
   log,
   go,
+  onPickOrigin,
 }: {
   ready: boolean;
   hostedNoMl: boolean;
@@ -733,6 +759,7 @@ function HomePage({
   preview: string | null;
   log: ScanLogEntry[];
   go: (p: PageId) => void;
+  onPickOrigin?: (lat: number, lon: number) => void;
 }) {
   const thumb = overlay ?? preview;
   const recent = allDetections.slice(0, 5);
@@ -782,6 +809,7 @@ function HomePage({
             key={`home-map-${surveys.length}-${surveys[0]?.id ?? "none"}`}
             detections={mapped}
             surveys={surveys}
+            onPickOrigin={onPickOrigin}
           />
           <MapLegend count={surveys.length} />
         </CardContent>
@@ -1020,8 +1048,9 @@ function UploadPage({
             }}
           />
           <p className="text-xs text-slate-600">
-            Each file is inferred immediately (live). Pins appear only when this ping has GPS: type survey origin,
-            JPEG EXIF, or device GPS. No placeholder city is used.
+            Each upload is pinned on the map immediately. If the file has no GPS, the pin is placed on the
+            NIOT survey plot (Bay of Bengal). Click the map, type lat/lon, or use device GPS for the true
+            ship position.
           </p>
           <Button className="h-10 w-full" onClick={onPick} disabled={busy}>
             <Upload /> Upload sonar image
@@ -1068,7 +1097,7 @@ function UploadPage({
                 {label}
                 <Input
                   value={meta[key]}
-                  placeholder="required to plot on map"
+                  placeholder="optional — or click map"
                   onChange={(e) => setMeta({ ...meta, [key]: e.target.value })}
                   className="h-8"
                 />
@@ -1085,8 +1114,8 @@ function UploadPage({
         <CardHeader>
           <CardTitle>Map position</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Real-time geotag uses JPEG EXIF GPS if present, otherwise the latitude/longitude you type (or live
-            device GPS). Empty GPS → detection still runs; the contact stays unmapped.
+            Detection always runs. Pins always appear. Without file GPS they sit on the NIOT survey plot until
+            you click the map, type coordinates, or use device GPS.
           </p>
         </CardHeader>
         <CardContent>
@@ -1488,7 +1517,7 @@ function SettingsPage({
                 {label}
                 <Input
                   value={meta[key]}
-                  placeholder="required to plot on map"
+                  placeholder="optional — or click map"
                   onChange={(e) => setMeta({ ...meta, [key]: e.target.value })}
                   className="h-8"
                 />

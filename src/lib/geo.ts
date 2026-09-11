@@ -14,7 +14,39 @@ export function asCoord(value: unknown): number | null {
   return null;
 }
 
-/** Operator-entered or EXIF/model coordinates only — never a placeholder city. */
+/** NIOT / Bay of Bengal — used only when a ping has no GNSS, so the map still shows pins. */
+export const SURVEY_PLOT_ORIGIN: [number, number] = [13.0827, 80.2707];
+
+export function lastMappedPosition(entries: ScanLogEntry[]): [number, number] | null {
+  for (const e of entries) {
+    const lat = asCoord(e.latitude) ?? asCoord(e.detections[0]?.latitude);
+    const lon = asCoord(e.longitude) ?? asCoord(e.detections[0]?.longitude);
+    if (lat != null && lon != null) return [lat, lon];
+  }
+  return null;
+}
+
+/** Always returns a pin location. GNSS if known; otherwise next point on the survey plot. */
+export function plotPosition(
+  entries: ScanLogEntry[],
+  lat?: number | null,
+  lon?: number | null,
+): { lat: number; lon: number; gnss: boolean } {
+  if (lat != null && lon != null && Number.isFinite(lat) && Number.isFinite(lon)) {
+    return { lat, lon, gnss: true };
+  }
+  const last = lastMappedPosition(entries);
+  if (last) {
+    const n = entries.length + 1;
+    return {
+      lat: last[0] + 0.012 * ((n % 5) - 2),
+      lon: last[1] + 0.014 * ((n % 4) - 1.5),
+      gnss: false,
+    };
+  }
+  return { lat: SURVEY_PLOT_ORIGIN[0], lon: SURVEY_PLOT_ORIGIN[1], gnss: false };
+}
+
 export function coordsFromReport(report: DetectReport): [number | null, number | null] {
   const fromMetaLat = asCoord(report.metadata?.latitude);
   const fromMetaLon = asCoord(report.metadata?.longitude);
