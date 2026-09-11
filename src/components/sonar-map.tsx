@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import L from "leaflet";
-import { CircleMarker, ImageOverlay, MapContainer, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { CircleMarker, ImageOverlay, MapContainer, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { CLASS_LABEL, confidenceColor } from "@/lib/labels";
 import type { Detection, SurveyPin } from "@/lib/types";
 import "leaflet/dist/leaflet.css";
@@ -17,7 +17,7 @@ function FitPins({ points }: { points: [number, number][] }) {
       if (map.getSize().x < 8) return;
       map.invalidateSize();
       if (points.length === 0) {
-        map.setView([15, 75], 3);
+        map.setView([13.0827, 80.2707], 8);
         return;
       }
       if (points.length === 1) map.setView(points[0], 13);
@@ -49,6 +49,25 @@ function ResizeGuard() {
   return null;
 }
 
+function PinPane() {
+  const map = useMap();
+  if (!map.getPane("pins")) {
+    const pane = map.createPane("pins");
+    pane.style.zIndex = "650";
+    pane.style.pointerEvents = "auto";
+  }
+  return null;
+}
+
+function MapClickOrigin({ onPickOrigin }: { onPickOrigin?: (lat: number, lon: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onPickOrigin?.(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
 function overlayBounds(lat: number, lon: number): L.LatLngBoundsExpression {
   const dlat = 0.006;
   const dlon = 0.006 / Math.max(0.2, Math.cos((lat * Math.PI) / 180));
@@ -62,10 +81,12 @@ export function SonarMap({
   detections,
   surveys = [],
   basemap = "world",
+  onPickOrigin,
 }: {
   detections: Mapped[];
   surveys?: SurveyPin[];
   basemap?: "world" | "imagery";
+  onPickOrigin?: (lat: number, lon: number) => void;
 }) {
   const points = useMemo(() => {
     const fromDet = detections
@@ -92,8 +113,8 @@ export function SonarMap({
     }
     return frames;
   }, [detections, surveys]);
-  const center = points[0] ?? ([15, 75] as [number, number]);
-  const zoom = points.length ? 13 : 3;
+  const center = points[0] ?? ([13.0827, 80.2707] as [number, number]);
+  const zoom = points.length ? 13 : 8;
 
   return (
     <MapContainer center={center} zoom={zoom} className="h-full min-h-[280px] w-full" scrollWheelZoom>
@@ -109,13 +130,16 @@ export function SonarMap({
         />
       )}
       <ResizeGuard />
+      <PinPane />
+      <MapClickOrigin onPickOrigin={onPickOrigin} />
       <FitPins points={points} />
       {sonarFrames.map((f) => (
-        <ImageOverlay key={`${f.id}-img`} url={f.url} bounds={overlayBounds(f.lat, f.lon)} opacity={0.88} />
+        <ImageOverlay key={`${f.id}-img`} url={f.url} bounds={overlayBounds(f.lat, f.lon)} opacity={0.35} />
       ))}
       {surveys.map((s) => (
         <CircleMarker
           key={`${s.id}-survey`}
+          pane="pins"
           center={[s.latitude, s.longitude]}
           radius={s.latest ? 16 : 10}
           pathOptions={{
@@ -153,6 +177,7 @@ export function SonarMap({
         .map((d) => (
           <CircleMarker
             key={d.id}
+            pane="pins"
             center={[d.latitude, d.longitude]}
             radius={12}
             pathOptions={{
