@@ -123,9 +123,7 @@ export function mergeLogs(server: ScanLogEntry[], local: ScanLogEntry[]): ScanLo
       asCoord(hint?.longitude) ??
       asCoord(hint?.detections[0]?.longitude);
     const overlay =
-      raw.overlay_url?.startsWith("data:") || raw.overlay_url
-        ? raw.overlay_url
-        : (hint?.overlay_url ?? raw.image_url ?? null);
+      raw.overlay_url || hint?.overlay_url || raw.image_url || hint?.image_url || null;
     const e: ScanLogEntry = {
       ...raw,
       latitude: lat,
@@ -165,7 +163,7 @@ export function pinsFromLog(entries: ScanLogEntry[]): SurveyPin[] {
         filename: e.filename,
         latitude: lat,
         longitude: lon,
-        overlay_url: latest ? (e.overlay_url ?? e.image_url ?? top?.overlay_url ?? null) : null,
+        overlay_url: e.overlay_url ?? e.image_url ?? top?.overlay_url ?? top?.image_url ?? null,
         material: top ? CLASS_LABEL[top.class] ?? top.class : e.filename.replace(/\.[^.]+$/, ""),
         classId: top?.class,
         confidence: top?.confidence ?? null,

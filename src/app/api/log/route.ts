@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { appendLog, readLog } from "@/lib/log-store";
+import { appendLog, readLog, saveOverlayJpeg } from "@/lib/log-store";
 import type { DetectReport } from "@/lib/types";
 
 const OPS = process.env.OPS_API_URL ?? "http://127.0.0.1:8766";
@@ -16,11 +16,7 @@ export async function GET() {
   } catch {
     /* ops API offline */
   }
-  const fileEntries = readLog().filter((e) => {
-    const n = e.filename.toLowerCase();
-    return !n.startsWith("sctd_") && !n.startsWith("wt_marine-debris");
-  });
-  return Response.json({ entries: fileEntries, source: "file" });
+  return Response.json({ entries: readLog(), source: "file" });
 }
 
 export async function POST(req: NextRequest) {
@@ -32,6 +28,8 @@ export async function POST(req: NextRequest) {
   if (!body.report) {
     return Response.json({ error: "report required" }, { status: 400 });
   }
+  const id = `SCAN-${crypto.randomUUID().slice(0, 8)}`;
+  const overlayUrl = saveOverlayJpeg(id, body.overlay_jpeg_base64);
   try {
     const ingest = await fetch(`${OPS}/api/ingest/ml-report`, {
       method: "POST",
@@ -47,24 +45,39 @@ export async function POST(req: NextRequest) {
       if (logRes.ok) {
         const data = await logRes.json();
         if (Array.isArray(data.entries)) {
-          return Response.json({ ok: true, entries: data.entries, source: "postgres" });
+          const filename = body.filename || "upload";
+          let attached = false;
+          const entries = data.entries.map((e: { filename?: string; overlay_url?: string | null; image_url?: string | null }) => {
+            if (attached || e.filename !== filename) return e;
+            attached = true;
+            const photo = overlayUrl || e.overlay_url || e.image_url;
+            return { ...e, overlay_url: photo, image_url: e.image_url || photo };
+          });
+          return Response.json({ ok: true, entries, source: "postgres" });
         }
       }
     }
   } catch {
     /* still keep local log */
   }
+  const detections = body.report.detections.map((d) => ({
+    ...d,
+    overlay_url: d.overlay_url ?? overlayUrl,
+    image_url: d.image_url ?? overlayUrl,
+  }));
   const entries = appendLog({
-    id: `SCAN-${crypto.randomUUID().slice(0, 8)}`,
+    id,
     at: new Date().toISOString(),
     filename: body.filename || "upload",
     survey: String(body.report.survey_id || "unspecified"),
     count: body.report.count,
     inference_ms: body.report.inference_ms,
     threshold: body.report.threshold,
-    detections: body.report.detections,
+    detections,
     latitude: body.report.detections[0]?.latitude ?? (body.report.metadata?.latitude as number | null | undefined) ?? null,
     longitude: body.report.detections[0]?.longitude ?? (body.report.metadata?.longitude as number | null | undefined) ?? null,
+    overlay_url: overlayUrl,
+    image_url: overlayUrl,
   });
   return Response.json({ ok: true, entries, source: "file" });
 }

@@ -4,6 +4,18 @@ import type { ScanLogEntry } from "@/lib/types";
 
 const DIR = join(process.cwd(), "data");
 const FILE = join(DIR, "survey-log.json");
+const OVERLAY_DIR = join(DIR, "overlays");
+
+export function overlayFilePath(id: string): string {
+  return join(OVERLAY_DIR, `${id}.jpg`);
+}
+
+export function saveOverlayJpeg(id: string, b64: string | null | undefined): string | null {
+  if (!b64?.trim()) return null;
+  mkdirSync(OVERLAY_DIR, { recursive: true });
+  writeFileSync(overlayFilePath(id), Buffer.from(b64, "base64"));
+  return `/api/overlays/${id}`;
+}
 
 function ensure() {
   mkdirSync(DIR, { recursive: true });

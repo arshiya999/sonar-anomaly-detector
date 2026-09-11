@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import L from "leaflet";
-import { CircleMarker, MapContainer, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
-import { confidenceColor } from "@/lib/labels";
+import { Marker, MapContainer, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import type { Detection, SurveyPin } from "@/lib/types";
 import "leaflet/dist/leaflet.css";
 
@@ -68,12 +67,65 @@ function MapClickOrigin({ onPickOrigin }: { onPickOrigin?: (lat: number, lon: nu
   return null;
 }
 
+function escapeAttr(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+function photoIcon(pin: SurveyPin): L.DivIcon {
+  const size = pin.latest ? 52 : 44;
+  const ring = pin.latest ? "#fbbf24" : "#ffffff";
+  const src = pin.overlay_url;
+  const inner = src
+    ? `<img src="${escapeAttr(src)}" alt="${escapeAttr(pin.material)}" />`
+    : `<span>${escapeAttr((pin.material || "?").slice(0, 2))}</span>`;
+  return L.divIcon({
+    className: "sonar-photo-pin",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+    html: `<div class="sonar-photo-pin-face ${pin.latest ? "is-latest" : ""}" style="width:${size}px;height:${size}px;border-color:${ring}">${inner}</div>`,
+  });
+}
+
+function PhotoPin({ pin }: { pin: SurveyPin }) {
+  const icon = useMemo(
+    () => photoIcon(pin),
+    [pin.id, pin.overlay_url, pin.latest, pin.material],
+  );
+  const photo = pin.overlay_url;
+  return (
+    <Marker pane="pins" position={[pin.latitude, pin.longitude]} icon={icon}>
+      <Tooltip permanent direction="top" offset={[0, pin.latest ? -28 : -24]} className="sonar-material-label">
+        {pin.latest ? `Latest · ${pin.material}` : pin.material}
+      </Tooltip>
+      <Popup>
+        <div className="max-w-[260px] text-sm text-slate-900">
+          <p className="text-[10px] font-semibold tracking-wide text-blue-700 uppercase">
+            {pin.latest ? "Latest ping (this upload)" : "Earlier ping (previous upload)"}
+          </p>
+          <p className="font-semibold">{pin.material}</p>
+          <p className="text-xs text-slate-600">{pin.filename}</p>
+          <p className="font-mono text-[11px]">
+            {pin.latitude.toFixed(5)}, {pin.longitude.toFixed(5)}
+          </p>
+          {pin.confidence != null ? <p className="text-xs">{pin.confidence.toFixed(0)}% confidence</p> : null}
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo} alt={pin.material} className="mt-2 max-h-48 w-full rounded object-cover" />
+          ) : (
+            <p className="mt-2 text-xs text-slate-500">No sonar frame stored for this ping yet. Re-upload to attach the photo.</p>
+          )}
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
 export function SonarMap({
   surveys = [],
   basemap = "world",
   onPickOrigin,
 }: {
-  /** Kept so older call sites compile; pins come from surveys only (one image → one pin). */
   detections?: Mapped[];
   surveys?: SurveyPin[];
   basemap?: "world" | "imagery";
@@ -104,41 +156,7 @@ export function SonarMap({
       <MapClickOrigin onPickOrigin={onPickOrigin} />
       <FitPins points={points} />
       {surveys.map((s) => (
-        <CircleMarker
-          key={`${s.id}-survey`}
-          pane="pins"
-          center={[s.latitude, s.longitude]}
-          radius={s.latest ? 16 : 10}
-          pathOptions={{
-            color: s.latest ? "#fbbf24" : "#ffffff",
-            fillColor: s.latest ? "#2563eb" : s.classId ? confidenceColor(s.confidence ?? 55) : "#64748b",
-            fillOpacity: s.latest ? 1 : 0.72,
-            weight: s.latest ? 4 : 2,
-          }}
-        >
-          <Tooltip permanent direction="top" offset={[0, s.latest ? -14 : -10]} className="sonar-material-label">
-            {s.latest ? `Latest · ${s.material}` : `Earlier · ${s.material}`}
-          </Tooltip>
-          <Popup>
-            <div className="max-w-[240px] text-sm text-slate-900">
-              <p className="text-[10px] font-semibold tracking-wide text-blue-700 uppercase">
-                {s.latest ? "Latest ping (this upload)" : "Earlier ping (previous upload)"}
-              </p>
-              <p className="font-semibold">{s.material}</p>
-              <p className="text-xs text-slate-600">One pin per image · {s.filename}</p>
-              {s.contactSummary ? <p className="text-xs">In this file: {s.contactSummary}</p> : null}
-              {s.hitCount != null ? <p className="text-xs">{s.hitCount} box{s.hitCount === 1 ? "" : "es"} in the waterfall</p> : null}
-              <p className="font-mono text-[11px]">
-                {s.latitude.toFixed(5)}, {s.longitude.toFixed(5)}
-              </p>
-              {s.confidence != null ? <p className="text-xs">{s.confidence.toFixed(0)}% confidence</p> : null}
-              {s.overlay_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={s.overlay_url} alt={s.material} className="mt-2 max-h-40 w-full rounded object-cover" />
-              ) : null}
-            </div>
-          </Popup>
-        </CircleMarker>
+        <PhotoPin key={`${s.id}-survey`} pin={s} />
       ))}
     </MapContainer>
   );
