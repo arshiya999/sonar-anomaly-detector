@@ -60,8 +60,9 @@ export function geotagReport(report: DetectReport, lat: number | null, lon: numb
   if (lat == null || lon == null) return report;
   const detections = report.detections.map((d) => ({
     ...d,
-    latitude: asCoord(d.latitude) ?? lat,
-    longitude: asCoord(d.longitude) ?? lon,
+    // One ping / one image shares a single lat/lon. Pixel offsets are for the waterfall, not extra map wrecks.
+    latitude: lat,
+    longitude: lon,
   }));
   return {
     ...report,
@@ -148,7 +149,11 @@ export function mergeLogs(server: ScanLogEntry[], local: ScanLogEntry[]): ScanLo
 }
 
 export function pinsFromLog(entries: ScanLogEntry[]): SurveyPin[] {
-  const pins = entries.flatMap((e, index) => {
+  const persistedFiles = new Set(
+    entries.filter((e) => !e.id.startsWith("local-")).map((e) => e.filename),
+  );
+  const unique = entries.filter((e) => !(e.id.startsWith("local-") && persistedFiles.has(e.filename)));
+  const pins = unique.flatMap((e, index) => {
     const top = [...e.detections].sort((a, b) => b.confidence - a.confidence)[0];
     const lat = asCoord(e.latitude) ?? asCoord(top?.latitude);
     const lon = asCoord(e.longitude) ?? asCoord(top?.longitude);
@@ -166,6 +171,8 @@ export function pinsFromLog(entries: ScanLogEntry[]): SurveyPin[] {
         confidence: top?.confidence ?? null,
         latest,
         ageLabel: latest ? "Latest ping" : "Earlier ping",
+        hitCount: e.count,
+        contactSummary: [...new Set(e.detections.map((d) => CLASS_LABEL[d.class] ?? d.class))].join(", "),
       } satisfies SurveyPin,
     ];
   });

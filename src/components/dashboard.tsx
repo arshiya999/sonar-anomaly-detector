@@ -635,7 +635,7 @@ export function Dashboard() {
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Live map</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      Every uploaded image is pinned here as soon as inference finishes.
+                      One pin per uploaded image. Earlier uploads stay; the gold ring is the newest ping.
                     </p>
                   </CardHeader>
                   <CardContent className="relative h-[420px] p-0">
@@ -670,8 +670,9 @@ export function Dashboard() {
               <CardHeader>
                 <CardTitle>Global detections map</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Gold ring + “Latest” is the ping you just uploaded. Grey “Earlier” pins are previous finds.
-                  If two contacts share the same GPS, older pins are offset so they do not sit on top of each other.
+                  One uploaded image is one pin at that ping’s latitude/longitude. Extra boxes in the same
+                  file stay on the waterfall and in the pin popup — they are not extra wrecks. Gold ring is
+                  the latest upload; grey pins are earlier finds and stay on the map.
                 </p>
               </CardHeader>
               <CardContent className="relative h-[620px] p-0">
@@ -802,7 +803,10 @@ function HomePage({
 
       <Card className="overflow-hidden shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Global Detections Map</CardTitle>
+          <CardTitle className="text-base">Survey map</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Latest ping plus earlier finds. One image, one pin.
+          </p>
         </CardHeader>
         <CardContent className="relative h-[420px] p-0">
           <SonarMap
@@ -1641,7 +1645,9 @@ function StatusPill({ ok, warn, label }: { ok: boolean; warn?: boolean; label: s
 function MapLegend({ count }: { count: number }) {
   return (
     <div className="pointer-events-none absolute right-3 bottom-3 z-[1000] rounded-md bg-white/95 px-2 py-1.5 text-[11px] text-slate-700 shadow">
-      <div className="mb-1 font-medium">{count ? `${count} mapped pings` : "Upload a sonar image to plot"}</div>
+      <div className="mb-1 font-medium">
+        {count ? `${count} image${count === 1 ? "" : "s"} · 1 pin each` : "Upload a sonar image to plot"}
+      </div>
       <div className="mb-1 flex gap-2">
         <span className="flex items-center gap-1">
           <i className="size-2 rounded-full ring-2 ring-amber-400 bg-blue-600" /> Latest
