@@ -46,12 +46,22 @@ const GRAPHS: { id: GraphId; label: string; hint: string; icon: typeof BarChart3
   { id: "risk", label: "Hazard", hint: "Cleanup priority scores", icon: Shield },
 ];
 
-const TOOLTIP_STYLE = {
-  background: "#ffffff",
-  border: "1px solid #e2e8f0",
+const OCEAN_TOOLTIP = {
+  background: "#0c4a6e",
+  border: "1px solid #22d3ee",
   borderRadius: 10,
   fontSize: 12,
-  color: "#0f172a",
+  color: "#ecfeff",
+};
+
+const OCEAN_TICK = { fill: "#bae6fd", fontSize: 11 };
+const OCEAN_GRID = "#155e75";
+
+const CONF_BAR: Record<string, string> = {
+  "0-25%": "#155e75",
+  "25-50%": "#0e7490",
+  "50-75%": "#22d3ee",
+  "75-100%": "#fbbf24",
 };
 
 export function SurveyCharts({
@@ -139,6 +149,7 @@ export function SurveyCharts({
           )}
           {on.includes("timeline") && (
             <ChartCard
+              tone="ocean"
               title="Images entered"
               subtitle="Cumulative count — the line should rise every time you upload a new file"
             >
@@ -146,29 +157,29 @@ export function SurveyCharts({
                 <AreaChart data={stats.timeline} margin={{ left: 0, right: 8, top: 8 }}>
                   <defs>
                     <linearGradient id="intakeFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#5eead4" stopOpacity={0.45} />
-                      <stop offset="100%" stopColor="#5eead4" stopOpacity={0.02} />
+                      <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.85} />
+                      <stop offset="100%" stopColor="#0c4a6e" stopOpacity={0.15} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} />
-                  <YAxis allowDecimals={false} tick={{ fill: "#64748b", fontSize: 11 }} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={OCEAN_GRID} />
+                  <XAxis dataKey="label" tick={OCEAN_TICK} />
+                  <YAxis allowDecimals={false} tick={OCEAN_TICK} />
+                  <Tooltip contentStyle={OCEAN_TOOLTIP} />
                   <Area
                     type="monotone"
                     dataKey="images"
                     name="Images uploaded (total)"
-                    stroke="#5eead4"
+                    stroke="#67e8f9"
                     fill="url(#intakeFill)"
-                    strokeWidth={2}
+                    strokeWidth={2.5}
                   />
                   <Area
                     type="monotone"
                     dataKey="hits"
                     name="Detections (total)"
-                    stroke="#38bdf8"
+                    stroke="#fbbf24"
                     fill="transparent"
-                    strokeWidth={2}
+                    strokeWidth={2.5}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -176,16 +187,21 @@ export function SurveyCharts({
           )}
           {on.includes("confidence") && (
             <ChartCard
+              tone="ocean"
               title="Fused confidence"
               subtitle="How many detections fall in each confidence band (updates with every scan)"
             >
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={stats.confBuckets} margin={{ left: 0, right: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} />
-                  <YAxis allowDecimals={false} tick={{ fill: "#64748b", fontSize: 11 }} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} />
-                  <Bar dataKey="count" name="Detections" fill="#38bdf8" radius={[6, 6, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={OCEAN_GRID} />
+                  <XAxis dataKey="label" tick={OCEAN_TICK} />
+                  <YAxis allowDecimals={false} tick={OCEAN_TICK} />
+                  <Tooltip contentStyle={OCEAN_TOOLTIP} />
+                  <Bar dataKey="count" name="Detections" radius={[6, 6, 0, 0]}>
+                    {stats.confBuckets.map((row) => (
+                      <Cell key={row.label} fill={CONF_BAR[row.label] ?? "#22d3ee"} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
@@ -200,7 +216,7 @@ export function SurveyCharts({
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="i" tick={{ fill: "#64748b", fontSize: 11 }} name="Scan" />
                   <YAxis tick={{ fill: "#64748b", fontSize: 11 }} unit=" ms" />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  <Tooltip contentStyle={OCEAN_TOOLTIP} />
                   <Area
                     type="monotone"
                     dataKey="ms"
@@ -216,18 +232,19 @@ export function SurveyCharts({
           )}
           {on.includes("risk") && (
             <ChartCard
+              tone="ocean"
               title="Hazard score"
               subtitle="Ghost gear and wrecks rank higher for cleanup order"
             >
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={stats.risk} margin={{ left: 0, right: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} />
-                  <YAxis tick={{ fill: "#64748b", fontSize: 11 }} domain={[0, 100]} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={OCEAN_GRID} />
+                  <XAxis dataKey="label" tick={OCEAN_TICK} />
+                  <YAxis tick={OCEAN_TICK} domain={[0, 100]} />
+                  <Tooltip contentStyle={OCEAN_TOOLTIP} />
                   <Bar dataKey="score" name="Mean hazard" radius={[6, 6, 0, 0]} maxBarSize={42}>
                     {stats.risk.map((row) => (
-                      <Cell key={row.class} fill={CLASS_COLOR[row.class] ?? "#f87171"} />
+                      <Cell key={row.class} fill={CLASS_COLOR[row.class] ?? "#fb7185"} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -319,18 +336,27 @@ function ChartCard({
   title,
   subtitle,
   children,
+  tone = "light",
 }: {
   title: string;
   subtitle: string;
   children: React.ReactNode;
+  tone?: "light" | "ocean";
 }) {
+  const ocean = tone === "ocean";
   return (
-    <div className="overflow-hidden rounded-xl border border-border/70 bg-card/60 p-4 shadow-[inset_0_1px_0_oklch(1_0_0_/_0.04)]">
+    <div
+      className={
+        ocean
+          ? "overflow-hidden rounded-xl border border-cyan-600/80 bg-[#0c4a6e] p-4 text-cyan-50 shadow-inner"
+          : "overflow-hidden rounded-xl border border-border/70 bg-card/60 p-4 shadow-[inset_0_1px_0_oklch(1_0_0_/_0.04)]"
+      }
+    >
       <div className="mb-3 flex items-start gap-2">
-        <BarChart3 className="mt-0.5 size-4 text-primary" />
+        <BarChart3 className={`mt-0.5 size-4 ${ocean ? "text-cyan-300" : "text-primary"}`} />
         <div>
           <p className="text-sm font-medium">{title}</p>
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
+          <p className={`text-xs ${ocean ? "text-cyan-200" : "text-muted-foreground"}`}>{subtitle}</p>
         </div>
       </div>
       {children}

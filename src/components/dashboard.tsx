@@ -832,18 +832,20 @@ function HomePage({
             )}
           </CardContent>
         </Card>
-        <Card className="shadow-sm xl:col-span-3">
+        <Card className="border-cyan-800 bg-[#0c4a6e] text-cyan-50 shadow-sm xl:col-span-3">
           <CardHeader className="pb-1">
-            <CardTitle className="text-base">Confidence Distribution</CardTitle>
+            <CardTitle className="text-base text-cyan-50">Confidence Distribution</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {allDetections.length === 0 ? (
-              <EmptyNote text="Confidence bands appear after the first fused scan." />
+              <p className="rounded-lg bg-cyan-950/40 px-3 py-8 text-center text-sm text-cyan-200">
+                Confidence bands appear after the first fused scan.
+              </p>
             ) : (
               <>
-                <StackedBand label="High (>80%)" count={bands.high} color="#ef4444" share={bands.high / bandTotal} />
-                <StackedBand label="Medium (50–80%)" count={bands.medium} color="#f97316" share={bands.medium / bandTotal} />
-                <StackedBand label="Low (<50%)" count={bands.low} color="#22c55e" share={bands.low / bandTotal} />
+                <StackedBand label="High (>80%)" count={bands.high} color="#fb7185" share={bands.high / bandTotal} dark />
+                <StackedBand label="Medium (50–80%)" count={bands.medium} color="#fbbf24" share={bands.medium / bandTotal} dark />
+                <StackedBand label="Low (<50%)" count={bands.low} color="#22d3ee" share={bands.low / bandTotal} dark />
               </>
             )}
           </CardContent>
@@ -1670,14 +1672,26 @@ function MapLegend({ count }: { count: number }) {
   );
 }
 
-function StackedBand({ label, count, color, share }: { label: string; count: number; color: string; share: number }) {
+function StackedBand({
+  label,
+  count,
+  color,
+  share,
+  dark,
+}: {
+  label: string;
+  count: number;
+  color: string;
+  share: number;
+  dark?: boolean;
+}) {
   return (
     <div>
-      <div className="mb-1 flex justify-between text-xs text-slate-600">
+      <div className={`mb-1 flex justify-between text-xs ${dark ? "text-cyan-100" : "text-slate-600"}`}>
         <span>{label}</span>
         <span className="font-mono">{count}</span>
       </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+      <div className={`h-2.5 overflow-hidden rounded-full ${dark ? "bg-cyan-950/70" : "bg-slate-100"}`}>
         <div className="h-full rounded-full" style={{ width: `${Math.round(share * 100)}%`, background: color }} />
       </div>
     </div>
