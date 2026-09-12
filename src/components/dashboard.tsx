@@ -421,7 +421,7 @@ export function Dashboard() {
       )
       .join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Aqua Vision briefing</title>
-<style>body{font-family:ui-sans-serif,system-ui;background:#e7f8fb;color:#134e4a;padding:32px}h1{color:#0d9488}table{border-collapse:collapse;width:100%;background:#fff}td,th{border:1px solid #99f6e4;padding:8px;text-align:left}</style>
+<style>body{font-family:ui-sans-serif,system-ui;background:#cfeaf3;color:#083344;padding:32px}h1{color:#0369a1}table{border-collapse:collapse;width:100%;background:#fff}td,th{border:1px solid #7dd3fc;padding:8px;text-align:left}</style>
 </head><body><h1>Aqua Vision cleanup briefing</h1>
 <p>${log.length} sonar images · ${allDetections.length} contacts</p>
 <table><thead><tr><th>Image</th><th>ID</th><th>Class</th><th>Conf</th><th>Hazard</th><th>Lat, Lon</th></tr></thead><tbody>${rows}</tbody></table>
@@ -510,7 +510,7 @@ export function Dashboard() {
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[248px] flex-col bg-sidebar text-sidebar-foreground shadow-xl shadow-teal-900/10 transition-transform lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[248px] flex-col bg-sidebar text-sidebar-foreground shadow-xl shadow-cyan-950/25 transition-transform lg:static lg:translate-x-0 ${
           navOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -527,7 +527,7 @@ export function Dashboard() {
                 type="button"
                 onClick={() => go(item.id)}
                 className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                  active ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-teal-50/80 hover:bg-white/10 hover:text-white"
+                  active ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sky-100 hover:bg-white/15 hover:text-white"
                 }`}
               >
                 <Icon className="size-4" />
@@ -552,7 +552,7 @@ export function Dashboard() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-teal-100/80 bg-white/80 px-4 backdrop-blur-md">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-cyan-300 bg-white px-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -576,7 +576,7 @@ export function Dashboard() {
                 </span>
               ) : null}
             </button>
-            <div className="grid size-8 place-items-center rounded-full bg-teal-600 text-xs font-semibold text-white">
+            <div className="grid size-8 place-items-center rounded-full bg-cyan-800 text-xs font-semibold text-white">
               <User className="size-4" />
             </div>
           </div>
@@ -718,7 +718,7 @@ export function Dashboard() {
           {page === "about" && <AboutPage />}
         </main>
 
-        <footer className="flex flex-col gap-1 bg-sidebar px-4 py-2 text-[11px] text-teal-50 sm:flex-row sm:items-center sm:justify-between">
+        <footer className="flex flex-col gap-1 bg-sidebar px-4 py-2 text-[11px] text-sky-100 sm:flex-row sm:items-center sm:justify-between">
           <span>
             <span className="font-heading font-bold text-white">Aqua Vision</span> v1.0.0
           </span>
@@ -949,7 +949,7 @@ function HomePage({
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <button type="button" className="text-slate-500 hover:text-teal-600" onClick={() => go("analysis")}>
+                            <button type="button" className="text-slate-500 hover:text-cyan-700" onClick={() => go("analysis")}>
                               <Eye className="size-4" />
                             </button>
                           </TableCell>
@@ -980,7 +980,7 @@ function HomePage({
                     key={d.id}
                     type="button"
                     onClick={() => go("analysis")}
-                    className="overflow-hidden rounded-xl border border-teal-100 bg-white text-left hover:border-teal-400"
+                    className="overflow-hidden rounded-xl border border-cyan-200 bg-white text-left hover:border-cyan-600"
                   >
                     {d.overlay_url || d.image_url || thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -1070,7 +1070,7 @@ function UploadPage({
           <div>
             <div className="mb-2 flex items-center justify-between text-xs text-slate-600">
               <span>Confidence gate</span>
-              <span className="font-mono text-teal-700">{threshold}%</span>
+              <span className="font-mono text-cyan-800">{threshold}%</span>
             </div>
             <Slider
               min={5}
@@ -1544,7 +1544,7 @@ function SettingsPage({
         ].map(([k, v, d]) => (
           <Card key={k} className="shadow-sm">
             <CardContent className="pt-5">
-              <p className="font-mono text-[10px] tracking-widest text-teal-700 uppercase">{k}</p>
+              <p className="font-mono text-[10px] tracking-widest text-cyan-800 uppercase">{k}</p>
               <p className="font-heading mt-1 text-2xl font-semibold">{v}</p>
               <p className="mt-1 text-xs text-muted-foreground">{d}</p>
             </CardContent>
@@ -1606,7 +1606,7 @@ function MetricCard({
   const tones = {
     green: "bg-emerald-50 text-emerald-700",
     purple: "bg-violet-50 text-violet-700",
-    blue: "bg-teal-50 text-teal-700",
+    blue: "bg-cyan-100 text-cyan-900",
     orange: "bg-orange-50 text-orange-700",
     red: "bg-red-50 text-red-700",
   };
@@ -1649,7 +1649,7 @@ function MapLegend({ count }: { count: number }) {
       </div>
       <div className="mb-1 flex gap-2">
         <span className="flex items-center gap-1">
-          <i className="size-2 rounded-full ring-2 ring-amber-300 bg-teal-500" /> Latest
+          <i className="size-2 rounded-full ring-2 ring-amber-400 bg-cyan-700" /> Latest
         </span>
         <span className="flex items-center gap-1">
           <i className="size-2 rounded-full bg-slate-400" /> Earlier
