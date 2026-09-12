@@ -52,7 +52,7 @@ export function ClassMixPie({
             strokeWidth={2}
           >
             {data.map((row) => (
-              <Cell key={row.class} fill={CLASS_COLOR[row.class] ?? "#2563eb"} />
+              <Cell key={row.class} fill={CLASS_COLOR[row.class] ?? "#0d9488"} />
             ))}
             <Label
               content={({ viewBox }) => {

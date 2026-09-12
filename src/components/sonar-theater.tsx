@@ -23,14 +23,14 @@ export function SonarTheater({
   const src = overlay ?? preview;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1526]">
+    <div className="overflow-hidden rounded-2xl border border-teal-200/80 bg-[#0a4d56]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-2">
         <div className="flex items-center gap-2">
           <span className="relative flex size-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#c9a227] opacity-75" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-[#c9a227]" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-300 opacity-75" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-cyan-300" />
           </span>
-          <p className="font-mono text-[11px] tracking-[0.2em] text-[#e8d5a3] uppercase">
+          <p className="font-mono text-[11px] tracking-[0.2em] text-cyan-100 uppercase">
             Side-scan waterfall
           </p>
         </div>
