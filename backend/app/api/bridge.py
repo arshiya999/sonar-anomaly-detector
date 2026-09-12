@@ -188,6 +188,9 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
         xyxy = d.get("bbox_xyxy") or [0, 0, 0, 0]
         x1, y1, x2, y2 = [float(v) for v in xyxy]
         conf = float(d.get("confidence") or 0)
+        parts = d.get("confidence_parts") if isinstance(d.get("confidence_parts"), dict) else {}
+        yolo = float(parts.get("yolo") or 0)
+        raw_pct = round(yolo * 100, 1) if yolo else conf
         status = "CONFIRMED" if conf > 80 else "LIKELY" if conf >= 50 else "UNCERTAIN"
         risk = "HIGH" if conf > 80 else "MEDIUM" if conf >= 50 else "LOW"
         dims = d.get("dimensions") or {}
@@ -195,7 +198,7 @@ def ingest_ml_report(body: MlIngest, db: Session = Depends(get_db)):
             survey_id=survey.id,
             frame_id=frame.id,
             class_name=str(d.get("class") or "unknown"),
-            raw_confidence=conf,
+            raw_confidence=raw_pct,
             final_confidence=conf,
             validation_status=status,
             risk_level=risk,
@@ -260,13 +263,16 @@ def ops_log(db: Session = Depends(get_db)):
                 frame_lat, frame_lon = ping.latitude, ping.longitude
         packed = []
         for d in dets:
+            parts = {"yolo": (d.raw_confidence or 0) / 100, "contrast": 1, "shadow": 1}
+            if d.validation and isinstance(d.validation.features, dict) and d.validation.features:
+                parts = {**parts, **d.validation.features}
             packed.append(
                 {
                     "id": d.id,
                     "class": d.class_name,
                     "hazard_score": HAZARD.get(d.class_name, 50),
                     "confidence": d.final_confidence,
-                    "confidence_parts": {"yolo": d.raw_confidence / 100, "contrast": 1, "shadow": 1},
+                    "confidence_parts": parts,
                     "bbox_xyxy": [d.x, d.y, d.x + d.width, d.y + d.height],
                     "center_px": [d.x + d.width / 2, d.y + d.height / 2],
                     "latitude": d.latitude,
