@@ -39,3 +39,5 @@ ml/**/__pycache__/
 .venv/
 agent-tools/
 /artifacts/
+/aqua-vision-sih26057.zip
+/public/aqua-vision-sih26057.zip
