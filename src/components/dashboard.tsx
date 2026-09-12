@@ -421,7 +421,7 @@ export function Dashboard() {
       )
       .join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Aqua Vision briefing</title>
-<style>body{font-family:ui-sans-serif,system-ui;background:#eef1f6;color:#0f172a;padding:32px}h1{color:#2563eb}table{border-collapse:collapse;width:100%;background:#fff}td,th{border:1px solid #e2e8f0;padding:8px;text-align:left}</style>
+<style>body{font-family:ui-sans-serif,system-ui;background:#e7f8fb;color:#134e4a;padding:32px}h1{color:#0d9488}table{border-collapse:collapse;width:100%;background:#fff}td,th{border:1px solid #99f6e4;padding:8px;text-align:left}</style>
 </head><body><h1>Aqua Vision cleanup briefing</h1>
 <p>${log.length} sonar images · ${allDetections.length} contacts</p>
 <table><thead><tr><th>Image</th><th>ID</th><th>Class</th><th>Conf</th><th>Hazard</th><th>Lat, Lon</th></tr></thead><tbody>${rows}</tbody></table>
@@ -499,7 +499,7 @@ export function Dashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#eef1f6]">
+    <div className="flex min-h-screen bg-transparent">
       {navOpen ? (
         <button
           type="button"
@@ -510,7 +510,7 @@ export function Dashboard() {
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[248px] flex-col bg-[#0b1c33] text-slate-100 transition-transform lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[248px] flex-col bg-sidebar text-sidebar-foreground shadow-xl shadow-teal-900/10 transition-transform lg:static lg:translate-x-0 ${
           navOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -527,7 +527,7 @@ export function Dashboard() {
                 type="button"
                 onClick={() => go(item.id)}
                 className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                  active ? "bg-[#2563eb] text-white shadow-sm" : "text-slate-300 hover:bg-white/5 hover:text-white"
+                  active ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-teal-50/80 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <Icon className="size-4" />
@@ -552,7 +552,7 @@ export function Dashboard() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-teal-100/80 bg-white/80 px-4 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -576,7 +576,7 @@ export function Dashboard() {
                 </span>
               ) : null}
             </button>
-            <div className="grid size-8 place-items-center rounded-full bg-slate-800 text-xs font-semibold text-white">
+            <div className="grid size-8 place-items-center rounded-full bg-teal-600 text-xs font-semibold text-white">
               <User className="size-4" />
             </div>
           </div>
@@ -718,7 +718,7 @@ export function Dashboard() {
           {page === "about" && <AboutPage />}
         </main>
 
-        <footer className="flex flex-col gap-1 bg-[#0b1c33] px-4 py-2 text-[11px] text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+        <footer className="flex flex-col gap-1 bg-sidebar px-4 py-2 text-[11px] text-teal-50 sm:flex-row sm:items-center sm:justify-between">
           <span>
             <span className="font-heading font-bold text-white">Aqua Vision</span> v1.0.0
           </span>
@@ -949,7 +949,7 @@ function HomePage({
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <button type="button" className="text-slate-500 hover:text-blue-600" onClick={() => go("analysis")}>
+                            <button type="button" className="text-slate-500 hover:text-teal-600" onClick={() => go("analysis")}>
                               <Eye className="size-4" />
                             </button>
                           </TableCell>
@@ -980,7 +980,7 @@ function HomePage({
                     key={d.id}
                     type="button"
                     onClick={() => go("analysis")}
-                    className="overflow-hidden rounded-xl border border-slate-200 bg-white text-left hover:border-blue-400"
+                    className="overflow-hidden rounded-xl border border-teal-100 bg-white text-left hover:border-teal-400"
                   >
                     {d.overlay_url || d.image_url || thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -1070,7 +1070,7 @@ function UploadPage({
           <div>
             <div className="mb-2 flex items-center justify-between text-xs text-slate-600">
               <span>Confidence gate</span>
-              <span className="font-mono text-blue-700">{threshold}%</span>
+              <span className="font-mono text-teal-700">{threshold}%</span>
             </div>
             <Slider
               min={5}
@@ -1544,7 +1544,7 @@ function SettingsPage({
         ].map(([k, v, d]) => (
           <Card key={k} className="shadow-sm">
             <CardContent className="pt-5">
-              <p className="font-mono text-[10px] tracking-widest text-blue-700 uppercase">{k}</p>
+              <p className="font-mono text-[10px] tracking-widest text-teal-700 uppercase">{k}</p>
               <p className="font-heading mt-1 text-2xl font-semibold">{v}</p>
               <p className="mt-1 text-xs text-muted-foreground">{d}</p>
             </CardContent>
@@ -1606,7 +1606,7 @@ function MetricCard({
   const tones = {
     green: "bg-emerald-50 text-emerald-700",
     purple: "bg-violet-50 text-violet-700",
-    blue: "bg-blue-50 text-blue-700",
+    blue: "bg-teal-50 text-teal-700",
     orange: "bg-orange-50 text-orange-700",
     red: "bg-red-50 text-red-700",
   };
@@ -1649,7 +1649,7 @@ function MapLegend({ count }: { count: number }) {
       </div>
       <div className="mb-1 flex gap-2">
         <span className="flex items-center gap-1">
-          <i className="size-2 rounded-full ring-2 ring-amber-400 bg-blue-600" /> Latest
+          <i className="size-2 rounded-full ring-2 ring-amber-300 bg-teal-500" /> Latest
         </span>
         <span className="flex items-center gap-1">
           <i className="size-2 rounded-full bg-slate-400" /> Earlier
@@ -1691,14 +1691,14 @@ function EmptyNote({ text }: { text: string }) {
 function ShipGraphic() {
   return (
     <svg viewBox="0 0 220 88" className="mt-3 w-full opacity-80" aria-hidden>
-      <rect x="0" y="48" width="220" height="40" fill="#08203a" />
-      <path d="M0 62 Q55 48 110 62 T220 62 V88 H0 Z" fill="#0e3a5c" />
-      <path d="M48 40 L168 40 L158 52 L58 52 Z" fill="#94a3b8" />
-      <rect x="92" y="22" width="36" height="18" rx="2" fill="#cbd5e1" />
-      <rect x="104" y="10" width="10" height="14" fill="#64748b" />
-      <path d="M110 52 L110 78" stroke="#38bdf8" strokeWidth="2" />
-      <path d="M90 78 Q110 70 130 78" fill="none" stroke="#38bdf8" strokeWidth="1.5" opacity="0.8" />
-      <path d="M70 82 Q110 68 150 82" fill="none" stroke="#38bdf8" strokeWidth="1" opacity="0.5" />
+      <rect x="0" y="48" width="220" height="40" fill="#67e8f9" />
+      <path d="M0 62 Q55 48 110 62 T220 62 V88 H0 Z" fill="#2dd4bf" />
+      <path d="M48 40 L168 40 L158 52 L58 52 Z" fill="#5eead4" />
+      <rect x="92" y="22" width="36" height="18" rx="2" fill="#ccfbf1" />
+      <rect x="104" y="10" width="10" height="14" fill="#0d9488" />
+      <path d="M110 52 L110 78" stroke="#ecfeff" strokeWidth="2" />
+      <path d="M90 78 Q110 70 130 78" fill="none" stroke="#ecfeff" strokeWidth="1.5" opacity="0.9" />
+      <path d="M70 82 Q110 68 150 82" fill="none" stroke="#ecfeff" strokeWidth="1" opacity="0.6" />
       <circle cx="78" cy="80" r="3" fill="#f97316" />
       <circle cx="128" cy="76" r="3" fill="#ef4444" />
       <circle cx="152" cy="82" r="3" fill="#22c55e" />

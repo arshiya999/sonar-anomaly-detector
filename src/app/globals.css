@@ -49,38 +49,38 @@
 }
 
 :root {
-  --background: #eef1f6;
-  --foreground: #0f172a;
+  --background: #e7f8fb;
+  --foreground: #134e4a;
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #115e59;
   --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #2563eb;
+  --popover-foreground: #115e59;
+  --primary: #0d9488;
   --primary-foreground: #ffffff;
-  --secondary: #e8eef8;
-  --secondary-foreground: #1e3a5f;
-  --muted: #f1f4f9;
-  --muted-foreground: #64748b;
-  --accent: #dbeafe;
-  --accent-foreground: #1e40af;
-  --destructive: #dc2626;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #2563eb;
-  --chart-1: #2563eb;
-  --chart-2: #f97316;
-  --chart-3: #22c55e;
-  --chart-4: #a855f7;
-  --chart-5: #ef4444;
+  --secondary: #ccfbf1;
+  --secondary-foreground: #115e59;
+  --muted: #f0fdfa;
+  --muted-foreground: #0f766e;
+  --accent: #a5f3fc;
+  --accent-foreground: #155e75;
+  --destructive: #e11d48;
+  --border: #99f6e4;
+  --input: #99f6e4;
+  --ring: #14b8a6;
+  --chart-1: #0d9488;
+  --chart-2: #06b6d4;
+  --chart-3: #34d399;
+  --chart-4: #f59e0b;
+  --chart-5: #fb7185;
   --radius: 0.75rem;
-  --sidebar: #0b1c33;
-  --sidebar-foreground: #e8eef8;
-  --sidebar-primary: #2563eb;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #143056;
+  --sidebar: #0f766e;
+  --sidebar-foreground: #ecfeff;
+  --sidebar-primary: #2dd4bf;
+  --sidebar-primary-foreground: #042f2e;
+  --sidebar-accent: #0d9488;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #1a3358;
-  --sidebar-ring: #3b82f6;
+  --sidebar-border: #14b8a6;
+  --sidebar-ring: #67e8f9;
 }
 
 @layer base {
@@ -88,14 +88,18 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background:
+      radial-gradient(1100px 420px at 92% -8%, rgba(125, 211, 252, 0.55), transparent 52%),
+      radial-gradient(900px 380px at -8% 108%, rgba(45, 212, 191, 0.35), transparent 48%),
+      linear-gradient(180deg, #e6fbff 0%, #f4fffc 42%, #dffaf3 100%);
   }
   html {
     @apply font-sans;
     color-scheme: light;
   }
   .leaflet-container {
-    background: #0b1c33;
+    background: #bae6fd;
     font-family: inherit;
     height: 100%;
     width: 100%;
@@ -112,8 +116,8 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, #38bdf8, transparent);
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.45);
+  background: linear-gradient(90deg, transparent, #2dd4bf, transparent);
+  box-shadow: 0 0 16px rgba(45, 212, 191, 0.5);
   animation: abyss-sweep 2.2s linear infinite;
 }
 
@@ -137,7 +141,7 @@
   position: absolute;
   inset: -14px;
   border-radius: 999px;
-  border: 1px solid rgba(37, 99, 235, 0.45);
+  border: 1px solid rgba(20, 184, 166, 0.55);
   animation: abyss-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 .sonar-logo::after {
@@ -163,8 +167,8 @@
   overflow: hidden;
   border-radius: 999px;
   border: 3px solid #fff;
-  background: #0b1c33;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.45);
+  background: #0f766e;
+  box-shadow: 0 2px 10px rgba(15, 118, 110, 0.35);
   display: grid;
   place-items: center;
   color: #e2e8f0;
@@ -181,7 +185,7 @@
 }
 
 .leaflet-tooltip.sonar-material-label {
-  background: #0b1c33;
+  background: #0f766e;
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -191,5 +195,5 @@
   box-shadow: 0 2px 8px rgb(15 23 42 / 0.25);
 }
 .leaflet-tooltip.sonar-material-label::before {
-  border-top-color: #0b1c33;
+  border-top-color: #0f766e;
 }

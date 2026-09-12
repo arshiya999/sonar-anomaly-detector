@@ -23,7 +23,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  themeColor: "#0b1c33",
+  themeColor: "#0d9488",
 };
 
 export const metadata: Metadata = {
@@ -40,7 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${syne.variable} h-full antialiased`}
     >
-        <body className="min-h-full flex flex-col bg-[#eef1f6] text-foreground">
+        <body className="min-h-full flex flex-col text-foreground">
         {children}
         <Toaster />
       </body>
