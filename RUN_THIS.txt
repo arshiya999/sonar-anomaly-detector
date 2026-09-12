@@ -1,0 +1,45 @@
+Aqua Vision — give this folder to a teammate
+==========================================
+Smart India Hackathon 2026  ·  SIH26057  ·  MoES / NIOT
+
+What you need on the laptop
+---------------------------
+1. Node.js 20 or newer  (https://nodejs.org)
+2. Optional, for sonar detection: Python 3.10+ and pip
+
+Open the website (UI only, 2 minutes)
+-------------------------------------
+  unzip aqua-vision-sih26057.zip
+  cd aqua-vision-sih26057
+  npm install
+  npm run dev
+
+Then open:  http://127.0.0.1:47281
+
+This shows the operator console (map, charts, About, sample uploads).
+Uploads will not be scored until the YOLO server below is running.
+
+Full demo (detect debris on sonar images)
+-----------------------------------------
+In a second terminal, from the same folder:
+
+  python3 -m pip install -r ml/requirements.txt
+  python3 -m uvicorn --app-dir ml server:app --host 0.0.0.0 --port 8765
+
+Keep `npm run dev` running. Upload a JPEG from public/pick-one/ or public/samples/.
+
+All-in-one (UI + YOLO + optional Postgres API)
+----------------------------------------------
+  python3 -m pip install -r ml/requirements.txt -r backend/requirements.txt
+  npm install
+  npm run dev:all
+
+Postgres is optional. Without it, the dashboard still runs; survey history
+is kept in local files instead of the database.
+
+PostgreSQL is only required if you want the ops API on port 8766.
+
+Do not zip / share
+------------------
+node_modules, .next  — reinstall with npm install
+.env                 — copy from .env.example if needed
