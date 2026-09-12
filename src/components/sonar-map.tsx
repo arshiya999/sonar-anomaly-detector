@@ -109,18 +109,7 @@ function PhotoPin({ pin }: { pin: SurveyPin }) {
             {pin.latitude.toFixed(5)}, {pin.longitude.toFixed(5)}
           </p>
           {pin.confidence != null ? (
-            <p className="text-xs">
-              {pin.confidence.toFixed(0)}% fused confidence
-              {pin.confidenceYolo != null
-                ? ` · detector ${pin.confidenceYolo.toFixed(0)}%`
-                : ""}
-            </p>
-          ) : null}
-          {pin.confidenceContrast != null || pin.confidenceShadow != null ? (
-            <p className="text-[11px] text-slate-500">
-              Contrast {pin.confidenceContrast?.toFixed(0) ?? "—"}% · acoustic shadow{" "}
-              {pin.confidenceShadow?.toFixed(0) ?? "—"}%
-            </p>
+            <p className="text-xs">{pin.confidence.toFixed(0)}% confidence</p>
           ) : null}
           {photo ? (
             // eslint-disable-next-line @next/next/no-img-element
