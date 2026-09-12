@@ -100,7 +100,7 @@ function PhotoPin({ pin }: { pin: SurveyPin }) {
       </Tooltip>
       <Popup>
         <div className="max-w-[260px] text-sm text-slate-900">
-          <p className="text-[10px] font-semibold tracking-wide text-teal-700 uppercase">
+          <p className="text-[10px] font-semibold tracking-wide text-cyan-800 uppercase">
             {pin.latest ? "Latest ping (this upload)" : "Earlier ping (previous upload)"}
           </p>
           <p className="font-semibold">{pin.material}</p>

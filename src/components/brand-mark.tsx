@@ -8,15 +8,15 @@ export function BrandMark({
   size?: "nav" | "hero";
 }) {
   const hero = size === "hero";
-  const name = onDark ? "text-white" : "text-teal-950";
-  const sub = onDark ? "text-teal-100/80" : "text-teal-700";
+  const name = onDark ? "text-white" : "text-cyan-950";
+  const sub = onDark ? "text-cyan-100" : "text-cyan-800";
 
   return (
     <div className={`flex items-center gap-3 ${hero ? "gap-4" : ""}`}>
       <div
-        className={`grid shrink-0 place-items-center rounded-md bg-teal-400 ${hero ? "size-11" : "size-9"}`}
+        className={`grid shrink-0 place-items-center rounded-md bg-cyan-400 ${hero ? "size-11" : "size-9"}`}
       >
-        <Waves className={hero ? "size-5 text-white" : "size-4 text-white"} />
+        <Waves className={hero ? "size-5 text-cyan-950" : "size-4 text-cyan-950"} />
       </div>
       <div className="min-w-0">
         <p

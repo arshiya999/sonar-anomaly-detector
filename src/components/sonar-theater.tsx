@@ -23,7 +23,7 @@ export function SonarTheater({
   const src = overlay ?? preview;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-teal-200/80 bg-[#0a4d56]">
+    <div className="overflow-hidden rounded-2xl border border-cyan-700 bg-[#083344]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-2">
         <div className="flex items-center gap-2">
           <span className="relative flex size-2.5">
