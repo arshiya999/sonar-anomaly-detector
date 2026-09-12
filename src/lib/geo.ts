@@ -1,5 +1,6 @@
 import type { DetectReport, Detection, ScanLogEntry, SurveyPin } from "@/lib/types";
 import { CLASS_LABEL } from "@/lib/labels";
+import { presentConfidencePct } from "@/lib/confidence";
 
 export function isFiniteCoord(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -57,17 +58,19 @@ export function coordsFromReport(report: DetectReport): [number | null, number |
 }
 
 export function geotagReport(report: DetectReport, lat: number | null, lon: number | null): DetectReport {
-  if (lat == null || lon == null) return report;
   const detections = report.detections.map((d) => ({
     ...d,
-    // One ping / one image shares a single lat/lon. Pixel offsets are for the waterfall, not extra map wrecks.
-    latitude: lat,
-    longitude: lon,
+    confidence: presentConfidencePct(d.confidence),
+    latitude: lat != null ? lat : d.latitude,
+    longitude: lon != null ? lon : d.longitude,
   }));
   return {
     ...report,
     detections,
-    metadata: { ...report.metadata, latitude: lat, longitude: lon },
+    metadata: {
+      ...report.metadata,
+      ...(lat != null && lon != null ? { latitude: lat, longitude: lon } : {}),
+    },
   };
 }
 
@@ -166,7 +169,7 @@ export function pinsFromLog(entries: ScanLogEntry[]): SurveyPin[] {
         overlay_url: e.overlay_url ?? e.image_url ?? top?.overlay_url ?? top?.image_url ?? null,
         material: top ? CLASS_LABEL[top.class] ?? top.class : e.filename.replace(/\.[^.]+$/, ""),
         classId: top?.class,
-        confidence: top?.confidence ?? null,
+        confidence: top?.confidence != null ? presentConfidencePct(top.confidence) : null,
         confidenceYolo: top?.confidence_parts?.yolo != null ? top.confidence_parts.yolo * 100 : null,
         confidenceContrast: top?.confidence_parts?.contrast != null ? top.confidence_parts.contrast * 100 : null,
         confidenceShadow: top?.confidence_parts?.shadow != null ? top.confidence_parts.shadow * 100 : null,
@@ -200,6 +203,7 @@ export function detectionsFromLog(entries: ScanLogEntry[]): (Detection & { sourc
     e.detections.map((d) => ({
       ...d,
       source: e.filename,
+      confidence: presentConfidencePct(d.confidence),
       latitude: asCoord(d.latitude) ?? asCoord(e.latitude),
       longitude: asCoord(d.longitude) ?? asCoord(e.longitude),
       overlay_url: d.overlay_url ?? e.overlay_url,
