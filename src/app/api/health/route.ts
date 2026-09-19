@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const res = await fetch(`${ML}/health`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(25_000),
     });
     const data = await res.json();
     return Response.json({ ...data, ml: ML });

@@ -6,19 +6,23 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   const ML = mlApiUrl();
   try {
-    const form = await req.formData();
+    const incoming = await req.formData();
+    const outgoing = new FormData();
+    for (const [key, value] of incoming.entries()) {
+      outgoing.append(key, value);
+    }
     const res = await fetch(`${ML}/detect`, {
       method: "POST",
-      body: form,
+      body: outgoing,
       signal: AbortSignal.timeout(55_000),
     });
     const data = await res.json();
     return Response.json(data, { status: res.status });
-  } catch {
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : "network error";
     return Response.json(
       {
-        error:
-          "Cannot reach the YOLO service. On Vercel, set ML_API_URL to your Render detector URL (no trailing slash).",
+        error: `Cannot reach YOLO at ${ML} (${detail}). Wake the Render ML service and retry.`,
       },
       { status: 503 },
     );

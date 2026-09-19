@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/table";
 import { CLASS_COLOR, CLASS_LABEL, confidenceBand, confidenceColor } from "@/lib/labels";
 import { MODEL_METRICS } from "@/lib/metrics";
+import { PUBLIC_ML_URL } from "@/lib/public-upstreams";
 import { formatIst } from "@/lib/format";
 import { textLinesToPdf } from "@/lib/pdf";
 import type { DetectReport, DetectResponse, Detection, ScanLogEntry, SurveyPin } from "@/lib/types";
@@ -193,6 +194,7 @@ export function Dashboard() {
     trained?: boolean;
     weights?: string;
     error?: string;
+    ml?: string;
   } | null>(null);
   const [meta, setMeta] = useState<MetaForm>(DEFAULT_META);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
@@ -283,7 +285,15 @@ export function Dashboard() {
       if (mppy != null) metadata.meters_per_pixel_y = mppy;
       form.append("metadata", JSON.stringify(metadata));
       try {
-        const res = await fetch("/api/detect", { method: "POST", body: form });
+        const mlHost = (PUBLIC_ML_URL || health?.ml || "").replace(/\/+$/, "");
+        const detectUrl =
+          mlHost.startsWith("http://") || mlHost.startsWith("https://")
+            ? `${mlHost}/detect`
+            : "/api/detect";
+        if (detectUrl !== "/api/detect") {
+          await fetch(`${mlHost}/health`, { cache: "no-store" }).catch(() => undefined);
+        }
+        const res = await fetch(detectUrl, { method: "POST", body: form });
         const data = (await res.json()) as DetectResponse;
         if (!res.ok || data.error) {
           throw new Error(data.error || "Detection failed");
@@ -350,7 +360,7 @@ export function Dashboard() {
         setBusy(false);
       }
     },
-    [meta, threshold, refreshLog],
+    [meta, threshold, refreshLog, health],
   );
 
   const pickMapOrigin = useCallback((lat: number, lon: number) => {
