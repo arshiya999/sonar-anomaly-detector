@@ -7,3 +7,9 @@ data
 node_modules
 *.pt
 *.onnx
+render.yaml
+docker-compose.yml
+Dockerfile
+Dockerfile.api
+Dockerfile.ml
+Dockerfile.web
