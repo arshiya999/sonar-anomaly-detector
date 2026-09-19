@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
 import { appendLog, readLog, saveOverlayJpeg } from "@/lib/log-store";
 import type { DetectReport } from "@/lib/types";
+import { opsApiUrl } from "@/lib/upstream";
 
-const OPS = process.env.OPS_API_URL ?? "http://127.0.0.1:8766";
+export const maxDuration = 30;
+
+const OPS = opsApiUrl();
 
 export async function GET() {
   try {

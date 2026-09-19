@@ -67,6 +67,25 @@ Copy `.env.example`:
 | `CORS_ORIGINS` | Operator UI origins |
 | `MAX_UPLOAD_MB` | Upload cap (default 64) |
 
+## Deploy: Vercel (frontend) + Render (ML + ops)
+
+The Next.js operator UI goes on **Vercel**. YOLO (`ml/server.py`) and the ops API (`backend/`) stay on **Render**. Vercel never runs the `.pt` weights.
+
+1. Push this repo to GitHub (`arshiya999/sonar-anomaly-detector`).
+2. In [vercel.com/new](https://vercel.com/new) import that repo. Framework: **Next.js**. Root directory: `.` (not `frontend/`).
+3. Before the first production deploy, add **Environment Variables** (Production):
+
+| Name | Value |
+| --- | --- |
+| `ML_API_URL` | Render URL of the detector, e.g. `https://aqua-vision-ml.onrender.com` (no trailing slash) |
+| `OPS_API_URL` | Render URL of the ops API, e.g. `https://aqua-vision-api.onrender.com` |
+
+4. Deploy. The site proxies `/api/detect` → Render ML, `/api/log` and `/media` → Render ops.
+5. On Render, set `CORS_ORIGINS` to your Vercel URL (or keep `*` if that is already allowed).
+6. First upload after Render sleep can take ~30–50s. Wait, then retry.
+
+Or click **Publish** in Cursor if that pill is shown — then paste the same two env vars in the Vercel project **Settings → Environment Variables** and redeploy.
+
 ## Production (Docker)
 
 ```bash

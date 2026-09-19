@@ -1,19 +1,24 @@
+import { mlApiUrl } from "@/lib/upstream";
+
+export const maxDuration = 30;
+
 export async function GET() {
-  const ML = process.env.ML_API_URL ?? "http://127.0.0.1:8765";
+  const ML = mlApiUrl();
   try {
     const res = await fetch(`${ML}/health`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(12_000),
     });
     const data = await res.json();
-    return Response.json(data);
+    return Response.json({ ...data, ml: ML });
   } catch {
     return Response.json(
       {
         ok: false,
         hosted: Boolean(process.env.VERCEL),
+        ml: ML,
         error: process.env.VERCEL
-          ? "The website is live. The YOLO detector is not running on Vercel."
+          ? "The Vercel site is live. Set ML_API_URL to the Render detector, then retry (Render free tier may be waking up)."
           : "Inference service is not running on port 8765.",
       },
       { status: 200 },
