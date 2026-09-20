@@ -80,7 +80,9 @@ export function SonarTheater({
             Contact list
           </p>
           {!report?.detections.length ? (
-            <p className="text-xs text-stone-200/70">Waiting for fused contacts from YOLO × contrast × shadow.</p>
+            <p className="text-xs text-stone-200/70">
+              Waiting for boxes. First start after idle can take 1–2 minutes — do not refresh.
+            </p>
           ) : (
             report.detections.map((d, i) => (
               <div
