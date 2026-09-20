@@ -84,8 +84,6 @@ The Next.js operator UI goes on **Vercel**. YOLO (`ml/server.py`) and the ops AP
 5. On Render, set `CORS_ORIGINS` to your Vercel URL (or keep `*` if that is already allowed).
 6. First upload after Render sleep can take ~30–50s. Wait, then retry.
 
-Or click **Publish** in Cursor if that pill is shown — then paste the same two env vars in the Vercel project **Settings → Environment Variables** and redeploy.
-
 ## Production (Docker)
 
 ```bash
