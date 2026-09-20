@@ -1,4 +1,5 @@
-# Keep Render services awake so judges can open Aqua Vision anytime.
+# Keep Aqua Vision reachable for SIH judges through 31 Dec 2026.
+# This runs on GitHub, not on the Cursor VM — closing the agent does not stop it.
 name: keep-alive
 
 on:
@@ -9,9 +10,37 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Ping detector
-        run: curl -sfS --retry 3 --retry-delay 5 --max-time 60 https://aquavision-ml.onrender.com/health
-      - name: Ping ops API
-        run: curl -sfS --retry 3 --retry-delay 5 --max-time 30 https://aquavision-backend-7iuh.onrender.com/api/system/status
+      - name: SIH window
+        id: window
+        run: |
+          today=$(date -u +%Y%m%d)
+          if [ "$today" -gt 20261231 ]; then
+            echo "Keep-alive window ended 31 Dec 2026."
+            echo "open=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Wake detector
+        if: steps.window.outputs.open == 'true'
+        continue-on-error: true
+        run: |
+          curl -sS --retry 5 --retry-delay 8 --retry-all-errors --max-time 90 \
+            https://aquavision-ml.onrender.com/health || true
+      - name: Wake ops API
+        if: steps.window.outputs.open == 'true'
+        continue-on-error: true
+        run: |
+          curl -sS --retry 5 --retry-delay 8 --retry-all-errors --max-time 45 \
+            https://aquavision-backend-7iuh.onrender.com/api/system/status || true
+          curl -sS --retry 3 --retry-delay 5 --max-time 30 \
+            https://aquavision-backend-7iuh.onrender.com/health || true
+      - name: Hit the public website (also triggers Vercel keep-alive)
+        if: steps.window.outputs.open == 'true'
+        continue-on-error: true
+        run: |
+          curl -sS --retry 3 --retry-delay 5 --max-time 30 \
+            https://aqua-vision-sih.vercel.app/api/keep-alive || true
+          curl -sS --retry 2 --retry-delay 4 --max-time 20 \
+            https://aqua-vision-sih.vercel.app/api/health || true

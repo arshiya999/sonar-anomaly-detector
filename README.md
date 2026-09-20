@@ -18,24 +18,20 @@ npm run dev:all
 
 Open http://127.0.0.1:47281 on this machine.
 
-## Open from any phone or laptop
+## Judge / public website (stays up through 31 Dec 2026)
 
-The dashboard is a normal HTTPS website. Anyone can use it if they have the public URL — they do **not** type `127.0.0.1` on their own device.
+**Share this URL:** https://aqua-vision-sih.vercel.app
 
-While this project is running with a Cloudflare tunnel:
+That site runs on **Vercel**, not on this Cursor machine. Closing the Cloud Agent, laptop, or tunnel does **not** take the website down. It stays online for judges through **31 December 2026** (and after, as long as the Vercel project exists).
 
-```bash
-cloudflared tunnel --url http://127.0.0.1:47281 --protocol http2 --edge-ip-version 4
-```
+Detection uses Render (`aquavision-ml` + `aquavision-backend-7iuh`). Free Render can nap after idle time. Two keep-alives run **without this VM**:
 
-That prints a link like `https://….trycloudflare.com`. Open that on a phone, tablet, or any PC (Chrome, Safari, Firefox). YOLO stays on the server; the phone only talks to the website.
+1. GitHub Action `keep-alive` — every 10 minutes, on GitHub’s servers
+2. Vercel Cron — daily hit of `/api/keep-alive`
 
-For a machine that stays online (college lab / VPS):
+First open after a Render nap can take ~30–50s while YOLO wakes, then Evaluate works. The dashboard still loads even if the detector is waking.
 
-```bash
-docker compose up --build -d
-# then put nginx or cloudflared in front of port 47281
-```
+Do **not** share `trycloudflare.com` links — those die when a local tunnel stops.
 
 `dev:all` starts:
 
