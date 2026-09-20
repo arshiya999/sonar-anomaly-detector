@@ -286,7 +286,7 @@ export function Dashboard() {
       if (mppx != null) metadata.meters_per_pixel_x = mppx;
       if (mppy != null) metadata.meters_per_pixel_y = mppy;
       try {
-        const hosts = [PUBLIC_OPS_URL, PUBLIC_ML_URL, health?.ml || ""]
+        const hosts = [PUBLIC_ML_URL, PUBLIC_OPS_URL, health?.ml || ""]
           .map((h) => (h || "").replace(/\/+$/, ""))
           .filter((h, i, arr) => h.startsWith("http") && arr.indexOf(h) === i);
         const detectUrls = hosts.length ? hosts.map((h) => `${h}/detect`) : ["/api/detect"];
@@ -297,13 +297,16 @@ export function Dashboard() {
           formTry.append("image", imageFile);
           formTry.append("conf_threshold", String(threshold / 100));
           formTry.append("metadata", JSON.stringify(metadata));
-          const ms = detectUrl.includes("aquavision-ml") ? 8_000 : 90_000;
           try {
             const res = await fetch(detectUrl, {
               method: "POST",
               body: formTry,
-              signal: AbortSignal.timeout(ms),
+              signal: AbortSignal.timeout(120_000),
             });
+            if (res.status === 404) {
+              lastError = `No detector at ${detectUrl}`;
+              continue;
+            }
             const parsed = (await res.json()) as DetectResponse;
             if (res.ok && parsed.report && !parsed.error) {
               data = parsed;
@@ -377,7 +380,7 @@ export function Dashboard() {
           (err instanceof DOMException && err.name === "TimeoutError") ||
           (err instanceof Error && /timeout|aborted/i.test(err.message));
         const message = timedOut
-          ? "Detector is still starting on Render. Open aquavision-ml in Render and click Restart, then upload again. Do not refresh while it is scanning."
+          ? "Detector is scoring this ping on cloud CPU — first run after idle can take 1–2 minutes. Wait, then tap Evaluate again. Do not refresh."
           : err instanceof Error
             ? err.message
             : "Detection failed";

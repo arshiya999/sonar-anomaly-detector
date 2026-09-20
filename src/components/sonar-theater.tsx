@@ -48,7 +48,9 @@ export function SonarTheater({
       {error && (
         <div className="flex items-center gap-2 px-4 py-2 text-sm text-rose-300">
           <ShieldAlert className="size-4" />
-          {error}
+          {/timeout|aborted|timed out/i.test(error)
+            ? "Detector is still scoring — wait 1–2 minutes and tap Evaluate again. Do not refresh."
+            : error}
         </div>
       )}
       <div className="grid lg:grid-cols-[1fr_260px]">
