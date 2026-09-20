@@ -4,14 +4,14 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import STORAGE, settings
 from app.database import Base, engine
 from app.hub import hub, pending
-from app.pipeline.infer import get_model
+from app.pipeline.infer import get_model, model_status
 from app.api import bridge, detections, reports, sonar, surveys, system
 
 log = logging.getLogger("aqua")
@@ -92,4 +92,58 @@ async def ws_alerts(ws: WebSocket):
 @app.get("/health")
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "aqua-vision"}
+    status = model_status()
+    return {
+        "ok": bool(status.get("loaded")),
+        "weights": status.get("path"),
+        "weights_exist": bool(status.get("exists")),
+        "trained": True,
+        "service": "aqua-vision",
+        "model": status,
+    }
+
+
+@app.post("/detect")
+async def detect(
+    image: UploadFile = File(...),
+    metadata: str = Form("{}"),
+    conf_threshold: float = Form(0.22),
+    return_overlay: bool = Form(True),
+):
+    """Same contract as ml/server.py so the website can use this host when the ML service is asleep."""
+    import base64
+    import json
+    import sys
+    from pathlib import Path
+
+    import cv2
+    import numpy as np
+    from fastapi.responses import JSONResponse
+
+    raw = await image.read()
+    arr = np.frombuffer(raw, dtype=np.uint8)
+    bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if bgr is None:
+        return JSONResponse({"error": "Could not decode image"}, status_code=400)
+    try:
+        meta = json.loads(metadata or "{}")
+    except json.JSONDecodeError:
+        meta = {}
+    if not isinstance(meta, dict):
+        meta = {}
+
+    ml_root = Path(__file__).resolve().parents[2] / "ml"
+    if ml_root.is_dir() and str(ml_root) not in sys.path:
+        sys.path.insert(0, str(ml_root))
+    from geotag import merge_gps_metadata
+    from infer import annotate, detect_image
+
+    meta = merge_gps_metadata(meta, raw)
+    report = detect_image(bgr, meta=meta, conf_threshold=float(conf_threshold))
+    overlay_b64 = None
+    if return_overlay:
+        vis = annotate(bgr, report)
+        ok, buf = cv2.imencode(".jpg", vis, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+        if ok:
+            overlay_b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+    return {"report": report, "overlay_jpeg_base64": overlay_b64}

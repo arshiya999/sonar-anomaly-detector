@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/table";
 import { CLASS_COLOR, CLASS_LABEL, confidenceBand, confidenceColor } from "@/lib/labels";
 import { MODEL_METRICS } from "@/lib/metrics";
-import { PUBLIC_ML_URL } from "@/lib/public-upstreams";
+import { PUBLIC_ML_URL, PUBLIC_OPS_URL } from "@/lib/public-upstreams";
 import { formatIst } from "@/lib/format";
 import { textLinesToPdf } from "@/lib/pdf";
 import type { DetectReport, DetectResponse, Detection, ScanLogEntry, SurveyPin } from "@/lib/types";
@@ -269,9 +269,6 @@ export function Dashboard() {
       const used = await resolveGps(nextMeta ?? meta);
       setMeta(used);
       saveOrigin(used);
-      const form = new FormData();
-      form.append("image", imageFile);
-      form.append("conf_threshold", String(threshold / 100));
       const metadata: Record<string, unknown> = {
         sensor: "side-scan-sonar",
         survey: used.survey.trim() || imageFile.name,
@@ -288,27 +285,38 @@ export function Dashboard() {
       if (heading != null) metadata.heading_deg = heading;
       if (mppx != null) metadata.meters_per_pixel_x = mppx;
       if (mppy != null) metadata.meters_per_pixel_y = mppy;
-      form.append("metadata", JSON.stringify(metadata));
       try {
-        const mlHost = (PUBLIC_ML_URL || health?.ml || "").replace(/\/+$/, "");
-        const detectUrl =
-          mlHost.startsWith("http://") || mlHost.startsWith("https://")
-            ? `${mlHost}/detect`
-            : "/api/detect";
-        if (detectUrl !== "/api/detect") {
-          await fetch(`${mlHost}/health`, {
-            cache: "no-store",
-            signal: AbortSignal.timeout(2500),
-          }).catch(() => undefined);
+        const hosts = [PUBLIC_OPS_URL, PUBLIC_ML_URL, health?.ml || ""]
+          .map((h) => (h || "").replace(/\/+$/, ""))
+          .filter((h, i, arr) => h.startsWith("http") && arr.indexOf(h) === i);
+        const detectUrls = hosts.length ? hosts.map((h) => `${h}/detect`) : ["/api/detect"];
+        let data: DetectResponse | null = null;
+        let lastError = "Detection failed";
+        for (const detectUrl of detectUrls) {
+          const formTry = new FormData();
+          formTry.append("image", imageFile);
+          formTry.append("conf_threshold", String(threshold / 100));
+          formTry.append("metadata", JSON.stringify(metadata));
+          const ms = detectUrl.includes("aquavision-ml") ? 8_000 : 90_000;
+          try {
+            const res = await fetch(detectUrl, {
+              method: "POST",
+              body: formTry,
+              signal: AbortSignal.timeout(ms),
+            });
+            const parsed = (await res.json()) as DetectResponse;
+            if (res.ok && parsed.report && !parsed.error) {
+              data = parsed;
+              break;
+            }
+            lastError = parsed.error || `Detection failed (${res.status})`;
+          } catch (err) {
+            lastError =
+              err instanceof Error ? err.message : "Detection failed";
+          }
         }
-        const res = await fetch(detectUrl, {
-          method: "POST",
-          body: form,
-          signal: AbortSignal.timeout(90_000),
-        });
-        const data = (await res.json()) as DetectResponse;
-        if (!res.ok || data.error) {
-          throw new Error(data.error || "Detection failed");
+        if (!data?.report) {
+          throw new Error(lastError);
         }
         const overlayData = data.overlay_jpeg_base64
           ? `data:image/jpeg;base64,${data.overlay_jpeg_base64}`
