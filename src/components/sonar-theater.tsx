@@ -42,7 +42,7 @@ export function SonarTheater({
       {busy && (
         <div className="flex items-center gap-2 px-4 py-2 text-sm text-amber-100">
           <Loader2 className="size-4 animate-spin" />
-          Speckle filter → detector → acoustic-shadow scoring → geotag
+          First ping after idle can take 1–2 minutes while the detector starts. Do not refresh.
         </div>
       )}
       {error && (

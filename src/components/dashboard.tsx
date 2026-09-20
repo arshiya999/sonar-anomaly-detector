@@ -296,9 +296,16 @@ export function Dashboard() {
             ? `${mlHost}/detect`
             : "/api/detect";
         if (detectUrl !== "/api/detect") {
-          await fetch(`${mlHost}/health`, { cache: "no-store" }).catch(() => undefined);
+          await fetch(`${mlHost}/health`, {
+            cache: "no-store",
+            signal: AbortSignal.timeout(2500),
+          }).catch(() => undefined);
         }
-        const res = await fetch(detectUrl, { method: "POST", body: form });
+        const res = await fetch(detectUrl, {
+          method: "POST",
+          body: form,
+          signal: AbortSignal.timeout(90_000),
+        });
         const data = (await res.json()) as DetectResponse;
         if (!res.ok || data.error) {
           throw new Error(data.error || "Detection failed");
@@ -358,7 +365,14 @@ export function Dashboard() {
             : `Pinned on survey plot ${placed.lat.toFixed(4)}, ${placed.lon.toFixed(4)} — click the map or type GPS for true position`,
         );
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Detection failed";
+        const timedOut =
+          (err instanceof DOMException && err.name === "TimeoutError") ||
+          (err instanceof Error && /timeout|aborted/i.test(err.message));
+        const message = timedOut
+          ? "Detector is still starting on Render. Open aquavision-ml in Render and click Restart, then upload again. Do not refresh while it is scanning."
+          : err instanceof Error
+            ? err.message
+            : "Detection failed";
         setError(message);
         toast.error(message);
       } finally {
