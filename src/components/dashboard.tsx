@@ -252,9 +252,14 @@ export function Dashboard() {
       fetch("/api/health", { cache: "no-store" })
         .then((r) => r.json())
         .then(setHealth)
-        .catch(() => setHealth({ ok: false }));
+        .catch(() =>
+          setHealth({
+            ok: false,
+            hosted: window.location.hostname.includes("vercel.app"),
+          }),
+        );
     void ping();
-    const id = setInterval(ping, 8000);
+    const id = setInterval(ping, 20000);
   }, [refreshLog]);
 
   const runDetect = useCallback(

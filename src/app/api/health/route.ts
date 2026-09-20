@@ -1,24 +1,26 @@
 import { mlApiUrl } from "@/lib/upstream";
 
-export const maxDuration = 30;
+export const maxDuration = 15;
 
 export async function GET() {
   const ML = mlApiUrl();
+  const hosted = Boolean(process.env.VERCEL);
+  const waitMs = hosted ? 4000 : 12_000;
   try {
     const res = await fetch(`${ML}/health`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(25_000),
+      signal: AbortSignal.timeout(waitMs),
     });
     const data = await res.json();
-    return Response.json({ ...data, ml: ML });
+    return Response.json({ ...data, hosted, ml: ML });
   } catch {
     return Response.json(
       {
         ok: false,
-        hosted: Boolean(process.env.VERCEL),
+        hosted,
         ml: ML,
-        error: process.env.VERCEL
-          ? "The Vercel site is live. Set ML_API_URL to the Render detector, then retry (Render free tier may be waking up)."
+        error: hosted
+          ? "Website is up. The detector is waking on Render — wait and retry the upload."
           : "Inference service is not running on port 8765.",
       },
       { status: 200 },
