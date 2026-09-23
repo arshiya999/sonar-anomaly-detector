@@ -667,7 +667,7 @@ export function Dashboard() {
         )
       : ["(none),,,,,,,,"];
     triggerDownload(
-      new Blob([[headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" }),
+      new Blob(["\uFEFF" + [headers.join(","), ...rows].join("\r\n")], { type: "text/csv;charset=utf-8" }),
       "aqua-vision-report.csv",
     );
   };
@@ -2153,7 +2153,29 @@ function triggerDownload(blob: Blob, name: string) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  window.open(url, "_blank", "noopener,noreferrer");
-  window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
-  toast.success(`${name} saved — also opened in a new tab`);
+
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".pdf") || lower.endsWith(".html") || lower.endsWith(".htm")) {
+    const tab = window.open(url, "_blank", "noopener,noreferrer");
+    if (!tab) toast.message("Allow pop-ups once so the report can open");
+  } else {
+    void blob.text().then((text) => {
+      const tab = window.open("", "_blank");
+      if (!tab) {
+        toast.message("Allow pop-ups once so the report can open");
+        return;
+      }
+      const safe = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      tab.document.open();
+      tab.document.write(
+        `<!doctype html><html><head><meta charset="utf-8"><title>${name}</title></head><body style="margin:0;background:#0c4a6e;color:#ecfeff"><pre style="white-space:pre-wrap;font:13px ui-monospace,monospace;padding:28px">${safe}</pre></body></html>`,
+      );
+      tab.document.close();
+    });
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 180_000);
+  toast.success(`${name} downloaded and opened`);
 }
