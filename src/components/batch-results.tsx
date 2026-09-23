@@ -194,9 +194,11 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
           "radial-gradient(900px 320px at 8% -10%, rgba(0,180,216,0.28), transparent 52%), radial-gradient(720px 280px at 100% 0%, rgba(0,119,182,0.35), transparent 48%), linear-gradient(165deg, #0077b6 0%, #023e8a 48%, #03045e 100%)",
       }}
     >
-      <p className="font-heading text-xl font-bold text-white drop-shadow">Batch assessment</p>
-      <p className="mt-1 text-xs font-medium text-cyan-50">
-        MoES · NIOT operator view — two traces per panel: filled series (result) and dashed series (time).
+      <p className="font-heading text-xl font-bold text-white drop-shadow">Detection performance telemetry</p>
+      <p className="mt-1 text-xs font-medium leading-relaxed text-cyan-50">
+        {empty
+          ? "Frame-level confidence and latency for accepted side-scan imagery; RGB score and screening time for rejected non-sonar files."
+          : `${stats.analyzed} accepted frames · ${stats.detections} contacts · precision ${fmtScore(VAL_EVALUATION.precision)} · mAP@50 ${fmtScore(VAL_EVALUATION.map50)} · elapsed ${fmtDuration(stats.wallMs)}${stats.throughput ? ` · ${stats.throughput.toFixed(2)} img/s` : ""}`}
       </p>
 
       {run && !run.finished ? (
@@ -307,12 +309,12 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
-                <p className="w-4 shrink-0 self-center text-center text-[10px] font-medium text-amber-200" style={{ writingMode: "vertical-rl" }}>
-                  Time (ms)
+                <p className="w-4 shrink-0 self-center text-center text-[10px] font-medium tracking-wide text-amber-200" style={{ writingMode: "vertical-rl" }}>
+                  Latency (ms)
                 </p>
               </div>
             )}
-            <p className="mt-1 text-center text-[11px] font-medium text-cyan-50">Rejected picture number</p>
+            <p className="mt-1 text-center text-[11px] font-medium tracking-wide text-cyan-50">Rejected frame index</p>
           </div>
         </div>
       )}
