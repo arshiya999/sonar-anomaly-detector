@@ -101,10 +101,16 @@ def detect_image(
     prepared = prepare_for_detector(image)
     gray = to_gray(image)
     h, w = gray.shape[:2]
+    preprocess_ms = round((time.time() - t0) * 1000)
+
+    t1 = time.time()
     model = get_model()
     names = model.names if isinstance(model.names, dict) else {i: n for i, n in enumerate(model.names)}
-    frame_votes = geometry_votes(gray)
     results = model.predict(prepared, conf=0.12, iou=iou, verbose=False, imgsz=320, device="cpu")
+    inference_ms = round((time.time() - t1) * 1000)
+
+    t2 = time.time()
+    frame_votes = geometry_votes(gray)
     detections = []
     for r in results:
         if r.boxes is None:
@@ -141,11 +147,15 @@ def detect_image(
 
     detections = nms_detections(detections)
     detections.sort(key=lambda d: d["confidence"], reverse=True)
-    elapsed = round((time.time() - t0) * 1000)
+    postprocess_ms = round((time.time() - t2) * 1000)
+    elapsed = preprocess_ms + inference_ms + postprocess_ms
     return {
         "model": Path(_model_path or "").name,
         "image_size": {"width": w, "height": h},
-        "inference_ms": elapsed,
+        "preprocess_ms": preprocess_ms,
+        "inference_ms": inference_ms,
+        "postprocess_ms": postprocess_ms,
+        "pipeline_ms": elapsed,
         "threshold": conf_threshold,
         "detections": detections,
         "count": len(detections),

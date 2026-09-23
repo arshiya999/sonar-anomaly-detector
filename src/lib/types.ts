@@ -22,6 +22,9 @@ export type DetectReport = {
   model: string;
   image_size: { width: number; height: number };
   inference_ms: number;
+  preprocess_ms?: number;
+  postprocess_ms?: number;
+  pipeline_ms?: number;
   threshold: number;
   detections: Detection[];
   count: number;

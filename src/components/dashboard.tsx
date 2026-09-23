@@ -442,6 +442,8 @@ export function Dashboard() {
         predicted: null,
         count: 0,
         inference_ms: 0,
+        preprocess_ms: 0,
+        postprocess_ms: 0,
         wall_ms: 0,
       }));
       setBatch({
@@ -527,6 +529,8 @@ export function Dashboard() {
               predicted: top?.class ?? null,
               count: detections.length,
               inference_ms: result.geoReport.inference_ms ?? 0,
+              preprocess_ms: result.geoReport.preprocess_ms ?? 0,
+              postprocess_ms: result.geoReport.postprocess_ms ?? 0,
               wall_ms: wall,
               reason: detections.length ? undefined : "Valid sonar — no contact above the confidence gate",
             };

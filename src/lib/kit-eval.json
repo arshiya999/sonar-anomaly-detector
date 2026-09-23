@@ -1,0 +1,191 @@
+{
+  "source": "Operator kit, image-level vs example_class in public/samples/manifest.json",
+  "n": 8,
+  "correct": 6,
+  "precision": 0.9167,
+  "recall": 0.75,
+  "f1": 0.9444,
+  "accuracy": 0.75,
+  "perClass": [
+    {
+      "classId": "ghost_net",
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "classId": "debris",
+      "support": 1,
+      "precision": null,
+      "recall": 0.0,
+      "f1": null
+    },
+    {
+      "classId": "shipwreck",
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "classId": "aircraft",
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "classId": "propeller",
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "classId": "tire",
+      "support": 1,
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.6667
+    },
+    {
+      "classId": "cylinder",
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "classId": "diver",
+      "support": 1,
+      "precision": null,
+      "recall": 0.0,
+      "f1": null
+    }
+  ],
+  "confusion": [
+    [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  ],
+  "pairs": [
+    {
+      "file": "sctd_000238.jpg",
+      "gt": "shipwreck",
+      "pred": "shipwreck"
+    },
+    {
+      "file": "sctd_000086.jpg",
+      "gt": "aircraft",
+      "pred": "aircraft"
+    },
+    {
+      "file": "sctd_000100.jpg",
+      "gt": "diver",
+      "pred": "none"
+    },
+    {
+      "file": "wt_marine-debris-aris3k-237.png",
+      "gt": "propeller",
+      "pred": "propeller"
+    },
+    {
+      "file": "wt_marine-debris-aris3k-1597.png",
+      "gt": "debris",
+      "pred": "tire"
+    },
+    {
+      "file": "wt_marine-debris-aris3k-262.png",
+      "gt": "cylinder",
+      "pred": "cylinder"
+    },
+    {
+      "file": "wt_marine-debris-aris3k-530.png",
+      "gt": "ghost_net",
+      "pred": "ghost_net"
+    },
+    {
+      "file": "wt_marine-debris-aris3k-645.png",
+      "gt": "tire",
+      "pred": "tire"
+    }
+  ]
+}
