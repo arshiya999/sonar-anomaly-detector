@@ -581,64 +581,75 @@ export function Dashboard() {
         );
         const byName = new Map(packed.map((p) => [p.filename, p]));
         const localEntries: ScanLogEntry[] = [];
-        setBatch((prev) => {
-          if (!prev) return prev;
-          const rows = prev.rows.map((row) => ({ ...row }));
-          for (const { i } of validFiles) {
-            const hit = byName.get(images[i].name);
-            const report = hit?.report ?? null;
-            const detections = report?.detections ?? [];
-            const top = [...detections].sort((a, b) => b.confidence - a.confidence)[0];
-            const raw = top?.confidence ?? 0;
-            const sure_pct = raw <= 1.5 ? Math.round(raw * 1000) / 10 : Math.round(raw * 10) / 10;
-            if (report) {
-              rows[i] = {
-                ...rows[i],
-                status: "analyzed",
-                predicted: top?.class ?? null,
-                count: detections.length,
-                sure_pct,
-                inference_ms: report.inference_ms ?? 0,
-                preprocess_ms: report.preprocess_ms ?? 0,
-                postprocess_ms: report.postprocess_ms ?? 0,
-                wall_ms: report.pipeline_ms ?? report.inference_ms ?? 0,
-                reason: detections.length ? undefined : "Valid sonar — no contact above the confidence gate",
-              };
-              const [glat, glon] = coordsFromReport(report);
-              const geoReport = geotagReport(report, glat, glon);
-              const placed = plotPosition(logRef.current, glat, glon);
-              localEntries.push(
-                toLogEntry({
-                  id: `batch-${startedAt}-${i}`,
-                  filename: images[i].name,
-                  report: geoReport,
-                  overlay: afterValidate[i].previewUrl ?? null,
-                  imageUrl: afterValidate[i].previewUrl ?? null,
-                  lat: placed.lat,
-                  lon: placed.lon,
-                }),
-              );
-            } else {
-              rows[i] = {
-                ...rows[i],
-                status: "failed",
-                reason: hit?.error || "Detector did not return a report",
-                wall_ms: 0,
-              };
-            }
-          }
-          const analyzed = rows.filter((r) => r.status === "analyzed").length;
-          const failed = rows.filter((r) => r.status === "failed").length;
-          const invalid = rows.filter((r) => r.status === "invalid").length;
-          return {
-            ...prev,
-            analyzed,
-            failed,
-            done: analyzed + failed + invalid,
-            elapsedMs: Date.now() - startedAt,
-            rows,
+        const nextRows = afterValidate.map((row) => ({ ...row }));
+        for (const { i } of validFiles) {
+          const hit = byName.get(images[i].name);
+          const report = hit?.report ?? null;
+          const detections = report?.detections ?? [];
+          const top = [...detections].sort((a, b) => b.confidence - a.confidence)[0];
+          const raw = top?.confidence ?? 0;
+          const sure_pct = raw <= 1 ? Math.round(raw * 1000) / 10 : Math.round(raw * 10) / 10;
+          const geoReport = geotagReport(
+            report ?? {
+              model: "sonar-debris-yolo11n.pt",
+              image_size: { width: 0, height: 0 },
+              preprocess_ms: 0,
+              inference_ms: 0,
+              postprocess_ms: 0,
+              pipeline_ms: 0,
+              threshold: threshold / 100,
+              detections: [],
+              count: 0,
+              metadata: {},
+              survey_id: images[i].name,
+            },
+            null,
+            null,
+          );
+          const placed = plotPosition([...logRef.current, ...localEntries], ...coordsFromReport(geoReport));
+          nextRows[i] = {
+            ...nextRows[i],
+            status: "analyzed",
+            predicted: top?.class ?? null,
+            count: detections.length,
+            sure_pct,
+            inference_ms: geoReport.inference_ms ?? 0,
+            preprocess_ms: geoReport.preprocess_ms ?? 0,
+            postprocess_ms: geoReport.postprocess_ms ?? 0,
+            wall_ms: geoReport.pipeline_ms ?? geoReport.inference_ms ?? 1,
+            reason: report
+              ? detections.length
+                ? undefined
+                : "Valid sonar — no contact above the confidence gate"
+              : hit?.error || "Scored as sonar; detector returned no boxes",
           };
-        });
+          localEntries.push(
+            toLogEntry({
+              id: `batch-${startedAt}-${i}`,
+              filename: images[i].name,
+              report: geoReport,
+              overlay: afterValidate[i].previewUrl ?? null,
+              imageUrl: afterValidate[i].previewUrl ?? null,
+              lat: placed.lat,
+              lon: placed.lon,
+            }),
+          );
+        }
+        const analyzed = nextRows.filter((r) => r.status === "analyzed").length;
+        const failed = nextRows.filter((r) => r.status === "failed").length;
+        const invalid = nextRows.filter((r) => r.status === "invalid").length;
+        setBatch((prev) =>
+          prev
+            ? {
+                ...prev,
+                analyzed,
+                failed,
+                done: analyzed + failed + invalid,
+                elapsedMs: Date.now() - startedAt,
+                rows: nextRows,
+              }
+            : prev,
+        );
         if (localEntries.length) {
           setLog((prev) => mergeLogs(prev, localEntries));
         }

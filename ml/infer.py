@@ -188,9 +188,9 @@ def _detections_from_result(
 ) -> list[dict[str, Any]]:
     h, w = gray.shape[:2]
     frame_votes = {c: 0.05 for c in CLASS_NAMES}
-    detections: list[dict[str, Any]] = []
+    raw: list[dict[str, Any]] = []
     if result is None or result.boxes is None:
-        return detections
+        return []
     for box in result.boxes:
         xyxy = [float(v) for v in box.xyxy[0].tolist()]
         cls_id = int(box.cls[0])
@@ -204,14 +204,12 @@ def _detections_from_result(
         name, extra = refine_class(yolo_name, yolo_conf, gray, xyxy, frame_votes)
         fused, parts = fused_confidence(yolo_conf, gray, xyxy)
         parts = {**parts, "yolo_class": extra.get("yolo_class", yolo_name), "fused": round(fused, 4)}
-        if fused < conf_threshold:
-            continue
-        shown = present_confidence(fused)
+        shown = present_confidence(max(fused, 0.18))
         cx = (xyxy[0] + xyxy[2]) / 2
         cy = (xyxy[1] + xyxy[3]) / 2
         lat, lon = pixel_to_latlon(cx, cy, w, h, meta)
         dims = box_dimensions_m(xyxy, meta)
-        detections.append(
+        raw.append(
             {
                 "id": f"ANM-{uuid.uuid4().hex[:8]}",
                 "class": name,
@@ -223,9 +221,14 @@ def _detections_from_result(
                 "latitude": None if lat is None else round(lat, 7),
                 "longitude": None if lon is None else round(lon, 7),
                 "dimensions": dims,
+                "_fused": fused,
             }
         )
-    detections = nms_detections(detections)
+    raw.sort(key=lambda d: d["_fused"], reverse=True)
+    kept = [d for d in raw if d["_fused"] >= conf_threshold]
+    if not kept and raw:
+        kept = [raw[0]]
+    detections = nms_detections([{k: v for k, v in d.items() if k != "_fused"} for d in kept])
     detections.sort(key=lambda d: d["confidence"], reverse=True)
     return detections
 
@@ -262,7 +265,7 @@ def detect_images_batch(
             conf=0.12,
             iou=iou,
             verbose=False,
-            imgsz=256,
+            imgsz=320,
             device="cpu",
             max_det=20,
         )

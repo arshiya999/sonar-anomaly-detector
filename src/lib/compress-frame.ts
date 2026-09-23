@@ -1,6 +1,6 @@
 /** Shrink sonar frames in the browser so Render scores a folder in seconds. */
 
-export async function compressFrame(file: File, maxSide = 320, quality = 0.62): Promise<Blob> {
+export async function compressFrame(file: File, maxSide = 512, quality = 0.72): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height, 1));
