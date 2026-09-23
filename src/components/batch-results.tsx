@@ -5,8 +5,6 @@ import {
   Legend,
   Line,
   LineChart,
-  ReferenceArea,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -111,40 +109,36 @@ export function summarizeBatch(run: BatchRun | null) {
   };
 }
 
-function dividedSeries(run: BatchRun | null) {
+function seriesFromRun(run: BatchRun | null) {
   const rows = run?.rows ?? [];
-  const validRows = rows.filter((r) => r.status !== "invalid");
-  const invalidRows = rows.filter((r) => r.status === "invalid");
-  const ordered = [...validRows, ...invalidRows];
+  let uploaded = 0;
   let valid = 0;
+  let invalid = 0;
   let identified = 0;
   let failed = 0;
-  let invalid = 0;
-  const points = ordered.map((row, idx) => {
-    const isInvalid = row.status === "invalid";
-    if (isInvalid) invalid += 1;
+  return rows.map((row, idx) => {
+    uploaded += 1;
+    if (row.status === "invalid") invalid += 1;
     else valid += 1;
     if (row.status === "analyzed") identified += 1;
     if (row.status === "failed") failed += 1;
     return {
       i: idx + 1,
       name: row.filename,
-      half: isInvalid ? "invalid" : "valid",
+      uploaded,
       valid,
+      invalid,
       identified,
       failed,
-      invalid,
-      latency: isInvalid ? null : row.wall_ms || row.inference_ms || 0,
+      latency: row.status === "invalid" ? 0 : row.wall_ms || row.inference_ms || 0,
     };
   });
-  return { points, split: validRows.length, invalidN: invalidRows.length, validN: validRows.length };
 }
 
 export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
   const stats = summarizeBatch(run);
-  const { points, split, invalidN, validN } = dividedSeries(run);
+  const series = seriesFromRun(run);
   const empty = !run || run.rows.length === 0;
-  const xMax = Math.max(points.length, 1);
 
   const cards: { k: string; v: string; d: string }[] = [
     { k: "Analyzed", v: String(stats.analyzed), d: "Valid sonar scored" },
@@ -166,8 +160,8 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
     >
       <p className="font-heading text-xl font-bold text-white">Batch results</p>
       <p className="mt-1 text-xs text-cyan-200">
-        One X–Y graph, two halves. Green left = valid sonar. Red right = colour photos (tiger etc.) rejected
-        before YOLO. Latency (ms) uses the right axis because it is not a count.
+        Same graph as before: X is image number, left Y is count, right Y is latency (ms). Sea-teal lines.
+        Invalid (colour photos) is the coral line — it stays at 0 unless you mix a colour photo in the run.
       </p>
 
       {run && !run.finished ? (
@@ -179,7 +173,10 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {cards.map((c) => (
-          <div key={c.k} className="rounded-xl border border-teal-200/30 bg-cyan-950/40 px-3 py-2 shadow-[inset_0_1px_0_rgba(165,243,252,0.2)]">
+          <div
+            key={c.k}
+            className="rounded-xl border border-teal-200/30 bg-cyan-950/40 px-3 py-2 shadow-[inset_0_1px_0_rgba(165,243,252,0.2)]"
+          >
             <p className="text-[10px] tracking-wide text-cyan-300 uppercase">{c.k}</p>
             <p className="mt-0.5 text-lg font-semibold text-white">{c.v}</p>
             <p className="text-[11px] text-cyan-200/80">{c.d}</p>
@@ -189,41 +186,17 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
 
       {empty ? (
         <p className="mt-6 rounded-xl bg-cyan-950/50 px-4 py-12 text-center text-sm text-cyan-200">
-          Add files on Upload, then Analyze. Put sonar and a colour photo in the same run to see both halves.
+          Add files on Upload, then Analyze.
         </p>
       ) : (
         <div className="mt-5 rounded-xl border border-cyan-300/20 bg-[#023047]/50 p-3 shadow-inner">
-          <div className="mb-2 flex flex-wrap gap-3 text-xs">
-            <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-emerald-200">
-              Left · valid sonar ({validN})
-            </span>
-            <span className="rounded-full bg-rose-500/20 px-3 py-1 text-rose-200">
-              Right · invalid / not sonar ({invalidN})
-            </span>
-          </div>
-          <div className="h-[400px]">
+          <div className="h-[420px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={points} margin={{ top: 36, right: 44, left: 12, bottom: 8 }}>
+              <LineChart data={series} margin={{ top: 40, right: 44, left: 12, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="4 6" stroke="#155e75" strokeOpacity={0.65} />
-                {split > 0 ? (
-                  <ReferenceArea yAxisId="left" x1={0.5} x2={split + 0.5} fill="#2dd4bf" fillOpacity={0.12} />
-                ) : null}
-                {invalidN > 0 ? (
-                  <ReferenceArea yAxisId="left" x1={split + 0.5} x2={xMax + 0.5} fill="#67e8f9" fillOpacity={0.08} />
-                ) : null}
-                {split > 0 && invalidN > 0 ? (
-                  <ReferenceLine
-                    yAxisId="left"
-                    x={split + 0.5}
-                    stroke="#99f6e4"
-                    strokeDasharray="4 3"
-                    label={{ value: "valid | invalid", fill: "#ccfbf1", fontSize: 11, position: "insideTopRight" }}
-                  />
-                ) : null}
                 <XAxis
                   dataKey="i"
                   tick={{ fill: "#a5f3fc", fontSize: 11 }}
-                  tickFormatter={(v) => (v <= split ? `V${v}` : `I${v - split}`)}
                   axisLine={{ stroke: "#5eead4" }}
                   tickLine={{ stroke: "#5eead4" }}
                 />
@@ -244,36 +217,36 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                 <Tooltip
                   contentStyle={TOOLTIP}
                   labelFormatter={(v, pts) => {
-                    const row = pts?.[0]?.payload as { name?: string; half?: string } | undefined;
-                    const side = row?.half === "invalid" ? "Invalid" : "Valid";
-                    return row?.name ? `${side} · ${row.name}` : `${side} ${v}`;
+                    const name = (pts?.[0]?.payload as { name?: string } | undefined)?.name;
+                    return name ? `Image ${v} · ${name}` : `Image ${v}`;
                   }}
                 />
                 <Legend
                   verticalAlign="top"
                   align="center"
-                  wrapperStyle={{ fontSize: 12, color: "#ecfeff", paddingBottom: 8 }}
+                  wrapperStyle={{ fontSize: 12, color: "#ecfeff", paddingBottom: 10 }}
                 />
-                <Line yAxisId="left" type="monotone" dataKey="valid" name="Valid sonar" stroke="#5eead4" strokeWidth={2.8} dot={{ r: 3, fill: "#99f6e4" }} />
+                <Line yAxisId="left" type="monotone" dataKey="uploaded" name="Uploaded" stroke="#67e8f9" strokeWidth={2.4} dot={false} />
+                <Line yAxisId="left" type="monotone" dataKey="valid" name="Valid sonar" stroke="#5eead4" strokeWidth={2.8} dot={false} />
                 <Line
                   yAxisId="left"
                   type="monotone"
                   dataKey="identified"
                   name="Successfully identified"
-                  stroke="#38bdf8"
+                  stroke="#22d3ee"
                   strokeWidth={2.6}
-                  dot={{ r: 3, fill: "#7dd3fc" }}
+                  dot={false}
                 />
-                <Line yAxisId="left" type="monotone" dataKey="failed" name="Failed" stroke="#67e8f9" strokeWidth={2} dot={false} />
                 <Line
                   yAxisId="left"
                   type="monotone"
                   dataKey="invalid"
-                  name="Invalid (not sonar)"
+                  name="Invalid"
                   stroke="#fb7185"
-                  strokeWidth={2.8}
+                  strokeWidth={3}
                   dot={{ r: 4, fill: "#fda4af" }}
                 />
+                <Line yAxisId="left" type="monotone" dataKey="failed" name="Failed" stroke="#7dd3fc" strokeWidth={2} dot={false} />
                 <Line
                   yAxisId="right"
                   type="monotone"
@@ -283,20 +256,11 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                   strokeWidth={2}
                   strokeDasharray="6 4"
                   dot={false}
-                  connectNulls={false}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-1 grid grid-cols-2 text-center text-[11px] text-cyan-200">
-            <p>Valid image number (V1, V2…)</p>
-            <p>Invalid image number (I1, I2…) — tiger / colour photos</p>
-          </div>
-          {invalidN === 0 ? (
-            <p className="mt-2 text-center text-xs text-rose-200">
-              Invalid half is empty this run. Add a colour photo with the sonar files so the red half climbs.
-            </p>
-          ) : null}
+          <p className="mt-2 text-center text-[11px] tracking-wide text-cyan-200">Image in this batch</p>
         </div>
       )}
     </div>
