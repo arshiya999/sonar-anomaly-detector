@@ -494,12 +494,20 @@ export function Dashboard() {
       const afterValidate: BatchRow[] = seedRows.map((row) => ({ ...row }));
       for (const { i, v, check_ms } of checks) {
         const colour_pct = Math.round((v.meanSat ?? 0) * 100);
-        afterValidate[i] = { ...afterValidate[i], check_ms, colour_pct };
+        const colour_busy = Math.round((v.highFrac ?? 0) * 100);
+        afterValidate[i] = { ...afterValidate[i], check_ms, colour_pct, colour_busy };
         if (v.ok) {
           validFiles.push({ file: images[i], i });
         } else {
           invalidCount += 1;
-          afterValidate[i] = { ...afterValidate[i], status: "invalid", reason: v.reason, check_ms, colour_pct };
+          afterValidate[i] = {
+            ...afterValidate[i],
+            status: "invalid",
+            reason: v.reason,
+            check_ms,
+            colour_pct,
+            colour_busy,
+          };
         }
       }
       setBatch((prev) =>

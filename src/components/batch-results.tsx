@@ -29,6 +29,7 @@ export type BatchRow = {
   check_ms?: number;
   file_kb?: number;
   colour_pct?: number;
+  colour_busy?: number;
 };
 
 export type BatchRun = {
@@ -118,22 +119,24 @@ function validSeries(run: BatchRun | null) {
   return rows.map((row, idx) => ({
     i: idx + 1,
     name: row.filename,
-    contacts: row.count,
-    identified: row.status === "analyzed" && row.count > 0 ? 1 : 0,
-    failed: row.status === "failed" ? 1 : 0,
-    latency: row.wall_ms || 0,
-    inference: row.inference_ms || 0,
+    debris: row.count,
+    tookMs: row.wall_ms || row.inference_ms || 0,
   }));
 }
 
 function invalidSeries(run: BatchRun | null) {
-  const rows = (run?.rows ?? []).filter((r) => r.status === "invalid");
+  const rows = (run?.rows ?? []).filter((r) => {
+    if (r.status !== "invalid") return false;
+    const colour = r.colour_pct ?? 0;
+    const busy = r.colour_busy ?? 0;
+    const check = r.check_ms || 0;
+    return colour > 8 || busy > 8 || check > 20;
+  });
   return rows.map((row, idx) => ({
     i: idx + 1,
     name: row.filename,
-    colour: Math.round(row.colour_pct ?? 0),
-    check: row.check_ms || 0,
-    size: row.file_kb || 0,
+    cameraLook: Math.max(row.colour_pct ?? 0, row.colour_busy ?? 0),
+    rejectMs: Math.max(row.check_ms || 0, 1),
     reason: row.reason ?? "Not side-scan sonar",
   }));
 }
@@ -164,7 +167,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
     >
       <p className="font-heading text-xl font-bold text-white drop-shadow">Batch results</p>
       <p className="mt-1 text-xs font-medium text-cyan-50">
-        Two graphs, two lines each. Left: contacts and time per ping. Right: colour-ness and check time per rejected file.
+        Two simple graphs. Each has two lines. One line is the result for that picture. The other line is how long that picture took.
       </p>
 
       {run && !run.finished ? (
@@ -194,9 +197,10 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
       ) : (
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
-            <p className="text-sm font-semibold text-cyan-50">Valid sonar</p>
+            <p className="text-sm font-semibold text-cyan-50">Sonar pictures (accepted)</p>
             <p className="mb-2 text-[11px] text-cyan-100">
-              Aqua = contacts found on that ping. Cyan dashed = time for that ping (ms).
+              Solid aqua: how many debris pieces the system saw in that picture (0, 1, 2…). Dashed cyan: how many
+              milliseconds that picture took to analyse. Peaks mean a busy wreck field or a slower image.
             </p>
             {valid.length === 0 ? (
               <p className="grid h-[320px] place-items-center text-sm text-cyan-100">No valid sonar in this run.</p>
@@ -210,13 +214,13 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                       yAxisId="left"
                       allowDecimals={false}
                       tick={{ fill: "#90e0ef", fontSize: 11 }}
-                      label={{ value: "Contacts this frame", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
+                      label={{ value: "Debris pieces seen", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
                       tick={{ fill: "#ffe66d", fontSize: 11 }}
-                      label={{ value: "Latency (ms)", angle: 90, position: "insideRight", fill: "#ffe66d" }}
+                      label={{ value: "Time this picture took (ms)", angle: 90, position: "insideRight", fill: "#ffe66d" }}
                     />
                     <Tooltip
                       contentStyle={TOOLTIP}
@@ -226,12 +230,12 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                       }}
                     />
                     <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
-                    <Line yAxisId="left" type="linear" dataKey="contacts" name="Contacts this frame" stroke="#00f5d4" strokeWidth={3.4} dot={{ r: 4, fill: "#80ffdb" }} />
+                    <Line yAxisId="left" type="linear" dataKey="debris" name="Debris pieces seen in this picture" stroke="#00f5d4" strokeWidth={3.4} dot={{ r: 4, fill: "#80ffdb" }} />
                     <Line
                       yAxisId="right"
                       type="linear"
-                      dataKey="latency"
-                      name="Time this frame (ms)"
+                      dataKey="tookMs"
+                      name="Time this picture took (ms)"
                       stroke="#48cae4"
                       strokeWidth={2.4}
                       strokeDasharray="6 4"
@@ -241,13 +245,15 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                 </ResponsiveContainer>
               </div>
             )}
-            <p className="mt-1 text-center text-[11px] font-medium text-cyan-50">Valid image number</p>
+            <p className="mt-1 text-center text-[11px] font-medium text-cyan-50">Sonar picture number</p>
           </div>
 
           <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
-            <p className="text-sm font-semibold text-cyan-50">Invalid — not sonar</p>
+            <p className="text-sm font-semibold text-cyan-50">Not sonar (tiger, garden, camera photos)</p>
             <p className="mb-2 text-[11px] text-cyan-100">
-              Aqua = how colourful the file is. Cyan dashed = how long the sonar check took (ms).
+              Solid aqua: how much this file looks like an everyday colour photo (higher = more like a camera snap, so
+              we refuse it). Dashed cyan: how long that quick look took. Empty zeros are hidden so the line does not go
+              flat after the real photos.
             </p>
             {invalid.length === 0 ? (
               <p className="grid h-[320px] place-items-center px-4 text-center text-sm text-cyan-100">
@@ -262,13 +268,13 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                     <YAxis
                       yAxisId="left"
                       tick={{ fill: "#90e0ef", fontSize: 11 }}
-                      label={{ value: "Colour-ness (%)", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
+                      label={{ value: "Looks like a camera photo", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
                       tick={{ fill: "#ffe66d", fontSize: 11 }}
-                      label={{ value: "Check time (ms)", angle: 90, position: "insideRight", fill: "#ffe66d" }}
+                      label={{ value: "Time to reject (ms)", angle: 90, position: "insideRight", fill: "#ffe66d" }}
                     />
                     <Tooltip
                       contentStyle={TOOLTIP}
@@ -281,8 +287,8 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                     <Line
                       yAxisId="left"
                       type="linear"
-                      dataKey="colour"
-                      name="Colour-ness (%)"
+                      dataKey="cameraLook"
+                      name="Looks like a normal camera photo"
                       stroke="#00f5d4"
                       strokeWidth={3.4}
                       dot={{ r: 4, fill: "#80ffdb" }}
@@ -290,8 +296,8 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                     <Line
                       yAxisId="right"
                       type="linear"
-                      dataKey="check"
-                      name="Check time (ms)"
+                      dataKey="rejectMs"
+                      name="Time to reject this file (ms)"
                       stroke="#48cae4"
                       strokeWidth={2.4}
                       strokeDasharray="6 4"
@@ -301,7 +307,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                 </ResponsiveContainer>
               </div>
             )}
-            <p className="mt-1 text-center text-[11px] font-medium text-cyan-50">Invalid image number</p>
+            <p className="mt-1 text-center text-[11px] font-medium text-cyan-50">Rejected picture number</p>
           </div>
         </div>
       )}
