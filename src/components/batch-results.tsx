@@ -162,10 +162,10 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
   return (
     <div
       id="sih-batch-results"
-      className="overflow-hidden rounded-2xl border-2 border-cyan-300 p-5 text-cyan-950 shadow-[0_12px_40px_rgba(0,150,199,0.35)]"
+      className="overflow-hidden rounded-2xl border-2 border-cyan-600 p-5 text-cyan-50 shadow-[0_12px_40px_rgba(3,4,94,0.4)]"
       style={{
         background:
-          "radial-gradient(900px 320px at 8% -10%, rgba(0,245,212,0.55), transparent 52%), radial-gradient(720px 280px at 100% 0%, rgba(0,180,216,0.5), transparent 48%), linear-gradient(165deg, #90e0ef 0%, #00b4d8 42%, #0077b6 100%)",
+          "radial-gradient(900px 320px at 8% -10%, rgba(0,180,216,0.28), transparent 52%), radial-gradient(720px 280px at 100% 0%, rgba(0,119,182,0.35), transparent 48%), linear-gradient(165deg, #0077b6 0%, #023e8a 48%, #03045e 100%)",
       }}
     >
       <p className="font-heading text-xl font-bold text-white drop-shadow">Batch results</p>
@@ -184,9 +184,9 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
         {cards.map((c) => (
           <div
             key={c.k}
-            className="rounded-xl border border-white/60 bg-white/25 px-3 py-2 shadow-[0_0_20px_rgba(144,224,239,0.55)] backdrop-blur-sm"
+            className="rounded-xl border border-cyan-400/40 bg-cyan-950/45 px-3 py-2 shadow-[0_0_18px_rgba(0,119,182,0.35)]"
           >
-            <p className="text-[10px] tracking-wide text-cyan-950 uppercase">{c.k}</p>
+            <p className="text-[10px] tracking-wide text-cyan-200 uppercase">{c.k}</p>
             <p className="mt-0.5 text-lg font-semibold text-white drop-shadow-sm">{c.v}</p>
             <p className="text-[11px] text-cyan-50">{c.d}</p>
           </div>
@@ -199,7 +199,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
         </p>
       ) : (
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border-2 border-cyan-200 bg-[#023e8a]/70 p-3 shadow-inner">
+          <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
             <p className="text-sm font-semibold text-cyan-50">Valid sonar</p>
             <p className="mb-2 text-[11px] text-cyan-100">
               Left axis = valid frames and how many were identified. Right axis = latency (ms) for that frame.
@@ -210,8 +210,8 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
               <div className="h-[340px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={valid} margin={{ top: 32, right: 40, left: 8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 6" stroke="#48cae4" strokeOpacity={0.55} />
-                    <XAxis dataKey="i" tick={{ fill: "#caf0f8", fontSize: 11 }} axisLine={{ stroke: "#90e0ef" }} />
+                    <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.55} />
+                    <XAxis dataKey="i" tick={{ fill: "#90e0ef", fontSize: 11 }} axisLine={{ stroke: "#0096c7" }} />
                     <YAxis
                       yAxisId="left"
                       allowDecimals={false}
@@ -238,9 +238,9 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                       type="monotone"
                       dataKey="identified"
                       name="Successfully identified"
-                      stroke="#00bbf9"
+                      stroke="#0096c7"
                       strokeWidth={3}
-                      dot={{ r: 4, fill: "#48cae4" }}
+                      dot={{ r: 4, fill: "#00b4d8" }}
                     />
                     <Line yAxisId="left" type="monotone" dataKey="failed" name="Failed" stroke="#ffe66d" strokeWidth={2.4} dot={false} />
                     <Line
@@ -248,7 +248,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                       type="monotone"
                       dataKey="latency"
                       name="Latency (ms)"
-                      stroke="#caf0f8"
+                      stroke="#48cae4"
                       strokeWidth={2.2}
                       strokeDasharray="6 4"
                       dot={false}
@@ -260,7 +260,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
             <p className="mt-1 text-center text-[11px] font-medium text-cyan-50">Valid image number</p>
           </div>
 
-          <div className="rounded-2xl border-2 border-orange-200 bg-[#0077b6]/75 p-3 shadow-inner">
+          <div className="rounded-2xl border-2 border-orange-400/70 bg-[#023e8a]/80 p-3 shadow-inner">
             <p className="text-sm font-semibold text-orange-50">Invalid — not sonar</p>
             <p className="mb-2 text-[11px] text-orange-50/95">
               Tiger, garden, and other colour photos. Counted here and never sent to YOLO.
@@ -273,7 +273,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
               <div className="h-[340px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={invalid} margin={{ top: 32, right: 16, left: 8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 6" stroke="#90e0ef" strokeOpacity={0.4} />
+                    <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.45} />
                     <XAxis dataKey="i" tick={{ fill: "#fff0e0", fontSize: 11 }} axisLine={{ stroke: "#ff9e00" }} />
                     <YAxis
                       allowDecimals={false}
