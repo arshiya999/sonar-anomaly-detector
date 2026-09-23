@@ -203,7 +203,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
             ) : (
               <div className="h-[340px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={valid} margin={{ top: 32, right: 40, left: 8, bottom: 8 }}>
+                  <LineChart data={valid} margin={{ top: 40, right: 40, left: 8, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.55} />
                     <XAxis dataKey="i" tick={{ fill: "#90e0ef", fontSize: 11 }} axisLine={{ stroke: "#0096c7" }} />
                     <YAxis
@@ -225,7 +225,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                         return name ? `Valid ${v} · ${name}` : `Valid ${v}`;
                       }}
                     />
-                    <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} /> />
+                    <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
                     <Line yAxisId="left" type="linear" dataKey="contacts" name="Contacts this frame" stroke="#00f5d4" strokeWidth={3.4} dot={{ r: 4, fill: "#80ffdb" }} />
                     <Line
                       yAxisId="left"
@@ -275,7 +275,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
             ) : (
               <div className="h-[340px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={invalid} margin={{ top: 32, right: 16, left: 8, bottom: 8 }}>
+                  <LineChart data={invalid} margin={{ top: 40, right: 40, left: 8, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.55} />
                     <XAxis dataKey="i" tick={{ fill: "#90e0ef", fontSize: 11 }} axisLine={{ stroke: "#0096c7" }} />
                     <YAxis
@@ -296,7 +296,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                         return row?.name ? `Invalid ${v} · ${row.name}` : `Invalid ${v}`;
                       }}
                     />
-                    <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} /> />
+                    <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
                     <Line
                       yAxisId="left"
                       type="linear"
