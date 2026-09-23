@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/aqua-vision-check-kit.zip",
+        headers: [
+          {
+            key: "Content-Disposition",
+            value: 'attachment; filename="aqua-vision-check-kit.zip"',
+          },
+        ],
+      },
+    ];
+  },
   allowedDevOrigins: [
     "127.0.0.1",
     "localhost",
