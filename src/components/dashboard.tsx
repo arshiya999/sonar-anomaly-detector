@@ -1348,6 +1348,14 @@ function UploadPage({
             <Images />
             Add files (select many)
           </Button>
+          <a
+            href="/aqua-vision-check-kit.zip"
+            download
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-cyan-700 bg-white text-sm font-medium text-cyan-900 hover:bg-cyan-50"
+          >
+            <Download className="size-4" />
+            Download 30 valid + 5 invalid test images
+          </a>
           <p className="text-xs text-slate-600">
             In the file window hold <strong>Ctrl</strong> (Windows) or <strong>Cmd</strong> (Mac) and click each
             sonar image, or click the first then <strong>Shift+click</strong> the last. Do not use the phone

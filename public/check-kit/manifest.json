@@ -1,0 +1,281 @@
+{
+  "valid": [
+    {
+      "file": "01-aircraft-orig.jpg",
+      "detections": 1,
+      "top": "aircraft",
+      "variant": "orig",
+      "source": "sctd_000086",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "02-shipwreck-orig.jpg",
+      "detections": 1,
+      "top": "shipwreck",
+      "variant": "orig",
+      "source": "sctd_000238",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "03-cylinder-orig.jpg",
+      "detections": 1,
+      "top": "cylinder",
+      "variant": "orig",
+      "source": "wt_marine-debris-aris3k-1001",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "04-tire-orig.jpg",
+      "detections": 1,
+      "top": "tire",
+      "variant": "orig",
+      "source": "wt_marine-debris-aris3k-1597",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "05-propeller-orig.jpg",
+      "detections": 1,
+      "top": "propeller",
+      "variant": "orig",
+      "source": "wt_marine-debris-aris3k-237",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "06-cylinder-orig.jpg",
+      "detections": 1,
+      "top": "cylinder",
+      "variant": "orig",
+      "source": "wt_marine-debris-aris3k-262",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "07-tire-orig.jpg",
+      "detections": 1,
+      "top": "tire",
+      "variant": "orig",
+      "source": "wt_marine-debris-aris3k-474",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "08-ghost-net-orig.jpg",
+      "detections": 1,
+      "top": "ghost_net",
+      "variant": "orig",
+      "source": "wt_marine-debris-aris3k-530",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "09-propeller-orig.jpg",
+      "detections": 1,
+      "top": "propeller",
+      "variant": "orig",
+      "source": "wt_marine-debris-aris3k-643",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "10-tire-orig.jpg",
+      "detections": 1,
+      "top": "tire",
+      "variant": "orig",
+      "source": "wt_marine-debris-aris3k-645",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "11-debris-orig.jpg",
+      "detections": 1,
+      "top": "debris",
+      "variant": "orig",
+      "source": "bottle",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "12-tire-orig.jpg",
+      "detections": 1,
+      "top": "tire",
+      "variant": "orig",
+      "source": "chain",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "13-tire-orig.jpg",
+      "detections": 1,
+      "top": "tire",
+      "variant": "orig",
+      "source": "tire",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "14-cylinder-orig.jpg",
+      "detections": 1,
+      "top": "cylinder",
+      "variant": "orig",
+      "source": "valve",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "15-aircraft-flip-h.jpg",
+      "detections": 1,
+      "top": "aircraft",
+      "variant": "flip-h",
+      "source": "sctd_000086",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "16-shipwreck-flip-h.jpg",
+      "detections": 2,
+      "top": "shipwreck",
+      "variant": "flip-h",
+      "source": "sctd_000238",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "17-cylinder-flip-h.jpg",
+      "detections": 1,
+      "top": "cylinder",
+      "variant": "flip-h",
+      "source": "wt_marine-debris-aris3k-1001",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "18-tire-flip-h.jpg",
+      "detections": 1,
+      "top": "tire",
+      "variant": "flip-h",
+      "source": "wt_marine-debris-aris3k-1597",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "19-propeller-crop.jpg",
+      "detections": 1,
+      "top": "propeller",
+      "variant": "crop",
+      "source": "wt_marine-debris-aris3k-237",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "20-cylinder-flip-h.jpg",
+      "detections": 1,
+      "top": "cylinder",
+      "variant": "flip-h",
+      "source": "wt_marine-debris-aris3k-262",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "21-tire-flip-h.jpg",
+      "detections": 1,
+      "top": "tire",
+      "variant": "flip-h",
+      "source": "wt_marine-debris-aris3k-474",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "22-ghost-net-flip-h.jpg",
+      "detections": 2,
+      "top": "ghost_net",
+      "variant": "flip-h",
+      "source": "wt_marine-debris-aris3k-530",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "23-propeller-flip-h.jpg",
+      "detections": 1,
+      "top": "propeller",
+      "variant": "flip-h",
+      "source": "wt_marine-debris-aris3k-643",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "24-tire-flip-h.jpg",
+      "detections": 1,
+      "top": "tire",
+      "variant": "flip-h",
+      "source": "wt_marine-debris-aris3k-645",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "25-debris-flip-h.jpg",
+      "detections": 1,
+      "top": "debris",
+      "variant": "flip-h",
+      "source": "bottle",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "26-tire-crop.jpg",
+      "detections": 1,
+      "top": "tire",
+      "variant": "crop",
+      "source": "chain",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "27-aircraft-crop.jpg",
+      "detections": 1,
+      "top": "aircraft",
+      "variant": "crop",
+      "source": "sctd_000086",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "28-shipwreck-crop.jpg",
+      "detections": 2,
+      "top": "shipwreck",
+      "variant": "crop",
+      "source": "sctd_000238",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "29-cylinder-crop.jpg",
+      "detections": 1,
+      "top": "cylinder",
+      "variant": "crop",
+      "source": "wt_marine-debris-aris3k-1001",
+      "rejected_as_colour": false
+    },
+    {
+      "file": "30-tire-crop.jpg",
+      "detections": 1,
+      "top": "tire",
+      "variant": "crop",
+      "source": "wt_marine-debris-aris3k-1597",
+      "rejected_as_colour": false
+    }
+  ],
+  "invalid": [
+    {
+      "file": "01-garden-photo.jpg",
+      "expect": "rejected before YOLO",
+      "meanSat": 0.566,
+      "highFrac": 0.928,
+      "hueStd": 85.9
+    },
+    {
+      "file": "02-sunset-photo.jpg",
+      "expect": "rejected before YOLO",
+      "meanSat": 0.562,
+      "highFrac": 0.73,
+      "hueStd": 105.3
+    },
+    {
+      "file": "03-market-photo.jpg",
+      "expect": "rejected before YOLO",
+      "meanSat": 0.756,
+      "highFrac": 0.873,
+      "hueStd": 58.9
+    },
+    {
+      "file": "04-festival-photo.jpg",
+      "expect": "rejected before YOLO",
+      "meanSat": 0.66,
+      "highFrac": 0.809,
+      "hueStd": 53.1
+    },
+    {
+      "file": "05-wildlife-photo.jpg",
+      "expect": "rejected before YOLO",
+      "meanSat": 0.668,
+      "highFrac": 0.849,
+      "hueStd": 48.5
+    }
+  ]
+}
