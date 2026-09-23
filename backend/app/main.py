@@ -52,6 +52,7 @@ if "*" not in origins:
     origins.extend(
         [
             "https://aqua-vision-sih.vercel.app",
+            "https://sonar-anomaly-detector.vercel.app",
             "http://127.0.0.1:47281",
             "http://localhost:47281",
         ]

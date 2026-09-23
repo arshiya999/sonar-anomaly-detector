@@ -207,6 +207,12 @@ export function Dashboard() {
     weights?: string;
     error?: string;
     ml?: string;
+    ops?: string;
+    links?: {
+      frontend?: { ok?: boolean; url?: string };
+      ml?: { ok?: boolean; url?: string };
+      ops?: { ok?: boolean; url?: string };
+    };
   } | null>(null);
   const [meta, setMeta] = useState<MetaForm>(DEFAULT_META);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
@@ -831,9 +837,9 @@ export function Dashboard() {
           <div className={`flex items-center gap-2 text-xs ${ready ? "text-emerald-300" : siteLive ? "text-amber-200" : "text-red-300"}`}>
             <CheckCircle2 className="size-4" />
             {ready
-              ? "System health: all systems operational"
+              ? "Linked: Vercel UI · Render ML · Render ops"
               : hostedNoMl
-                ? "Website live · YOLO not hosted here"
+                ? "Website live · Render ML/ops waking"
                 : siteLive
                   ? "Website live · detector offline"
                   : "Cannot reach this website"}
@@ -858,7 +864,9 @@ export function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <StatusPill ok={siteLive && !busy} warn={hostedNoMl && !busy} label={`Site: ${busy ? "Scanning" : siteLive ? "Live" : "Down"}`} />
+            <StatusPill ok={siteLive && !busy} warn={hostedNoMl && !busy} label={`UI: ${busy ? "Scanning" : siteLive ? "Live" : "Down"}`} />
+            <StatusPill ok={Boolean(health?.links?.ml?.ok)} warn={hostedNoMl} label="ML" />
+            <StatusPill ok={Boolean(health?.links?.ops?.ok)} warn={hostedNoMl} label="API" />
             <button type="button" className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100" onClick={() => go("detections")}>
               <Bell className="size-4" />
               {alerts > 0 ? (
@@ -1973,9 +1981,9 @@ function SettingsPage({
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             {health?.ok
-              ? `Detector online${health.weights ? ` · ${health.weights}` : ""}`
+              ? `Detector online on Render${health.weights ? ` · ${health.weights}` : ""}`
               : health?.hosted
-                ? "This public website is live. YOLO inference is not deployed on Vercel — run `npm run dev:all` locally to score uploads."
+                ? "Website is on Vercel. ML and ops APIs are on Render — first Analyze after idle can take ~30s while they wake."
                 : `Detector offline${health?.error ? ` · ${health.error}` : ""}`}
           </p>
           <div>
