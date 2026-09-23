@@ -39,6 +39,8 @@ async def lifespan(_app: FastAPI):
     task.cancel()
 
 
+BUILD = "2026.09.23-console"
+
 app = FastAPI(
     title="Aqua Vision",
     description="SIH26057 — AI-powered side-scan sonar debris and anomaly detection",
@@ -46,11 +48,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+if "*" not in origins:
+    origins.extend(
+        [
+            "https://aqua-vision-sih.vercel.app",
+            "http://127.0.0.1:47281",
+            "http://localhost:47281",
+        ]
+    )
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins or ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 STORAGE.mkdir(parents=True, exist_ok=True)
@@ -89,12 +100,29 @@ async def ws_alerts(ws: WebSocket):
     await _ws("alerts", ws)
 
 
+@app.get("/")
+def root():
+    status = model_status()
+    return {
+        "service": "Aqua Vision ops API",
+        "ok": True,
+        "build": BUILD,
+        "health": "/health",
+        "detect": "POST /detect",
+        "ingest": "POST /api/ingest/ml-report",
+        "log": "GET /api/ops/log",
+        "system": "GET /api/system/status",
+        "model_loaded": bool(status.get("loaded")),
+    }
+
+
 @app.get("/health")
 @app.get("/api/health")
 def health():
     status = model_status()
     return {
         "ok": bool(status.get("loaded")),
+        "build": BUILD,
         "weights": status.get("path"),
         "weights_exist": bool(status.get("exists")),
         "trained": True,

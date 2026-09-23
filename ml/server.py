@@ -18,7 +18,16 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from geotag import merge_gps_metadata  # noqa: E402
-from infer import annotate, detect_image, get_model, report_to_csv, resolve_weights  # noqa: E402
+from infer import (  # noqa: E402
+    CLASS_NAMES,
+    annotate,
+    detect_image,
+    get_model,
+    report_to_csv,
+    resolve_weights,
+)
+
+BUILD = "2026.09.23-console"
 
 app = FastAPI(title="NIOT Marine Debris Detector", version="1.0.0")
 app.add_middleware(
@@ -26,7 +35,23 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+
+@app.get("/")
+def root():
+    weights = resolve_weights()
+    return {
+        "service": "Aqua Vision ML",
+        "ok": True,
+        "build": BUILD,
+        "health": "/health",
+        "detect": "POST /detect",
+        "classes": CLASS_NAMES,
+        "weights": str(weights),
+        "weights_exist": weights.exists(),
+    }
 
 
 @app.get("/health")
@@ -34,9 +59,12 @@ def health():
     weights = resolve_weights()
     return {
         "ok": True,
+        "build": BUILD,
+        "service": "Aqua Vision ML",
         "weights": str(weights),
         "weights_exist": weights.exists(),
         "trained": "sonar-debris" in weights.name or weights.name == "best.pt",
+        "classes": CLASS_NAMES,
     }
 
 
