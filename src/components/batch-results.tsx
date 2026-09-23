@@ -129,6 +129,16 @@ function paddedDomain(values: number[], pad = 0.18): [number, number] {
   return [lo - span * pad, hi + span * pad];
 }
 
+function niceDomain(values: number[]): [number, number] {
+  const [lo, hi] = paddedDomain(values);
+  return [Math.floor(lo), Math.ceil(hi)];
+}
+
+function tickInt(v: number): string {
+  if (!Number.isFinite(v)) return "";
+  return String(Math.round(v));
+}
+
 function validSeries(run: BatchRun | null) {
   const rows = (run?.rows ?? []).filter((r) => r.status !== "invalid");
   return rows.map((row, idx) => ({
@@ -161,10 +171,10 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
   const valid = validSeries(run);
   const invalid = invalidSeries(run);
   const empty = !run || run.rows.length === 0;
-  const sureDomain = paddedDomain(valid.map((r) => r.sure));
-  const tookDomain = paddedDomain(valid.map((r) => r.tookMs));
-  const camDomain = paddedDomain(invalid.map((r) => r.cameraLook));
-  const rejDomain = paddedDomain(invalid.map((r) => r.rejectMs));
+  const sureDomain = niceDomain(valid.map((r) => r.sure));
+  const tookDomain = niceDomain(valid.map((r) => r.tookMs));
+  const camDomain = niceDomain(invalid.map((r) => r.cameraLook));
+  const rejDomain = niceDomain(invalid.map((r) => r.rejectMs));
 
   const cards: { k: string; v: string; d: string }[] = [
     { k: "Analyzed", v: String(stats.analyzed), d: "Valid sonar scored" },
@@ -185,9 +195,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
       }}
     >
       <p className="font-heading text-xl font-bold text-white drop-shadow">Batch results</p>
-      <p className="mt-1 text-xs font-medium text-cyan-50">
-        Two graphs, two traces each. Aqua fill = the result for that picture. Dashed cyan = how long that picture took. The scale zooms in so the wiggles show, like a live instrument.
-      </p>
+      <p className="mt-1 text-xs font-medium text-cyan-50">Aqua fill = result for that picture. Dashed cyan = time it took.</p>
 
       {run && !run.finished ? (
         <p className="mt-3 font-mono text-sm text-yellow-200">
@@ -215,129 +223,91 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
         </p>
       ) : (
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
+          <div className="overflow-hidden rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
             <p className="text-sm font-semibold text-cyan-50">Sonar pictures (accepted)</p>
-            <p className="mb-2 text-[11px] text-cyan-100">
-              Filled aqua: how sure the system is that it found debris in that picture (higher % = more sure). Dashed
-              cyan: how long that picture took. Both should rise and fall picture by picture, like a live instrument.
-            </p>
+            <ul className="mb-2 list-disc space-y-0.5 pl-4 text-[11px] text-cyan-100">
+              <li>Aqua fill — how sure we are this picture has debris.</li>
+              <li>Dashed cyan — how long this picture took (ms).</li>
+            </ul>
             {valid.length === 0 ? (
-              <p className="grid h-[320px] place-items-center text-sm text-cyan-100">No valid sonar in this run.</p>
+              <p className="grid h-[300px] place-items-center text-sm text-cyan-100">No valid sonar in this run.</p>
             ) : (
-              <div className="h-[340px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={valid} margin={{ top: 40, right: 44, left: 8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.55} />
-                    <XAxis dataKey="i" tick={{ fill: "#90e0ef", fontSize: 11 }} axisLine={{ stroke: "#0096c7" }} />
-                    <YAxis
-                      yAxisId="left"
-                      domain={sureDomain}
-                      tick={{ fill: "#90e0ef", fontSize: 11 }}
-                      label={{ value: "How sure we are (%)", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      domain={tookDomain}
-                      tick={{ fill: "#ffe66d", fontSize: 11 }}
-                      label={{ value: "Time this picture took (ms)", angle: 90, position: "insideRight", fill: "#ffe66d" }}
-                    />
-                    <Tooltip
-                      contentStyle={TOOLTIP}
-                      labelFormatter={(v, pts) => {
-                        const name = (pts?.[0]?.payload as { name?: string } | undefined)?.name;
-                        return name ? `Sonar picture ${v} · ${name}` : `Sonar picture ${v}`;
-                      }}
-                    />
-                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
-                    <Area
-                      yAxisId="left"
-                      type="linear"
-                      dataKey="sure"
-                      name="How sure we are (%)"
-                      stroke="#00f5d4"
-                      fill="#00f5d4"
-                      fillOpacity={0.22}
-                      strokeWidth={2.8}
-                      dot={{ r: 3, fill: "#80ffdb" }}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="linear"
-                      dataKey="tookMs"
-                      name="Time this picture took (ms)"
-                      stroke="#48cae4"
-                      strokeWidth={2.4}
-                      strokeDasharray="6 4"
-                      dot={{ r: 3, fill: "#90e0ef" }}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
+              <div className="flex h-[320px] gap-1">
+                <p
+                  className="w-4 shrink-0 self-center text-center text-[10px] font-medium text-cyan-200"
+                  style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                >
+                  How sure (%)
+                </p>
+                <div className="min-w-0 flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={valid} margin={{ top: 36, right: 8, left: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.55} />
+                      <XAxis dataKey="i" tick={{ fill: "#90e0ef", fontSize: 11 }} axisLine={{ stroke: "#0096c7" }} />
+                      <YAxis yAxisId="left" domain={sureDomain} width={36} tickFormatter={tickInt} tick={{ fill: "#90e0ef", fontSize: 11 }} />
+                      <YAxis yAxisId="right" orientation="right" domain={tookDomain} width={40} tickFormatter={tickInt} tick={{ fill: "#fde68a", fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={TOOLTIP}
+                        labelFormatter={(v, pts) => {
+                          const name = (pts?.[0]?.payload as { name?: string } | undefined)?.name;
+                          return name ? `Sonar picture ${v} · ${name}` : `Sonar picture ${v}`;
+                        }}
+                      />
+                      <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#ecfeff" }} />
+                      <Area yAxisId="left" type="linear" dataKey="sure" name="How sure (%)" stroke="#00f5d4" fill="#00f5d4" fillOpacity={0.22} strokeWidth={2.8} dot={{ r: 3, fill: "#80ffdb" }} />
+                      <Line yAxisId="right" type="linear" dataKey="tookMs" name="Time (ms)" stroke="#48cae4" strokeWidth={2.4} strokeDasharray="6 4" dot={{ r: 3, fill: "#90e0ef" }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="w-4 shrink-0 self-center text-center text-[10px] font-medium text-amber-200" style={{ writingMode: "vertical-rl" }}>
+                  Time (ms)
+                </p>
               </div>
             )}
             <p className="mt-1 text-center text-[11px] font-medium text-cyan-50">Sonar picture number</p>
           </div>
 
-          <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
-            <p className="text-sm font-semibold text-cyan-50">Not sonar (tiger, garden, camera photos)</p>
-            <p className="mb-2 text-[11px] text-cyan-100">
-              Filled aqua: how much this file looks like an everyday camera snap (we zoom the axis so small differences
-              show). Dashed cyan: how long the refuse check took. Not a flat line — each photo scores a bit differently.
-            </p>
+          <div className="overflow-hidden rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
+            <p className="text-sm font-semibold text-cyan-50">Not sonar (camera photos)</p>
+            <ul className="mb-2 list-disc space-y-0.5 pl-4 text-[11px] text-cyan-100">
+              <li>Aqua fill — how much it looks like a normal camera photo.</li>
+              <li>Dashed cyan — how long we took to reject it (ms).</li>
+            </ul>
             {invalid.length === 0 ? (
-              <p className="grid h-[320px] place-items-center px-4 text-center text-sm text-cyan-100">
-                No invalid files this run. Add a colour photo with the sonar set to see this graph climb.
+              <p className="grid h-[300px] place-items-center px-4 text-center text-sm text-cyan-100">
+                Add a colour photo with the sonar set to fill this graph.
               </p>
             ) : (
-              <div className="h-[340px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={invalid} margin={{ top: 40, right: 44, left: 8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.55} />
-                    <XAxis dataKey="i" tick={{ fill: "#90e0ef", fontSize: 11 }} axisLine={{ stroke: "#0096c7" }} />
-                    <YAxis
-                      yAxisId="left"
-                      domain={camDomain}
-                      tick={{ fill: "#90e0ef", fontSize: 11 }}
-                      label={{ value: "Looks like a camera photo", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      domain={rejDomain}
-                      tick={{ fill: "#ffe66d", fontSize: 11 }}
-                      label={{ value: "Time to reject (ms)", angle: 90, position: "insideRight", fill: "#ffe66d" }}
-                    />
-                    <Tooltip
-                      contentStyle={TOOLTIP}
-                      labelFormatter={(v, pts) => {
-                        const row = pts?.[0]?.payload as { name?: string } | undefined;
-                        return row?.name ? `Rejected ${v} · ${row.name}` : `Rejected ${v}`;
-                      }}
-                    />
-                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
-                    <Area
-                      yAxisId="left"
-                      type="linear"
-                      dataKey="cameraLook"
-                      name="Looks like a camera photo"
-                      stroke="#00f5d4"
-                      fill="#00f5d4"
-                      fillOpacity={0.22}
-                      strokeWidth={2.8}
-                      dot={{ r: 3, fill: "#80ffdb" }}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="linear"
-                      dataKey="rejectMs"
-                      name="Time to reject this file"
-                      stroke="#48cae4"
-                      strokeWidth={2.4}
-                      strokeDasharray="6 4"
-                      dot={{ r: 3, fill: "#90e0ef" }}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
+              <div className="flex h-[320px] gap-1">
+                <p
+                  className="w-4 shrink-0 self-center text-center text-[10px] font-medium text-cyan-200"
+                  style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                >
+                  Camera-like
+                </p>
+                <div className="min-w-0 flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={invalid} margin={{ top: 36, right: 8, left: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.55} />
+                      <XAxis dataKey="i" tick={{ fill: "#90e0ef", fontSize: 11 }} axisLine={{ stroke: "#0096c7" }} />
+                      <YAxis yAxisId="left" domain={camDomain} width={36} tickFormatter={tickInt} tick={{ fill: "#90e0ef", fontSize: 11 }} />
+                      <YAxis yAxisId="right" orientation="right" domain={rejDomain} width={40} tickFormatter={tickInt} tick={{ fill: "#fde68a", fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={TOOLTIP}
+                        labelFormatter={(v, pts) => {
+                          const row = pts?.[0]?.payload as { name?: string } | undefined;
+                          return row?.name ? `Rejected ${v} · ${row.name}` : `Rejected ${v}`;
+                        }}
+                      />
+                      <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#ecfeff" }} />
+                      <Area yAxisId="left" type="linear" dataKey="cameraLook" name="Camera-like" stroke="#00f5d4" fill="#00f5d4" fillOpacity={0.22} strokeWidth={2.8} dot={{ r: 3, fill: "#80ffdb" }} />
+                      <Line yAxisId="right" type="linear" dataKey="rejectMs" name="Reject time (ms)" stroke="#48cae4" strokeWidth={2.4} strokeDasharray="6 4" dot={{ r: 3, fill: "#90e0ef" }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="w-4 shrink-0 self-center text-center text-[10px] font-medium text-amber-200" style={{ writingMode: "vertical-rl" }}>
+                  Time (ms)
+                </p>
               </div>
             )}
             <p className="mt-1 text-center text-[11px] font-medium text-cyan-50">Rejected picture number</p>
