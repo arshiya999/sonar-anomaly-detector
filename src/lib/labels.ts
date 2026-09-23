@@ -7,6 +7,7 @@ export const CLASS_LABEL: Record<string, string> = {
   tire: "Tire",
   cylinder: "Cylinder / pipe",
   diver: "Diver / human",
+  rejected: "Rejected RGB",
 };
 
 export const CLASS_COLOR: Record<string, string> = {
@@ -18,6 +19,7 @@ export const CLASS_COLOR: Record<string, string> = {
   tire: "#34d399",
   cylinder: "#facc15",
   diver: "#fb7185",
+  rejected: "#94a3b8",
 };
 
 export function confidenceBand(confidence: number): "low" | "medium" | "high" {

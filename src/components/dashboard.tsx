@@ -66,6 +66,7 @@ import { SonarTheater } from "@/components/sonar-theater";
 import { BatchResultsPanel, type BatchRun, type BatchRow } from "@/components/batch-results";
 import { validateSonarFile } from "@/lib/sonar-validate";
 import { detectFolder } from "@/lib/batch-detect";
+import { chartEntriesFromRun } from "@/lib/chart-entries";
 import { mapPool } from "@/lib/map-pool";
 
 /** Production site writes surveys to the live ops log and uses Render ML + ops. */
@@ -807,9 +808,11 @@ export function Dashboard() {
     triggerDownload(textLinesToPdf("Aqua Vision cleanup report", lines), "aqua-vision-report.pdf");
   };
 
-  const mapped = useMemo(() => detectionsFromLog(log).filter((d) => d.latitude != null && d.longitude != null), [log]);
+  const chartLog = useMemo(() => chartEntriesFromRun(batch, log), [batch, log]);
 
-  const allDetections: Mapped[] = useMemo(() => detectionsFromLog(log), [log]);
+  const mapped = useMemo(() => detectionsFromLog(chartLog).filter((d) => d.latitude != null && d.longitude != null), [chartLog]);
+
+  const allDetections: Mapped[] = useMemo(() => detectionsFromLog(chartLog), [chartLog]);
 
   const mixRows = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -961,7 +964,7 @@ export function Dashboard() {
               latest={latest}
               overlay={overlay}
               preview={preview}
-              log={log}
+              log={chartLog}
               go={go}
               onPickOrigin={pickMapOrigin}
             />
@@ -1011,6 +1014,22 @@ export function Dashboard() {
                 />
               </div>
               <BatchResultsPanel run={batch} />
+              <Card className="shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base">Live survey graphs</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Pie, latency, and hazard scores follow this Analyze run — accepted sonar and rejected RGB.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <SurveyCharts
+                    key={`results-charts-${chartLog.length}-${chartLog[0]?.id ?? "none"}`}
+                    entries={chartLog}
+                    defaultGraphs={["mix", "speed", "risk", "confidence"]}
+                    showLogTable={false}
+                  />
+                </CardContent>
+              </Card>
             </div>
           )}
           {page === "analysis" && (
@@ -1030,6 +1049,22 @@ export function Dashboard() {
                 />
               </div>
               <BatchResultsPanel run={batch} />
+              <Card className="shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base">Live survey graphs</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Pie, latency, and hazard scores follow this Analyze run — accepted sonar and rejected RGB.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <SurveyCharts
+                    key={`analysis-charts-${chartLog.length}-${chartLog[0]?.id ?? "none"}`}
+                    entries={chartLog}
+                    defaultGraphs={["mix", "speed", "risk", "confidence"]}
+                    showLogTable={false}
+                  />
+                </CardContent>
+              </Card>
               <div className="grid gap-4 xl:grid-cols-2">
                 <SonarTheater
                   preview={preview}
@@ -1084,7 +1119,7 @@ export function Dashboard() {
           )}
           {page === "report" && (
             <ReportPage
-              log={log}
+              log={chartLog}
               detections={allDetections}
               downloadJson={downloadJson}
               downloadCsv={downloadCsv}
@@ -1094,7 +1129,7 @@ export function Dashboard() {
           )}
           {page === "history" && (
             <HistoryPage
-              log={log}
+              log={chartLog}
               go={go}
               downloadJson={downloadJson}
               downloadCsv={downloadCsv}
@@ -1223,7 +1258,7 @@ function HomePage({
           </CardHeader>
           <CardContent>
             {mixRows.length === 0 ? (
-              <EmptyNote text="No contacts yet. Open Upload, add sonar frames (up to 150), then Analyze." />
+              <EmptyNote text="Pie slices appear after Analyze — sonar classes plus rejected RGB." />
             ) : (
               <ClassMixPie rows={mixRows} height={280} />
             )}
@@ -1302,8 +1337,8 @@ function HomePage({
         </CardHeader>
         <CardContent>
           <SurveyCharts
-            key={`home-charts-${log.length}-${log[0]?.id ?? "none"}`}
-            entries={log}
+            key={`home-charts-${chartLog.length}-${chartLog[0]?.id ?? "none"}`}
+            entries={chartLog}
             defaultGraphs={["mix", "timeline", "confidence", "speed", "risk"]}
           />
         </CardContent>
