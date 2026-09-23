@@ -1,8 +1,8 @@
 # Render: detector + ops API (not the Next.js UI — that stays on Vercel).
 # Dashboard: New → Blueprint → this GitHub repo, branch main.
-# Existing public URLs:
-#   https://aquavision-ml.onrender.com
-#   https://aquavision-backend-7iuh.onrender.com
+# Public URLs (this Render workspace):
+#   https://aquavision-ml-h8vr.onrender.com
+#   https://aquavision-backend-5g8u.onrender.com
 
 services:
   - type: web

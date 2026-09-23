@@ -24,7 +24,7 @@ Open http://127.0.0.1:47281 on this machine.
 
 That site runs on **Vercel**. Closing a laptop does not take it down. It stays online for judges through **31 December 2026** (and after, as long as the Vercel project exists).
 
-Detection uses Render (`aquavision-ml` + `aquavision-backend-7iuh`). Free Render can nap after idle time. A GitHub Action pings the services every 10 minutes.
+Detection uses Render (`aquavision-ml-h8vr` + `aquavision-backend-5g8u`). Free Render can nap after idle time. A GitHub Action pings the services every 10 minutes.
 
 First open after a Render nap can take ~30–50s while YOLO wakes, then Evaluate works. The dashboard still loads even if the detector is waking.
 
@@ -71,10 +71,10 @@ That repo **is** the frontend. Branch: **`main`**. Framework: **Next.js**. Root 
 
 | Name | Value |
 | --- | --- |
-| `ML_API_URL` | `https://aquavision-ml.onrender.com` |
-| `OPS_API_URL` | `https://aquavision-backend-7iuh.onrender.com` |
-| `NEXT_PUBLIC_ML_API_URL` | `https://aquavision-ml.onrender.com` |
-| `NEXT_PUBLIC_OPS_API_URL` | `https://aquavision-backend-7iuh.onrender.com` |
+| `ML_API_URL` | `https://aquavision-ml-h8vr.onrender.com` |
+| `OPS_API_URL` | `https://aquavision-backend-5g8u.onrender.com` |
+| `NEXT_PUBLIC_ML_API_URL` | `https://aquavision-ml-h8vr.onrender.com` |
+| `NEXT_PUBLIC_OPS_API_URL` | `https://aquavision-backend-5g8u.onrender.com` |
 
 4. Deploy. Hard-refresh **https://aqua-vision-sih.vercel.app** (or the new `*.vercel.app` URL).
 5. After Analyze, **Analysis** must show Empirical detection statistics, both graphs, and Download → PDF.

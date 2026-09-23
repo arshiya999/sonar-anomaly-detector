@@ -14,10 +14,10 @@ Vercel
    Settings → Git → this repo, branch main → Redeploy.
 5. Production environment variables (no trailing slash):
 
-   ML_API_URL=https://aquavision-ml.onrender.com
-   OPS_API_URL=https://aquavision-backend-7iuh.onrender.com
-   NEXT_PUBLIC_ML_API_URL=https://aquavision-ml.onrender.com
-   NEXT_PUBLIC_OPS_API_URL=https://aquavision-backend-7iuh.onrender.com
+   ML_API_URL=https://aquavision-ml-h8vr.onrender.com
+   OPS_API_URL=https://aquavision-backend-5g8u.onrender.com
+   NEXT_PUBLIC_ML_API_URL=https://aquavision-ml-h8vr.onrender.com
+   NEXT_PUBLIC_OPS_API_URL=https://aquavision-backend-5g8u.onrender.com
 
 6. Deploy. Hard-refresh the site.
 7. Upload sonar images → Analyze. Analysis should show empirical graphs
