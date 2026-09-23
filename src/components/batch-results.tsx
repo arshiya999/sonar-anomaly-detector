@@ -177,12 +177,12 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
   const rejDomain = niceDomain(invalid.map((r) => r.rejectMs));
 
   const cards: { k: string; v: string; d: string }[] = [
-    { k: "Analyzed", v: String(stats.analyzed), d: "Valid sonar scored" },
-    { k: "Detections", v: String(stats.detections), d: "Contacts in this batch" },
-    { k: "Time taken", v: fmtDuration(stats.wallMs), d: "Wall clock" },
-    { k: "Throughput", v: stats.throughput ? `${stats.throughput.toFixed(2)} img/s` : "—", d: "Analyzed per second" },
-    { k: "Precision", v: fmtScore(VAL_EVALUATION.precision), d: "Val set" },
-    { k: "mAP@50", v: fmtScore(VAL_EVALUATION.map50), d: "Val boxes" },
+    { k: "Analysed", v: String(stats.analyzed), d: "Accepted sonar frames" },
+    { k: "Contacts", v: String(stats.detections), d: "Debris objects in this batch" },
+    { k: "Elapsed time", v: fmtDuration(stats.wallMs), d: "End-to-end duration" },
+    { k: "Throughput", v: stats.throughput ? `${stats.throughput.toFixed(2)} img/s` : "—", d: "Frames processed per second" },
+    { k: "Precision", v: fmtScore(VAL_EVALUATION.precision), d: "Validation set" },
+    { k: "mAP@50", v: fmtScore(VAL_EVALUATION.map50), d: "Validation boxes" },
   ];
 
   return (
@@ -194,12 +194,14 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
           "radial-gradient(900px 320px at 8% -10%, rgba(0,180,216,0.28), transparent 52%), radial-gradient(720px 280px at 100% 0%, rgba(0,119,182,0.35), transparent 48%), linear-gradient(165deg, #0077b6 0%, #023e8a 48%, #03045e 100%)",
       }}
     >
-      <p className="font-heading text-xl font-bold text-white drop-shadow">Batch results</p>
-      <p className="mt-1 text-xs font-medium text-cyan-50">Aqua fill = result for that picture. Dashed cyan = time it took.</p>
+      <p className="font-heading text-xl font-bold text-white drop-shadow">Batch assessment</p>
+      <p className="mt-1 text-xs font-medium text-cyan-50">
+        MoES · NIOT operator view — two traces per panel: filled series (result) and dashed series (time).
+      </p>
 
       {run && !run.finished ? (
         <p className="mt-3 font-mono text-sm text-yellow-200">
-          {run.phase === "validate" ? "Checking files" : "Analyzing"} · {run.done} of {run.total}
+          {run.phase === "validate" ? "Validating imagery" : "Running inference"} · {run.done} of {run.total}
           {run.current ? ` · ${run.current}` : ""}
         </p>
       ) : null}
@@ -219,25 +221,25 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
 
       {empty ? (
         <p className="mt-6 rounded-xl bg-white/20 px-4 py-12 text-center text-sm text-white">
-          Add files on Upload, then Analyze. Mix sonar with a colour photo to fill the right graph.
+          Add sonar frames on Upload, then run analysis. Include an RGB photograph to populate the rejection panel.
         </p>
       ) : (
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <div className="overflow-hidden rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
-            <p className="text-sm font-semibold text-cyan-50">Sonar pictures (accepted)</p>
-            <ul className="mb-2 list-disc space-y-0.5 pl-4 text-[11px] text-cyan-100">
-              <li>Aqua fill — how sure we are this picture has debris.</li>
-              <li>Dashed cyan — how long this picture took (ms).</li>
+            <p className="text-sm font-semibold tracking-wide text-cyan-50">Accepted side-scan frames</p>
+            <ul className="mb-2 list-disc space-y-0.5 pl-4 text-[11px] leading-snug text-cyan-100">
+              <li>Filled series — detection confidence that this frame contains debris.</li>
+              <li>Dashed series — processing time for this frame (ms).</li>
             </ul>
             {valid.length === 0 ? (
-              <p className="grid h-[300px] place-items-center text-sm text-cyan-100">No valid sonar in this run.</p>
+              <p className="grid h-[300px] place-items-center text-sm text-cyan-100">No accepted sonar frames in this run.</p>
             ) : (
               <div className="flex h-[320px] gap-1">
                 <p
-                  className="w-4 shrink-0 self-center text-center text-[10px] font-medium text-cyan-200"
+                  className="w-4 shrink-0 self-center text-center text-[10px] font-medium tracking-wide text-cyan-200"
                   style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                 >
-                  How sure (%)
+                  Confidence (%)
                 </p>
                 <div className="min-w-0 flex-1">
                   <ResponsiveContainer width="100%" height="100%">
@@ -250,40 +252,40 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                         contentStyle={TOOLTIP}
                         labelFormatter={(v, pts) => {
                           const name = (pts?.[0]?.payload as { name?: string } | undefined)?.name;
-                          return name ? `Sonar picture ${v} · ${name}` : `Sonar picture ${v}`;
+                          return name ? `Frame ${v} · ${name}` : `Frame ${v}`;
                         }}
                       />
                       <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#ecfeff" }} />
-                      <Area yAxisId="left" type="linear" dataKey="sure" name="How sure (%)" stroke="#00f5d4" fill="#00f5d4" fillOpacity={0.22} strokeWidth={2.8} dot={{ r: 3, fill: "#80ffdb" }} />
-                      <Line yAxisId="right" type="linear" dataKey="tookMs" name="Time (ms)" stroke="#48cae4" strokeWidth={2.4} strokeDasharray="6 4" dot={{ r: 3, fill: "#90e0ef" }} />
+                      <Area yAxisId="left" type="linear" dataKey="sure" name="Confidence (%)" stroke="#00f5d4" fill="#00f5d4" fillOpacity={0.22} strokeWidth={2.8} dot={{ r: 3, fill: "#80ffdb" }} />
+                      <Line yAxisId="right" type="linear" dataKey="tookMs" name="Processing time (ms)" stroke="#48cae4" strokeWidth={2.4} strokeDasharray="6 4" dot={{ r: 3, fill: "#90e0ef" }} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
-                <p className="w-4 shrink-0 self-center text-center text-[10px] font-medium text-amber-200" style={{ writingMode: "vertical-rl" }}>
-                  Time (ms)
+                <p className="w-4 shrink-0 self-center text-center text-[10px] font-medium tracking-wide text-amber-200" style={{ writingMode: "vertical-rl" }}>
+                  Latency (ms)
                 </p>
               </div>
             )}
-            <p className="mt-1 text-center text-[11px] font-medium text-cyan-50">Sonar picture number</p>
+            <p className="mt-1 text-center text-[11px] font-medium tracking-wide text-cyan-50">Frame index</p>
           </div>
 
           <div className="overflow-hidden rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
-            <p className="text-sm font-semibold text-cyan-50">Not sonar (camera photos)</p>
-            <ul className="mb-2 list-disc space-y-0.5 pl-4 text-[11px] text-cyan-100">
-              <li>Aqua fill — how much it looks like a normal camera photo.</li>
-              <li>Dashed cyan — how long we took to reject it (ms).</li>
+            <p className="text-sm font-semibold tracking-wide text-cyan-50">Rejected non-sonar imagery</p>
+            <ul className="mb-2 list-disc space-y-0.5 pl-4 text-[11px] leading-snug text-cyan-100">
+              <li>Filled series — RGB photograph likelihood (higher = ordinary camera image, held back from the detector).</li>
+              <li>Dashed series — pre-filter screening time (ms).</li>
             </ul>
             {invalid.length === 0 ? (
               <p className="grid h-[300px] place-items-center px-4 text-center text-sm text-cyan-100">
-                Add a colour photo with the sonar set to fill this graph.
+                No rejected imagery in this run. Include an RGB photograph with the sonar set to populate this panel.
               </p>
             ) : (
               <div className="flex h-[320px] gap-1">
                 <p
-                  className="w-4 shrink-0 self-center text-center text-[10px] font-medium text-cyan-200"
+                  className="w-4 shrink-0 self-center text-center text-[10px] font-medium tracking-wide text-cyan-200"
                   style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                 >
-                  Camera-like
+                  RGB score
                 </p>
                 <div className="min-w-0 flex-1">
                   <ResponsiveContainer width="100%" height="100%">
@@ -296,12 +298,12 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                         contentStyle={TOOLTIP}
                         labelFormatter={(v, pts) => {
                           const row = pts?.[0]?.payload as { name?: string } | undefined;
-                          return row?.name ? `Rejected ${v} · ${row.name}` : `Rejected ${v}`;
+                          return row?.name ? `Rejected frame ${v} · ${row.name}` : `Rejected frame ${v}`;
                         }}
                       />
                       <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#ecfeff" }} />
-                      <Area yAxisId="left" type="linear" dataKey="cameraLook" name="Camera-like" stroke="#00f5d4" fill="#00f5d4" fillOpacity={0.22} strokeWidth={2.8} dot={{ r: 3, fill: "#80ffdb" }} />
-                      <Line yAxisId="right" type="linear" dataKey="rejectMs" name="Reject time (ms)" stroke="#48cae4" strokeWidth={2.4} strokeDasharray="6 4" dot={{ r: 3, fill: "#90e0ef" }} />
+                      <Area yAxisId="left" type="linear" dataKey="cameraLook" name="RGB score" stroke="#00f5d4" fill="#00f5d4" fillOpacity={0.22} strokeWidth={2.8} dot={{ r: 3, fill: "#80ffdb" }} />
+                      <Line yAxisId="right" type="linear" dataKey="rejectMs" name="Screening time (ms)" stroke="#48cae4" strokeWidth={2.4} strokeDasharray="6 4" dot={{ r: 3, fill: "#90e0ef" }} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
