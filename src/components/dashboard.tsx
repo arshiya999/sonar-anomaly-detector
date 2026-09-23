@@ -54,6 +54,7 @@ import {
   mergeLogs,
   pinsFromLog,
   plotPosition,
+  rejectedLogEntry,
   toLogEntry,
 } from "@/lib/geo";
 import { SurveyCharts } from "@/components/survey-charts";
@@ -281,7 +282,7 @@ export function Dashboard() {
     async (
       imageFile: File,
       nextMeta?: MetaForm,
-      opts?: { quiet?: boolean; keepBusy?: boolean; skipOverlay?: boolean },
+      opts?: { quiet?: boolean; keepBusy?: boolean; skipOverlay?: boolean; previewUrl?: string },
     ) => {
       setBusy(true);
       setError(null);
@@ -359,12 +360,13 @@ export function Dashboard() {
         );
         const geoReport = geotagReport(data.report, placed.lat, placed.lon);
         const localEntry = toLogEntry({
-          id: `local-${Date.now()}`,
+          id: `local-${Date.now()}-${imageFile.name}`,
           filename: imageFile.name,
           report: geoReport,
           lat: placed.lat,
           lon: placed.lon,
           overlay: overlayData,
+          imageUrl: opts?.previewUrl ?? null,
         });
         setReport(geoReport);
         setOverlay(overlayData);
@@ -445,6 +447,7 @@ export function Dashboard() {
         preprocess_ms: 0,
         postprocess_ms: 0,
         wall_ms: 0,
+        previewUrl: URL.createObjectURL(f),
       }));
       setBatch({
         uploaded: images.length,
@@ -503,6 +506,28 @@ export function Dashboard() {
           : prev,
       );
 
+      const rejectedPins: ScanLogEntry[] = [];
+      for (const { i, v } of checks) {
+        if (v.ok) continue;
+        const placed = plotPosition(
+          [...logRef.current, ...rejectedPins],
+          null,
+          null,
+        );
+        rejectedPins.push(
+          rejectedLogEntry({
+            id: `local-rejected-${startedAt}-${i}`,
+            filename: images[i].name,
+            lat: placed.lat,
+            lon: placed.lon,
+            imageUrl: afterValidate[i].previewUrl ?? null,
+          }),
+        );
+      }
+      if (rejectedPins.length) {
+        setLog((prev) => mergeLogs(prev, rejectedPins));
+      }
+
       await mapPool(validFiles, DETECT_CONCURRENCY, async ({ file, i }) => {
         if (batchCancel.current) return;
         setBatch((prev) =>
@@ -515,6 +540,7 @@ export function Dashboard() {
           quiet: true,
           keepBusy: true,
           skipOverlay: true,
+          previewUrl: afterValidate[i].previewUrl,
         });
         const wall = Date.now() - t0;
         const detections = result?.geoReport.detections ?? [];
@@ -847,28 +873,7 @@ export function Dashboard() {
           )}
           {page === "results" && (
             <div className="space-y-4">
-              <p className="text-sm text-slate-600">
-                Column charts and pies for this batch, plus the same hazard / confidence / class mix graphs used
-                on the dashboard. Invalid colour photos never reach the detector.
-              </p>
               <BatchResultsPanel run={batch} />
-              <Card className="shadow-sm">
-                <CardHeader>
-                  <CardTitle>Hazard, pie, confidence, latency</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    These are the same live graphs as Home and Analysis. They fill from every valid sonar frame
-                    in this batch (and earlier pings this session).
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <SurveyCharts
-                    key={`results-charts-${chartLog.length}-${chartLog[0]?.id ?? "none"}`}
-                    entries={chartLog}
-                    defaultGraphs={["mix", "timeline", "confidence", "speed", "risk"]}
-                    showLogTable={false}
-                  />
-                </CardContent>
-              </Card>
             </div>
           )}
           {page === "analysis" && (

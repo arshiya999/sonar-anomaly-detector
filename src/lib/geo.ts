@@ -81,20 +81,23 @@ export function toLogEntry(opts: {
   lat: number | null;
   lon: number | null;
   overlay?: string | null;
+  imageUrl?: string | null;
+  pinLabel?: string;
 }): ScanLogEntry {
+  const photo = opts.overlay ?? opts.imageUrl ?? null;
   return {
     id: opts.id,
     at: new Date().toISOString(),
     filename: opts.filename,
-    survey: String(opts.report.survey_id || opts.filename),
+    survey: opts.pinLabel || String(opts.report.survey_id || opts.filename),
     count: opts.report.count,
     inference_ms: opts.report.inference_ms,
     threshold: opts.report.threshold,
     detections: opts.report.detections,
     latitude: opts.lat,
     longitude: opts.lon,
-    overlay_url: opts.overlay ?? null,
-    image_url: opts.overlay ?? null,
+    overlay_url: photo,
+    image_url: photo,
   };
 }
 
@@ -167,7 +170,11 @@ export function pinsFromLog(entries: ScanLogEntry[]): SurveyPin[] {
         latitude: lat,
         longitude: lon,
         overlay_url: e.overlay_url ?? e.image_url ?? top?.overlay_url ?? top?.image_url ?? null,
-        material: top ? CLASS_LABEL[top.class] ?? top.class : e.filename.replace(/\.[^.]+$/, ""),
+        material: top
+          ? CLASS_LABEL[top.class] ?? top.class
+          : e.survey.startsWith("Rejected")
+            ? "Rejected"
+            : e.filename.replace(/\.[^.]+$/, ""),
         classId: top?.class,
         confidence: top?.confidence != null ? presentConfidencePct(top.confidence) : null,
         confidenceYolo: top?.confidence_parts?.yolo != null ? top.confidence_parts.yolo * 100 : null,
@@ -196,6 +203,29 @@ export function pinsFromLog(entries: ScanLogEntry[]): SurveyPin[] {
     const dlon = 0.0055 * ((slot % 2 === 0 ? 1 : -1) * Math.ceil(slot / 2));
     return { ...p, latitude: p.latitude + dlat, longitude: p.longitude + dlon };
   });
+}
+
+export function rejectedLogEntry(opts: {
+  id: string;
+  filename: string;
+  lat: number;
+  lon: number;
+  imageUrl?: string | null;
+}): ScanLogEntry {
+  return {
+    id: opts.id,
+    at: new Date().toISOString(),
+    filename: opts.filename,
+    survey: "Rejected — not sonar",
+    count: 0,
+    inference_ms: 0,
+    threshold: 0,
+    detections: [],
+    latitude: opts.lat,
+    longitude: opts.lon,
+    overlay_url: opts.imageUrl ?? null,
+    image_url: opts.imageUrl ?? null,
+  };
 }
 
 export function detectionsFromLog(entries: ScanLogEntry[]): (Detection & { source?: string })[] {
