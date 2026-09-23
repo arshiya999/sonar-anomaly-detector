@@ -812,7 +812,6 @@ export function Dashboard() {
               overlay={overlay}
               preview={preview}
               log={log}
-              batch={batch}
               go={go}
               onPickOrigin={pickMapOrigin}
             />
@@ -862,7 +861,6 @@ export function Dashboard() {
                 complete={Boolean(report) && !busy}
                 hint={busy ? "Processing sonar log" : report ? "Last ping fused and geotagged" : "Standing by"}
               />
-              <BatchResultsPanel run={batch} />
               <div className="grid gap-4 xl:grid-cols-2">
                 <SonarTheater
                   preview={preview}
@@ -984,7 +982,6 @@ function HomePage({
   overlay,
   preview,
   log,
-  batch,
   go,
   onPickOrigin,
 }: {
@@ -1000,7 +997,6 @@ function HomePage({
   overlay: string | null;
   preview: string | null;
   log: ScanLogEntry[];
-  batch: BatchRun | null;
   go: (p: PageId) => void;
   onPickOrigin?: (lat: number, lon: number) => void;
 }) {
@@ -1138,8 +1134,6 @@ function HomePage({
           </CardContent>
         </Card>
       </div>
-
-      <BatchResultsPanel run={batch} />
 
       <Card className="shadow-sm">
         <CardHeader>
