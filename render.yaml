@@ -32,3 +32,5 @@ services:
         value: "*"
       - key: MODEL_PATH
         value: ml/weights/sonar-debris-yolo11n.pt
+      - key: DATABASE_URL
+        value: sqlite:///data/aqua_vision.db
