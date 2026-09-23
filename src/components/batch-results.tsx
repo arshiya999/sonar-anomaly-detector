@@ -260,25 +260,25 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
             <p className="mt-1 text-center text-[11px] font-medium text-cyan-50">Valid image number</p>
           </div>
 
-          <div className="rounded-2xl border-2 border-orange-400/70 bg-[#023e8a]/80 p-3 shadow-inner">
-            <p className="text-sm font-semibold text-orange-50">Invalid — not sonar</p>
-            <p className="mb-2 text-[11px] text-orange-50/95">
+          <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
+            <p className="text-sm font-semibold text-cyan-50">Invalid — not sonar</p>
+            <p className="mb-2 text-[11px] text-cyan-100">
               Tiger, garden, and other colour photos. Counted here and never sent to YOLO.
             </p>
             {invalid.length === 0 ? (
-              <p className="grid h-[320px] place-items-center px-4 text-center text-sm text-cyan-50">
+              <p className="grid h-[320px] place-items-center px-4 text-center text-sm text-cyan-100">
                 No invalid files this run. Add a colour photo with the sonar set to see this graph climb.
               </p>
             ) : (
               <div className="h-[340px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={invalid} margin={{ top: 32, right: 16, left: 8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.45} />
-                    <XAxis dataKey="i" tick={{ fill: "#fff0e0", fontSize: 11 }} axisLine={{ stroke: "#ff9e00" }} />
+                    <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.55} />
+                    <XAxis dataKey="i" tick={{ fill: "#90e0ef", fontSize: 11 }} axisLine={{ stroke: "#0096c7" }} />
                     <YAxis
                       allowDecimals={false}
-                      tick={{ fill: "#ffd6a5", fontSize: 11 }}
-                      label={{ value: "Rejected count", angle: -90, position: "insideLeft", fill: "#ff9e00" }}
+                      tick={{ fill: "#90e0ef", fontSize: 11 }}
+                      label={{ value: "Rejected count", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
                     />
                     <Tooltip
                       contentStyle={TOOLTIP}
@@ -287,20 +287,20 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                         return row?.name ? `Invalid ${v} · ${row.name}` : `Invalid ${v}`;
                       }}
                     />
-                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#fff7ed" }} />
+                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
                     <Line
                       type="monotone"
                       dataKey="invalid"
                       name="Invalid (rejected)"
-                      stroke="#ff6b35"
-                      strokeWidth={3.6}
-                      dot={{ r: 6, fill: "#ff9f1c", stroke: "#fff", strokeWidth: 1.5 }}
+                      stroke="#00f5d4"
+                      strokeWidth={3.4}
+                      dot={{ r: 4, fill: "#80ffdb" }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             )}
-            <p className="mt-1 text-center text-[11px] font-medium text-orange-50">Invalid image number</p>
+            <p className="mt-1 text-center text-[11px] font-medium text-cyan-50">Invalid image number</p>
           </div>
         </div>
       )}
