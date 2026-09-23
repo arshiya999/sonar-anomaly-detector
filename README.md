@@ -27,7 +27,7 @@ That site runs on **Vercel**, not on this Cursor machine. Closing the Cloud Agen
 Detection uses Render (`aquavision-ml` + `aquavision-backend-7iuh`). Free Render can nap after idle time. Two keep-alives run **without this VM**:
 
 1. GitHub Action `keep-alive` — every 10 minutes, on GitHub’s servers
-2. Vercel Cron — daily hit of `/api/keep-alive`
+2. Optional Vercel Cron on `/api/keep-alive` (the GitHub Action already pings the site)
 
 First open after a Render nap can take ~30–50s while YOLO wakes, then Evaluate works. The dashboard still loads even if the detector is waking.
 
@@ -63,20 +63,33 @@ Copy `.env.example`:
 | `CORS_ORIGINS` | Operator UI origins |
 | `MAX_UPLOAD_MB` | Upload cap (default 64) |
 
+## Friend deploy (Vercel frontend)
+
+**GitHub (send this):** https://github.com/arshiya999/sonar-anomaly-detector
+
+That repo **is** the frontend. Branch: **`main`**. Framework: **Next.js**. Root directory: **`.`** (repo root). Do **not** set the root to `frontend/` — that folder is an old Vite app, not the operator console.
+
+1. Open [vercel.com/new](https://vercel.com/new) → Import **`arshiya999/sonar-anomaly-detector`**.
+2. To update the existing site instead of a new URL: project **aqua-vision-sih** → Settings → Git → connect this repo, production branch **main**.
+3. Environment variables (Production), no trailing slash:
+
+| Name | Value |
+| --- | --- |
+| `ML_API_URL` | `https://aquavision-ml.onrender.com` |
+| `OPS_API_URL` | `https://aquavision-backend-7iuh.onrender.com` |
+| `NEXT_PUBLIC_ML_API_URL` | `https://aquavision-ml.onrender.com` |
+| `NEXT_PUBLIC_OPS_API_URL` | `https://aquavision-backend-7iuh.onrender.com` |
+
+4. Deploy. Hard-refresh **https://aqua-vision-sih.vercel.app** (or the new `*.vercel.app` URL).
+5. After Analyze, **Analysis** must show Empirical detection statistics, both graphs, and Download → PDF.
+
+Zip alternative: GitHub → **Code** → **Download ZIP**. Unzip and import that folder (root must contain `package.json` with `"name": "aqua-vision"`).
+
+YOLO stays on Render. Vercel only hosts the Next.js UI.
+
 ## Deploy: Vercel (frontend) + Render (ML + ops)
 
 The Next.js operator UI goes on **Vercel**. YOLO (`ml/server.py`) and the ops API (`backend/`) stay on **Render**. Vercel never runs the `.pt` weights.
-
-**https://aqua-vision-sih.vercel.app only updates when that Vercel project rebuilds from this GitHub repo.** Pushing `main` is not enough if the Vercel project is still linked to an older snapshot (this repo currently has no Vercel GitHub webhook).
-
-1. Open the existing project **aqua-vision-sih** at [vercel.com/dashboard](https://vercel.com/dashboard).
-2. Settings → Git → connect `arshiya999/sonar-anomaly-detector`, production branch **main**, root directory **`.`** (not `frontend/`).
-3. Production env: `ML_API_URL=https://aquavision-ml.onrender.com` and `OPS_API_URL=https://aquavision-backend-7iuh.onrender.com` (no trailing slash).
-4. Deployments → **Redeploy** the latest production deployment (or push a commit to `main` after Git is connected).
-5. Hard-refresh the site (Ctrl+Shift+R). Analysis shows **Empirical detection statistics**, the two graphs after Analyze, and **Download → PDF**.
-6. On Render, set `CORS_ORIGINS` to `https://aqua-vision-sih.vercel.app` (or keep `*`).
-
-Optional: add GitHub Actions secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` so `.github/workflows/deploy-vercel.yml` can ship production on every `main` push.
 
 First upload after Render sleep can take ~30–50s. Wait, then retry.
 
