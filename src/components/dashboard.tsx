@@ -68,7 +68,7 @@ import { mapPool } from "@/lib/map-pool";
 
 /** This preview branch must not write to the live Render log or mix in production surveys. */
 const PREVIEW_ISOLATION = true;
-const MAX_BATCH = 200;
+const MAX_BATCH = 150;
 const DETECT_CONCURRENCY = 4;
 
 const SonarMap = dynamic(
@@ -434,6 +434,9 @@ export function Dashboard() {
       if (!images.length) {
         toast.error("No files in that selection");
         return;
+      }
+      if (picked.length > MAX_BATCH) {
+        toast.message(`This run takes the first ${MAX_BATCH} files`);
       }
       batchCancel.current = false;
       const startedAt = Date.now();
@@ -884,7 +887,11 @@ export function Dashboard() {
                 setQueue((prev) => {
                   const map = new Map(prev.map((f) => [`${f.name}-${f.size}-${f.lastModified}`, f]));
                   for (const f of files) map.set(`${f.name}-${f.size}-${f.lastModified}`, f);
-                  const next = Array.from(map.values()).slice(0, MAX_BATCH);
+                  const next = Array.from(map.values());
+                  if (next.length > MAX_BATCH) {
+                    toast.message(`Keeping the first ${MAX_BATCH} files (max per run)`);
+                    return next.slice(0, MAX_BATCH);
+                  }
                   toast.message(`${next.length} file${next.length === 1 ? "" : "s"} ready — add more or tap Analyze`);
                   return next;
                 });
@@ -1340,37 +1347,8 @@ function UploadPage({
     onStage(Array.from(list));
   };
 
-  const pickManyWithSystemDialog = async () => {
-    const w = window as Window & {
-      showOpenFilePicker?: (opts: {
-        multiple: boolean;
-        excludeAcceptAllOption?: boolean;
-        types?: { description: string; accept: Record<string, string[]> }[];
-      }) => Promise<Array<{ getFile: () => Promise<File> }>>;
-    };
-    try {
-      if (typeof w.showOpenFilePicker === "function") {
-        const handles = await w.showOpenFilePicker({
-          multiple: true,
-          excludeAcceptAllOption: false,
-          types: [
-            {
-              description: "Sonar / image files",
-              accept: {
-                "image/jpeg": [".jpg", ".jpeg"],
-                "image/png": [".png"],
-                "image/webp": [".webp"],
-                "image/tiff": [".tif", ".tiff"],
-              },
-            },
-          ],
-        });
-        take(await Promise.all(handles.map((h) => h.getFile())));
-        return;
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-    }
+  const pickManyWithSystemDialog = () => {
+    /* Native <input multiple> — Chrome's showOpenFilePicker often stops around ~32 files. */
     manyRef.current?.click();
   };
 
@@ -1380,8 +1358,8 @@ function UploadPage({
         <CardHeader>
           <CardTitle>Add sonar files</CardTitle>
           <p className="text-sm text-muted-foreground">
-            One file window, many files: Ctrl+click or Shift+click only the sonar frames you want. You can tap
-            Add files again to append 20, then 30, then 50. Analyze runs once for the whole list.
+            Select up to {MAX_BATCH} images in one go (Ctrl+A in the folder, or Shift+click the range). You can
+            also add another folder and tap Analyze once for the whole list.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1402,9 +1380,9 @@ function UploadPage({
             Add files (select many)
           </Button>
           <p className="text-xs text-slate-600">
-            In the file window hold <strong>Ctrl</strong> (Windows) or <strong>Cmd</strong> (Mac) and click each
-            sonar image, or click the first then <strong>Shift+click</strong> the last. Do not use the phone
-            Camera roll. Drop files below also works. Then tap Analyze once.
+            In the file window: click the first image, <strong>Shift+click</strong> the last, or <strong>Ctrl+A</strong>{" "}
+            for the whole folder — up to {MAX_BATCH} files. Drop a folder of images below also works. Then tap Analyze
+            once.
           </p>
 
           <div
@@ -1438,7 +1416,7 @@ function UploadPage({
           >
             <p className="font-semibold">{queue.length} files ready</p>
             <p className="text-xs">
-              Add files as many times as you want. Nothing is analyzed until you tap Analyze.
+              {queue.length} / {MAX_BATCH} this run. Nothing is analyzed until you tap Analyze.
             </p>
           </div>
 
@@ -1545,14 +1523,11 @@ function UploadPage({
             </p>
           ) : (
             <ul className="max-h-[480px] space-y-1 overflow-auto text-xs">
-              {queue.slice(0, 120).map((f, i) => (
+              {queue.map((f, i) => (
                 <li key={`${f.name}-${f.size}-${i}`} className="truncate font-mono text-slate-700">
                   {i + 1}. {f.name}
                 </li>
               ))}
-              {queue.length > 120 ? (
-                <li className="text-slate-500">…and {queue.length - 120} more</li>
-              ) : null}
             </ul>
           )}
         </CardContent>
