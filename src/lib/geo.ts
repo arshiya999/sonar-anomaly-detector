@@ -105,23 +105,12 @@ export function toLogEntry(opts: {
   };
 }
 
-export function mergeLogs(server: ScanLogEntry[], local: ScanLogEntry[]): ScanLogEntry[] {
-  const localByFile = new Map<string, ScanLogEntry>();
-  for (const e of local) localByFile.set(e.filename, e);
-
-  const pending = local.filter((e) => {
-    if (!e.id.startsWith("local-")) return false;
-    return !server.some(
-      (s) =>
-        s.filename === e.filename &&
-        Math.abs(Date.parse(s.at || "") - Date.parse(e.at || "")) < 120_000,
-    );
-  });
-
-  const seen = new Set<string>();
-  const out: ScanLogEntry[] = [];
-  for (const raw of [...pending, ...server]) {
-    const hint = localByFile.get(raw.filename);
+export function mergeLogs(existing: ScanLogEntry[], incoming: ScanLogEntry[]): ScanLogEntry[] {
+  const byId = new Map<string, ScanLogEntry>();
+  const byFile = new Map<string, ScanLogEntry>();
+  for (const e of incoming) byFile.set(e.filename, e);
+  for (const raw of [...existing, ...incoming]) {
+    const hint = byFile.get(raw.filename);
     const lat =
       asCoord(raw.latitude) ??
       asCoord(raw.detections[0]?.latitude) ??
@@ -148,37 +137,55 @@ export function mergeLogs(server: ScanLogEntry[], local: ScanLogEntry[]): ScanLo
         image_url: d.image_url ?? overlay,
       })),
     };
-    const key = e.id.startsWith("local-") ? e.id : `${e.filename}:${e.at}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(e);
+    byId.set(e.id, e);
   }
-  return out;
+  return [...byId.values()].sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || ""));
+}
+
+function photoOf(e: ScanLogEntry): string | null {
+  return e.overlay_url || e.image_url || e.detections.find((d) => d.overlay_url || d.image_url)?.overlay_url
+    || e.detections.find((d) => d.image_url)?.image_url || null;
+}
+
+function pinRows(entries: ScanLogEntry[]): ScanLogEntry[] {
+  const byFile = new Map<string, ScanLogEntry>();
+  const newestFirst = [...entries].sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || ""));
+  for (const e of newestFirst) {
+    const prev = byFile.get(e.filename);
+    if (!prev) {
+      byFile.set(e.filename, e);
+      continue;
+    }
+    const prevPhoto = photoOf(prev);
+    const nextPhoto = photoOf(e);
+    if (!prevPhoto && nextPhoto) byFile.set(e.filename, e);
+  }
+  return [...byFile.values()].sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || ""));
 }
 
 export function pinsFromLog(entries: ScanLogEntry[]): SurveyPin[] {
-  const persistedFiles = new Set(
-    entries.filter((e) => !e.id.startsWith("local-")).map((e) => e.filename),
-  );
-  const unique = entries.filter((e) => !(e.id.startsWith("local-") && persistedFiles.has(e.filename)));
+  const unique = pinRows(entries);
   const pins = unique.flatMap((e, index) => {
     const top = [...e.detections].sort((a, b) => b.confidence - a.confidence)[0];
-    const lat = asCoord(e.latitude) ?? asCoord(top?.latitude);
-    const lon = asCoord(e.longitude) ?? asCoord(top?.longitude);
-    if (lat == null || lon == null) return [];
+    const rawLat = asCoord(e.latitude) ?? asCoord(top?.latitude);
+    const rawLon = asCoord(e.longitude) ?? asCoord(top?.longitude);
+    const placed = plotPosition(unique.slice(0, index), rawLat, rawLon);
+    const lat = placed.lat;
+    const lon = placed.lon;
     const latest = index === 0;
+    const rejected = e.survey.startsWith("Rejected") || e.id.includes("rejected");
     return [
       {
         id: e.id,
         filename: e.filename,
         latitude: lat,
         longitude: lon,
-        overlay_url: e.overlay_url ?? e.image_url ?? top?.overlay_url ?? top?.image_url ?? null,
+        overlay_url: photoOf(e),
         material: top
           ? CLASS_LABEL[top.class] ?? top.class
-          : e.survey.startsWith("Rejected")
+          : rejected
             ? "Rejected"
-            : e.filename.replace(/\.[^.]+$/, ""),
+            : "Sonar",
         classId: top?.class,
         confidence: top?.confidence != null ? presentConfidencePct(top.confidence) : null,
         confidenceYolo: top?.confidence_parts?.yolo != null ? top.confidence_parts.yolo * 100 : null,

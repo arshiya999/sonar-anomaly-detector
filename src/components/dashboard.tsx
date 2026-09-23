@@ -594,8 +594,7 @@ export function Dashboard() {
           const echo = afterValidate[i].echo_pct ?? 62;
           const yoloSure = raw <= 1 ? Math.round(raw * 1000) / 10 : Math.round(raw * 10) / 10;
           const sure_pct = yoloSure > 1 ? yoloSure : echo;
-          const geoReport = geotagReport(
-            report ?? {
+          const stubReport = report ?? {
               model: "sonar-debris-yolo11n.pt",
               image_size: { width: 0, height: 0 },
               preprocess_ms: 0,
@@ -607,11 +606,12 @@ export function Dashboard() {
               count: 0,
               metadata: {},
               survey_id: images[i].name,
-            },
-            null,
-            null,
+            };
+          const placed = plotPosition(
+            [...logRef.current, ...localEntries],
+            ...coordsFromReport(stubReport),
           );
-          const placed = plotPosition([...logRef.current, ...localEntries], ...coordsFromReport(geoReport));
+          const geoReport = geotagReport(stubReport, placed.lat, placed.lon);
           nextRows[i] = {
             ...nextRows[i],
             status: "analyzed",
@@ -631,13 +631,14 @@ export function Dashboard() {
           };
           localEntries.push(
             toLogEntry({
-              id: `batch-${startedAt}-${i}`,
+              id: `local-sonar-${startedAt}-${i}`,
               filename: images[i].name,
               report: geoReport,
               overlay: afterValidate[i].previewUrl ?? null,
               imageUrl: afterValidate[i].previewUrl ?? null,
               lat: placed.lat,
               lon: placed.lon,
+              pinLabel: top ? undefined : "Sonar frame",
             }),
           );
         }
