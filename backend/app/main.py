@@ -39,7 +39,7 @@ async def lifespan(_app: FastAPI):
     task.cancel()
 
 
-BUILD = "2026.09.23-console"
+BUILD = "2026.09.23-fast"
 
 app = FastAPI(
     title="Aqua Vision",
@@ -165,7 +165,7 @@ async def detect(
     if ml_root.is_dir() and str(ml_root) not in sys.path:
         sys.path.insert(0, str(ml_root))
     from geotag import merge_gps_metadata
-    from infer import annotate, detect_image
+    from infer import annotate, detect_image, detect_images_batch
 
     meta = merge_gps_metadata(meta, raw)
     report = detect_image(bgr, meta=meta, conf_threshold=float(conf_threshold))
@@ -176,3 +176,58 @@ async def detect(
         if ok:
             overlay_b64 = base64.b64encode(buf.tobytes()).decode("ascii")
     return {"report": report, "overlay_jpeg_base64": overlay_b64}
+
+
+@app.post("/detect-batch")
+async def detect_batch(
+    images: list[UploadFile] = File(...),
+    metadata: str = Form("{}"),
+    conf_threshold: float = Form(0.22),
+):
+    import json
+    import sys
+    from pathlib import Path
+
+    import cv2
+    import numpy as np
+    from fastapi.responses import JSONResponse
+
+    ml_root = Path(__file__).resolve().parents[2] / "ml"
+    if ml_root.is_dir() and str(ml_root) not in sys.path:
+        sys.path.insert(0, str(ml_root))
+    from geotag import merge_gps_metadata
+    from infer import detect_images_batch
+
+    try:
+        shared_meta = json.loads(metadata or "{}")
+    except json.JSONDecodeError:
+        shared_meta = {}
+    if not isinstance(shared_meta, dict):
+        shared_meta = {}
+
+    bgrs = []
+    metas = []
+    names = []
+    for upload in images[:150]:
+        raw = await upload.read()
+        arr = np.frombuffer(raw, dtype=np.uint8)
+        bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if bgr is None:
+            continue
+        meta = dict(shared_meta)
+        meta["filename"] = upload.filename or f"frame-{len(names)}"
+        meta = merge_gps_metadata(meta, raw)
+        bgrs.append(bgr)
+        metas.append(meta)
+        names.append(upload.filename or meta["filename"])
+    if not bgrs:
+        return JSONResponse({"error": "No decodable images in batch"}, status_code=400)
+    reports = detect_images_batch(bgrs, metas=metas, conf_threshold=float(conf_threshold))
+    return {
+        "ok": True,
+        "count": len(reports),
+        "results": [
+            {"filename": name, "report": report, "overlay_jpeg_base64": None}
+            for name, report in zip(names, reports)
+        ],
+    }

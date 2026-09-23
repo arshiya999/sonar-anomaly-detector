@@ -14,7 +14,7 @@ from ultralytics import YOLO
 
 from classify import geometry_votes, nms_detections, refine_class
 from geotag import box_dimensions_m, pixel_to_latlon
-from preprocess import box_contrast_score, prepare_for_detector, shadow_penalty, to_gray
+from preprocess import box_contrast_score, enhance, prepare_for_detector, shadow_penalty, to_gray
 
 ROOT = Path(__file__).resolve().parent
 WEIGHTS = ROOT / "weights" / "sonar-debris-yolo11n.pt"
@@ -162,6 +162,133 @@ def detect_image(
         "metadata": meta,
         "survey_id": meta.get("survey") or "unspecified",
     }
+
+
+def prepare_fast(image: np.ndarray, max_side: int = 320) -> tuple[np.ndarray, np.ndarray]:
+    """CLAHE + shrink only — skip Lee/inpaint so a 100-frame run stays in seconds."""
+    gray = to_gray(image)
+    h, w = gray.shape[:2]
+    scale = min(1.0, max_side / max(h, w, 1))
+    if scale < 1:
+        gray = cv2.resize(
+            gray,
+            (max(8, int(w * scale)), max(8, int(h * scale))),
+            interpolation=cv2.INTER_AREA,
+        )
+    gray = enhance(gray)
+    return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR), gray
+
+
+def _detections_from_result(
+    result: Any,
+    gray: np.ndarray,
+    names: dict[Any, Any],
+    meta: dict[str, Any],
+    conf_threshold: float,
+) -> list[dict[str, Any]]:
+    h, w = gray.shape[:2]
+    frame_votes = {c: 0.05 for c in CLASS_NAMES}
+    detections: list[dict[str, Any]] = []
+    if result is None or result.boxes is None:
+        return detections
+    for box in result.boxes:
+        xyxy = [float(v) for v in box.xyxy[0].tolist()]
+        cls_id = int(box.cls[0])
+        yolo_name = str(
+            names.get(
+                cls_id,
+                CLASS_NAMES[cls_id] if 0 <= cls_id < len(CLASS_NAMES) else f"class_{cls_id}",
+            )
+        )
+        yolo_conf = float(box.conf[0])
+        name, extra = refine_class(yolo_name, yolo_conf, gray, xyxy, frame_votes)
+        fused, parts = fused_confidence(yolo_conf, gray, xyxy)
+        parts = {**parts, "yolo_class": extra.get("yolo_class", yolo_name), "fused": round(fused, 4)}
+        if fused < conf_threshold:
+            continue
+        shown = present_confidence(fused)
+        cx = (xyxy[0] + xyxy[2]) / 2
+        cy = (xyxy[1] + xyxy[3]) / 2
+        lat, lon = pixel_to_latlon(cx, cy, w, h, meta)
+        dims = box_dimensions_m(xyxy, meta)
+        detections.append(
+            {
+                "id": f"ANM-{uuid.uuid4().hex[:8]}",
+                "class": name,
+                "hazard_score": HAZARD_RANK.get(name, 50),
+                "confidence": round(shown * 100, 1),
+                "confidence_parts": parts,
+                "bbox_xyxy": [round(v, 1) for v in xyxy],
+                "center_px": [round(cx, 1), round(cy, 1)],
+                "latitude": None if lat is None else round(lat, 7),
+                "longitude": None if lon is None else round(lon, 7),
+                "dimensions": dims,
+            }
+        )
+    detections = nms_detections(detections)
+    detections.sort(key=lambda d: d["confidence"], reverse=True)
+    return detections
+
+
+def detect_images_batch(
+    images: list[np.ndarray],
+    metas: list[dict[str, Any]] | None = None,
+    conf_threshold: float = 0.22,
+    iou: float = 0.45,
+    chunk: int = 16,
+) -> list[dict[str, Any]]:
+    """One YOLO forward per chunk so a folder of pings finishes in seconds, not minutes."""
+    if not images:
+        return []
+    metas = metas or [{} for _ in images]
+    model = get_model()
+    names = model.names if isinstance(model.names, dict) else {i: n for i, n in enumerate(model.names)}
+    reports: list[dict[str, Any]] = []
+    t_all = time.time()
+    for start in range(0, len(images), chunk):
+        batch = images[start : start + chunk]
+        batch_meta = metas[start : start + chunk]
+        t0 = time.time()
+        prepared = []
+        grays = []
+        for im in batch:
+            p, g = prepare_fast(im)
+            prepared.append(p)
+            grays.append(g)
+        preprocess_ms = round((time.time() - t0) * 1000 / max(len(batch), 1))
+        t1 = time.time()
+        results = model.predict(
+            prepared,
+            conf=0.12,
+            iou=iou,
+            verbose=False,
+            imgsz=256,
+            device="cpu",
+            max_det=20,
+        )
+        inference_ms = round((time.time() - t1) * 1000 / max(len(batch), 1))
+        t2 = time.time()
+        for im, gray, meta, result in zip(batch, grays, batch_meta, results):
+            dets = _detections_from_result(result, gray, names, meta or {}, conf_threshold)
+            h, w = gray.shape[:2]
+            postprocess_ms = round((time.time() - t2) * 1000 / max(len(batch), 1))
+            reports.append(
+                {
+                    "model": Path(_model_path or "").name,
+                    "image_size": {"width": w, "height": h},
+                    "preprocess_ms": preprocess_ms,
+                    "inference_ms": inference_ms,
+                    "postprocess_ms": postprocess_ms,
+                    "pipeline_ms": preprocess_ms + inference_ms + postprocess_ms,
+                    "threshold": conf_threshold,
+                    "detections": dets,
+                    "count": len(dets),
+                    "metadata": meta or {},
+                    "survey_id": (meta or {}).get("survey") or "unspecified",
+                }
+            )
+    _ = t_all
+    return reports
 
 
 def annotate(image: np.ndarray, report: dict[str, Any]) -> np.ndarray:

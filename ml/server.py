@@ -22,12 +22,13 @@ from infer import (  # noqa: E402
     CLASS_NAMES,
     annotate,
     detect_image,
+    detect_images_batch,
     get_model,
     report_to_csv,
     resolve_weights,
 )
 
-BUILD = "2026.09.23-console"
+BUILD = "2026.09.23-fast"
 
 app = FastAPI(title="NIOT Marine Debris Detector", version="1.0.0")
 app.add_middleware(
@@ -48,6 +49,7 @@ def root():
         "build": BUILD,
         "health": "/health",
         "detect": "POST /detect",
+        "detect_batch": "POST /detect-batch",
         "classes": CLASS_NAMES,
         "weights": str(weights),
         "weights_exist": weights.exists(),
@@ -102,6 +104,49 @@ async def detect(
         if ok:
             overlay_b64 = base64.b64encode(buf.tobytes()).decode("ascii")
     return {"report": report, "overlay_jpeg_base64": overlay_b64}
+
+
+@app.post("/detect-batch")
+async def detect_batch(
+    images: list[UploadFile] = File(...),
+    metadata: str = Form("{}"),
+    conf_threshold: float = Form(0.22),
+):
+    try:
+        shared_meta = json.loads(metadata or "{}")
+    except json.JSONDecodeError:
+        shared_meta = {}
+    if not isinstance(shared_meta, dict):
+        shared_meta = {}
+
+    bgrs: list[np.ndarray] = []
+    metas: list[dict] = []
+    names: list[str] = []
+    for upload in images[:150]:
+        raw = await upload.read()
+        arr = np.frombuffer(raw, dtype=np.uint8)
+        bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if bgr is None:
+            continue
+        meta = dict(shared_meta)
+        meta["filename"] = upload.filename or f"frame-{len(names)}"
+        meta = merge_gps_metadata(meta, raw)
+        bgrs.append(bgr)
+        metas.append(meta)
+        names.append(upload.filename or meta["filename"])
+
+    if not bgrs:
+        return JSONResponse({"error": "No decodable images in batch"}, status_code=400)
+
+    reports = detect_images_batch(bgrs, metas=metas, conf_threshold=float(conf_threshold))
+    return {
+        "ok": True,
+        "count": len(reports),
+        "results": [
+            {"filename": name, "report": report, "overlay_jpeg_base64": None}
+            for name, report in zip(names, reports)
+        ],
+    }
 
 
 @app.post("/report.csv")

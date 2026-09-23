@@ -64,12 +64,13 @@ import { PipelineStrip } from "@/components/pipeline-strip";
 import { SonarTheater } from "@/components/sonar-theater";
 import { BatchResultsPanel, type BatchRun, type BatchRow } from "@/components/batch-results";
 import { validateSonarFile } from "@/lib/sonar-validate";
+import { detectFolder } from "@/lib/batch-detect";
 import { mapPool } from "@/lib/map-pool";
 
 /** Production site writes surveys to the live ops log and uses Render ML + ops. */
 const PREVIEW_ISOLATION = false;
 const MAX_BATCH = 150;
-const DETECT_CONCURRENCY = 4;
+const DETECT_CONCURRENCY = 8;
 
 const SonarMap = dynamic(
   () => import("@/components/sonar-map").then((m) => m.SonarMap),
@@ -314,7 +315,7 @@ export function Dashboard() {
       try {
         const hosts = PREVIEW_ISOLATION
           ? [PUBLIC_ML_URL, ""]
-          : [PUBLIC_OPS_URL, PUBLIC_ML_URL, health?.ml || ""];
+          : [PUBLIC_ML_URL, PUBLIC_OPS_URL, health?.ml || ""];
         const detectUrls = [
           ...hosts
             .map((h) => (h || "").replace(/\/+$/, ""))
@@ -334,7 +335,7 @@ export function Dashboard() {
             const res = await fetch(detectUrl, {
               method: "POST",
               body: formTry,
-              signal: AbortSignal.timeout(120_000),
+              signal: AbortSignal.timeout(20_000),
             });
             if (res.status === 404) {
               lastError = `No detector at ${detectUrl}`;
@@ -398,7 +399,7 @@ export function Dashboard() {
               : `Pinned on survey plot ${placed.lat.toFixed(4)}, ${placed.lon.toFixed(4)} — click the map or type GPS for true position`,
           );
         }
-        if (!PREVIEW_ISOLATION) {
+        if (!PREVIEW_ISOLATION && !opts?.quiet) {
           const persist = await fetch("/api/log", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -422,7 +423,7 @@ export function Dashboard() {
           (err instanceof DOMException && err.name === "TimeoutError") ||
           (err instanceof Error && /timeout|aborted/i.test(err.message));
         const message = timedOut
-          ? "Detector is scoring this ping on cloud CPU — first run after idle can take 1–2 minutes. Wait, then tap Evaluate again. Do not refresh."
+          ? "Detector is busy — retry this ping. Folder Analyze uses a faster batch path."
           : err instanceof Error
             ? err.message
             : "Detection failed";
@@ -485,9 +486,9 @@ export function Dashboard() {
       setPage("analysis");
       setFile(images[0]);
       setPreview(URL.createObjectURL(images[0]));
-      toast.message(`Checking ${images.length} files, then analyzing valid sonar in parallel`);
+      toast.message(`Checking ${images.length} files, then scoring valid sonar as one fast batch`);
 
-      const checks = await mapPool(images, 6, async (file, i) => {
+      const checks = await mapPool(images, DETECT_CONCURRENCY, async (file, i) => {
         const t0 = Date.now();
         const v = await validateSonarFile(file);
         return { file, i, v, check_ms: Date.now() - t0 };
@@ -555,48 +556,75 @@ export function Dashboard() {
         setLog((prev) => mergeLogs(prev, rejectedPins));
       }
 
-      await mapPool(validFiles, DETECT_CONCURRENCY, async ({ file, i }) => {
-        if (batchCancel.current) return;
+      const tick = window.setInterval(() => {
         setBatch((prev) =>
-          prev
-            ? { ...prev, current: file.name, elapsedMs: Date.now() - startedAt }
-            : prev,
+          prev && !prev.finished ? { ...prev, elapsedMs: Date.now() - startedAt } : prev,
         );
-        const t0 = Date.now();
-        const result = await runDetect(file, undefined, {
-          quiet: true,
-          keepBusy: true,
-          skipOverlay: true,
-          previewUrl: afterValidate[i].previewUrl,
-        });
-        const wall = Date.now() - t0;
-        const detections = result?.geoReport.detections ?? [];
-        const top = [...detections].sort((a, b) => b.confidence - a.confidence)[0];
-        const raw = top?.confidence ?? 0;
-        const sure_pct = raw <= 1.5 ? Math.round(raw * 1000) / 10 : Math.round(raw * 10) / 10;
+      }, 200);
+
+      try {
+        const packed = await detectFolder(
+          validFiles.map(({ file, i }) => ({ file, filename: images[i].name })),
+          threshold / 100,
+          (done, total, current) => {
+            setBatch((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    current: current || prev.current,
+                    done: invalidCount + done,
+                    elapsedMs: Date.now() - startedAt,
+                  }
+                : prev,
+            );
+          },
+        );
+        const byName = new Map(packed.map((p) => [p.filename, p]));
+        const localEntries: ScanLogEntry[] = [];
         setBatch((prev) => {
           if (!prev) return prev;
           const rows = prev.rows.map((row) => ({ ...row }));
-          if (result?.geoReport) {
-            rows[i] = {
-              ...rows[i],
-              status: "analyzed",
-              predicted: top?.class ?? null,
-              count: detections.length,
-              sure_pct,
-              inference_ms: result.geoReport.inference_ms ?? 0,
-              preprocess_ms: result.geoReport.preprocess_ms ?? 0,
-              postprocess_ms: result.geoReport.postprocess_ms ?? 0,
-              wall_ms: wall,
-              reason: detections.length ? undefined : "Valid sonar — no contact above the confidence gate",
-            };
-          } else {
-            rows[i] = {
-              ...rows[i],
-              status: "failed",
-              reason: "Detector did not return a report",
-              wall_ms: wall,
-            };
+          for (const { i } of validFiles) {
+            const hit = byName.get(images[i].name);
+            const report = hit?.report ?? null;
+            const detections = report?.detections ?? [];
+            const top = [...detections].sort((a, b) => b.confidence - a.confidence)[0];
+            const raw = top?.confidence ?? 0;
+            const sure_pct = raw <= 1.5 ? Math.round(raw * 1000) / 10 : Math.round(raw * 10) / 10;
+            if (report) {
+              rows[i] = {
+                ...rows[i],
+                status: "analyzed",
+                predicted: top?.class ?? null,
+                count: detections.length,
+                sure_pct,
+                inference_ms: report.inference_ms ?? 0,
+                preprocess_ms: report.preprocess_ms ?? 0,
+                postprocess_ms: report.postprocess_ms ?? 0,
+                wall_ms: report.pipeline_ms ?? report.inference_ms ?? 0,
+                reason: detections.length ? undefined : "Valid sonar — no contact above the confidence gate",
+              };
+              const geoReport = geotagReport(report);
+              const placed = plotPosition(logRef.current, ...coordsFromReport(geoReport));
+              localEntries.push(
+                toLogEntry({
+                  id: `batch-${startedAt}-${i}`,
+                  filename: images[i].name,
+                  report: geoReport,
+                  overlay: afterValidate[i].previewUrl ?? null,
+                  imageUrl: afterValidate[i].previewUrl ?? null,
+                  lat: placed.lat,
+                  lon: placed.lon,
+                }),
+              );
+            } else {
+              rows[i] = {
+                ...rows[i],
+                status: "failed",
+                reason: hit?.error || "Detector did not return a report",
+                wall_ms: 0,
+              };
+            }
           }
           const analyzed = rows.filter((r) => r.status === "analyzed").length;
           const failed = rows.filter((r) => r.status === "failed").length;
@@ -610,7 +638,12 @@ export function Dashboard() {
             rows,
           };
         });
-      });
+        if (localEntries.length) {
+          setLog((prev) => mergeLogs(prev, localEntries));
+        }
+      } finally {
+        window.clearInterval(tick);
+      }
 
       setBatch((prev) =>
         prev
@@ -628,7 +661,7 @@ export function Dashboard() {
       setQueue([]);
       toast.success("Run complete — empirical graphs and PDF are on Analysis");
     },
-    [runDetect],
+    [threshold],
   );
 
   const pickMapOrigin = useCallback((lat: number, lon: number) => {
