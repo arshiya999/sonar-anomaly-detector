@@ -616,10 +616,26 @@ export function Dashboard() {
   }, [meta]);
 
   const downloadJson = () => {
-    const blob = new Blob([JSON.stringify({ surveys: log, latest: report }, null, 2)], {
-      type: "application/json",
-    });
-    triggerDownload(blob, "anomaly-report.json");
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          {
+            title: "Aqua Vision cleanup report",
+            generated: new Date().toISOString(),
+            images: log.length,
+            contacts: detectionsFromLog(log).length,
+            precision: MODEL_METRICS.precision,
+            map50: MODEL_METRICS.map50,
+            latest: report,
+            surveys: log,
+          },
+          null,
+          2,
+        ),
+      ],
+      { type: "application/json" },
+    );
+    triggerDownload(blob, "aqua-vision-report.json");
   };
 
   const downloadCsv = () => {
@@ -634,39 +650,45 @@ export function Dashboard() {
       "width_m",
       "length_m",
     ];
-    const rows = detectionsFromLog(log).map((d) =>
-      [
-        d.source ?? "",
-        d.id,
-        d.class,
-        d.confidence,
-        d.hazard_score,
-        d.latitude ?? "",
-        d.longitude ?? "",
-        d.dimensions.width_m,
-        d.dimensions.length_m,
-      ].join(","),
-    );
+    const hits = detectionsFromLog(log);
+    const rows = hits.length
+      ? hits.map((d) =>
+          [
+            d.source ?? "",
+            d.id,
+            d.class,
+            d.confidence,
+            d.hazard_score,
+            d.latitude ?? "",
+            d.longitude ?? "",
+            d.dimensions.width_m,
+            d.dimensions.length_m,
+          ].join(","),
+        )
+      : ["(none),,,,,,,,"];
     triggerDownload(
-      new Blob([[headers.join(","), ...rows].join("\n")], { type: "text/csv" }),
-      "anomaly-report.csv",
+      new Blob([[headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" }),
+      "aqua-vision-report.csv",
     );
   };
 
   const downloadBriefing = () => {
-    const rows = detectionsFromLog(log)
-      .map(
-        (d) =>
-          `<tr><td>${d.source ?? ""}</td><td>${d.id}</td><td>${CLASS_LABEL[d.class] ?? d.class}</td><td>${d.confidence.toFixed(0)}%</td><td>${d.hazard_score}</td><td>${d.latitude ?? "—"}, ${d.longitude ?? "—"}</td></tr>`,
-      )
-      .join("");
+    const hits = detectionsFromLog(log);
+    const rows = hits.length
+      ? hits
+          .map(
+            (d) =>
+              `<tr><td>${d.source ?? ""}</td><td>${d.id}</td><td>${CLASS_LABEL[d.class] ?? d.class}</td><td>${d.confidence.toFixed(0)}%</td><td>${d.hazard_score}</td><td>${d.latitude ?? "—"}, ${d.longitude ?? "—"}</td></tr>`,
+          )
+          .join("")
+      : `<tr><td colspan="6">No contacts yet. Run Analyze, then download again.</td></tr>`;
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Aqua Vision briefing</title>
 <style>body{font-family:ui-sans-serif,system-ui;background:#cfeaf3;color:#083344;padding:32px}h1{color:#0369a1}table{border-collapse:collapse;width:100%;background:#fff}td,th{border:1px solid #7dd3fc;padding:8px;text-align:left}</style>
 </head><body><h1>Aqua Vision cleanup briefing</h1>
-<p>${log.length} sonar images · ${allDetections.length} contacts</p>
+<p>${log.length} sonar images · ${hits.length} contacts · precision ${MODEL_METRICS.precision} · mAP@50 ${MODEL_METRICS.map50}</p>
 <table><thead><tr><th>Image</th><th>ID</th><th>Class</th><th>Conf</th><th>Hazard</th><th>Lat, Lon</th></tr></thead><tbody>${rows}</tbody></table>
-<p>Trained YOLO11n mAP@50 74.9% on SCTD + Marine Debris FLS + SeabedObjects-KLSG.</p></body></html>`;
-    triggerDownload(new Blob([html], { type: "text/html" }), "aqua-vision-briefing.html");
+</body></html>`;
+    triggerDownload(new Blob([html], { type: "text/html;charset=utf-8" }), "aqua-vision-briefing.html");
   };
 
   const downloadPdf = () => {
@@ -674,25 +696,30 @@ export function Dashboard() {
     const lines = [
       `Generated ${new Date().toISOString()}`,
       `${log.length} sonar images · ${rows.length} contacts`,
+      `Precision ${MODEL_METRICS.precision} · mAP@50 ${MODEL_METRICS.map50}`,
       "",
-      ...log.map((e) => {
-        const top = [...e.detections].sort((a, b) => b.confidence - a.confidence)[0];
-        const cls = top ? CLASS_LABEL[top.class] ?? top.class : "no detection";
-        const gps =
-          e.latitude != null && e.longitude != null
-            ? `${e.latitude.toFixed(5)}, ${e.longitude.toFixed(5)}`
-            : "unmapped";
-        return `${formatIst(e.at)} | ${e.filename} | ${cls} | hits ${e.count} | ${gps}`;
-      }),
+      ...(log.length
+        ? log.map((e) => {
+            const top = [...e.detections].sort((a, b) => b.confidence - a.confidence)[0];
+            const cls = top ? CLASS_LABEL[top.class] ?? top.class : "no detection";
+            const gps =
+              e.latitude != null && e.longitude != null
+                ? `${e.latitude.toFixed(5)}, ${e.longitude.toFixed(5)}`
+                : "unmapped";
+            return `${formatIst(e.at)} | ${e.filename} | ${cls} | hits ${e.count} | ${gps}`;
+          })
+        : ["No images in this session yet."]),
       "",
       "Contacts",
-      ...rows.map((d) => {
-        const gps =
-          d.latitude != null && d.longitude != null
-            ? `${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}`
-            : "unmapped";
-        return `${d.source ?? ""} | ${CLASS_LABEL[d.class] ?? d.class} | ${d.confidence.toFixed(0)}% | hazard ${d.hazard_score} | ${gps}`;
-      }),
+      ...(rows.length
+        ? rows.map((d) => {
+            const gps =
+              d.latitude != null && d.longitude != null
+                ? `${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}`
+                : "unmapped";
+            return `${d.source ?? ""} | ${CLASS_LABEL[d.class] ?? d.class} | ${d.confidence.toFixed(0)}% | hazard ${d.hazard_score} | ${gps}`;
+          })
+        : ["None"]),
     ];
     triggerDownload(textLinesToPdf("Aqua Vision cleanup report", lines), "aqua-vision-report.pdf");
   };
@@ -1374,14 +1401,6 @@ function UploadPage({
             <Images />
             Add files (select many)
           </Button>
-          <a
-            href="/aqua-vision-check-kit.zip"
-            download
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-cyan-700 bg-white text-sm font-medium text-cyan-900 hover:bg-cyan-50"
-          >
-            <Download className="size-4" />
-            Download 30 valid + 5 invalid test images
-          </a>
           <p className="text-xs text-slate-600">
             In the file window hold <strong>Ctrl</strong> (Windows) or <strong>Cmd</strong> (Mac) and click each
             sonar image, or click the first then <strong>Shift+click</strong> the last. Do not use the phone
@@ -1703,7 +1722,7 @@ function ReportPage({
             </p>
           </div>
           <DownloadMenu
-            disabled={!hasData}
+            disabled={false}
             downloadJson={downloadJson}
             downloadCsv={downloadCsv}
             downloadBriefing={downloadBriefing}
@@ -1824,7 +1843,7 @@ function HistoryPage({
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle>Survey history</CardTitle>
         <DownloadMenu
-          disabled={log.length === 0}
+          disabled={false}
           downloadJson={downloadJson}
           downloadCsv={downloadCsv}
           downloadBriefing={downloadBriefing}
@@ -2130,6 +2149,11 @@ function triggerDownload(blob: Blob, name: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
+  a.rel = "noopener";
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  window.open(url, "_blank", "noopener,noreferrer");
+  window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
+  toast.success(`${name} saved — also opened in a new tab`);
 }

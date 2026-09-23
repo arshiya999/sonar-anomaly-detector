@@ -47,9 +47,9 @@ export type BatchRun = {
 };
 
 const TOOLTIP = {
-  background: "#0c4a6e",
-  border: "1px solid #22d3ee",
-  borderRadius: 10,
+  background: "linear-gradient(180deg, #083344 0%, #0c4a6e 100%)",
+  border: "1px solid #5eead4",
+  borderRadius: 12,
   fontSize: 12,
   color: "#ecfeff",
 };
@@ -156,7 +156,14 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
   ];
 
   return (
-    <div id="sih-batch-results" className="overflow-hidden rounded-2xl border border-cyan-700 bg-[#082f49] p-5 text-cyan-50">
+    <div
+      id="sih-batch-results"
+      className="overflow-hidden rounded-2xl border border-cyan-400/40 p-5 text-cyan-50 shadow-[inset_0_1px_0_rgba(165,243,252,0.25)]"
+      style={{
+        background:
+          "radial-gradient(1200px 400px at 10% -10%, rgba(45,212,191,0.22), transparent 50%), radial-gradient(800px 320px at 100% 0%, rgba(56,189,248,0.18), transparent 45%), linear-gradient(180deg, #042f2e 0%, #0c4a6e 55%, #082f49 100%)",
+      }}
+    >
       <p className="font-heading text-xl font-bold text-white">Batch results</p>
       <p className="mt-1 text-xs text-cyan-200">
         One X–Y graph, two halves. Green left = valid sonar. Red right = colour photos (tiger etc.) rejected
@@ -172,7 +179,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {cards.map((c) => (
-          <div key={c.k} className="rounded-xl border border-cyan-700/80 bg-cyan-950/50 px-3 py-2">
+          <div key={c.k} className="rounded-xl border border-teal-200/30 bg-cyan-950/40 px-3 py-2 shadow-[inset_0_1px_0_rgba(165,243,252,0.2)]">
             <p className="text-[10px] tracking-wide text-cyan-300 uppercase">{c.k}</p>
             <p className="mt-0.5 text-lg font-semibold text-white">{c.v}</p>
             <p className="text-[11px] text-cyan-200/80">{c.d}</p>
@@ -185,7 +192,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
           Add files on Upload, then Analyze. Put sonar and a colour photo in the same run to see both halves.
         </p>
       ) : (
-        <div className="mt-5 rounded-xl bg-cyan-950/30 p-3">
+        <div className="mt-5 rounded-xl border border-cyan-300/20 bg-[#023047]/50 p-3 shadow-inner">
           <div className="mb-2 flex flex-wrap gap-3 text-xs">
             <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-emerald-200">
               Left · valid sonar ({validN})
@@ -197,38 +204,42 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={points} margin={{ top: 36, right: 44, left: 12, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#155e75" />
+                <CartesianGrid strokeDasharray="4 6" stroke="#155e75" strokeOpacity={0.65} />
                 {split > 0 ? (
-                  <ReferenceArea yAxisId="left" x1={0.5} x2={split + 0.5} fill="#34d399" fillOpacity={0.08} />
+                  <ReferenceArea yAxisId="left" x1={0.5} x2={split + 0.5} fill="#2dd4bf" fillOpacity={0.12} />
                 ) : null}
                 {invalidN > 0 ? (
-                  <ReferenceArea yAxisId="left" x1={split + 0.5} x2={xMax + 0.5} fill="#f87171" fillOpacity={0.12} />
+                  <ReferenceArea yAxisId="left" x1={split + 0.5} x2={xMax + 0.5} fill="#67e8f9" fillOpacity={0.08} />
                 ) : null}
                 {split > 0 && invalidN > 0 ? (
                   <ReferenceLine
                     yAxisId="left"
                     x={split + 0.5}
-                    stroke="#fef3c7"
+                    stroke="#99f6e4"
                     strokeDasharray="4 3"
-                    label={{ value: "valid | invalid", fill: "#fef3c7", fontSize: 11, position: "insideTopRight" }}
+                    label={{ value: "valid | invalid", fill: "#ccfbf1", fontSize: 11, position: "insideTopRight" }}
                   />
                 ) : null}
                 <XAxis
                   dataKey="i"
-                  tick={{ fill: "#bae6fd", fontSize: 11 }}
+                  tick={{ fill: "#a5f3fc", fontSize: 11 }}
                   tickFormatter={(v) => (v <= split ? `V${v}` : `I${v - split}`)}
+                  axisLine={{ stroke: "#5eead4" }}
+                  tickLine={{ stroke: "#5eead4" }}
                 />
                 <YAxis
                   yAxisId="left"
                   allowDecimals={false}
-                  tick={{ fill: "#bae6fd", fontSize: 11 }}
-                  label={{ value: "Cumulative count", angle: -90, position: "insideLeft", fill: "#a5f3fc" }}
+                  tick={{ fill: "#99f6e4", fontSize: 11 }}
+                  axisLine={{ stroke: "#5eead4" }}
+                  label={{ value: "Cumulative count", angle: -90, position: "insideLeft", fill: "#5eead4" }}
                 />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tick={{ fill: "#fde68a", fontSize: 11 }}
-                  label={{ value: "Latency (ms)", angle: 90, position: "insideRight", fill: "#fde68a" }}
+                  tick={{ fill: "#a5f3fc", fontSize: 11 }}
+                  axisLine={{ stroke: "#67e8f9" }}
+                  label={{ value: "Latency (ms)", angle: 90, position: "insideRight", fill: "#67e8f9" }}
                 />
                 <Tooltip
                   contentStyle={TOOLTIP}
@@ -243,34 +254,34 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                   align="center"
                   wrapperStyle={{ fontSize: 12, color: "#ecfeff", paddingBottom: 8 }}
                 />
-                <Line yAxisId="left" type="monotone" dataKey="valid" name="Valid sonar" stroke="#34d399" strokeWidth={2.6} dot={{ r: 3 }} />
+                <Line yAxisId="left" type="monotone" dataKey="valid" name="Valid sonar" stroke="#5eead4" strokeWidth={2.8} dot={{ r: 3, fill: "#99f6e4" }} />
                 <Line
                   yAxisId="left"
                   type="monotone"
                   dataKey="identified"
                   name="Successfully identified"
                   stroke="#38bdf8"
-                  strokeWidth={2.4}
-                  dot={{ r: 3 }}
+                  strokeWidth={2.6}
+                  dot={{ r: 3, fill: "#7dd3fc" }}
                 />
-                <Line yAxisId="left" type="monotone" dataKey="failed" name="Failed" stroke="#fbbf24" strokeWidth={2} dot={false} />
+                <Line yAxisId="left" type="monotone" dataKey="failed" name="Failed" stroke="#67e8f9" strokeWidth={2} dot={false} />
                 <Line
                   yAxisId="left"
                   type="monotone"
                   dataKey="invalid"
                   name="Invalid (not sonar)"
-                  stroke="#f87171"
-                  strokeWidth={3}
-                  dot={{ r: 4, fill: "#f87171" }}
+                  stroke="#fb7185"
+                  strokeWidth={2.8}
+                  dot={{ r: 4, fill: "#fda4af" }}
                 />
                 <Line
                   yAxisId="right"
                   type="monotone"
                   dataKey="latency"
                   name="Latency (ms)"
-                  stroke="#fde68a"
+                  stroke="#a5f3fc"
                   strokeWidth={2}
-                  strokeDasharray="5 4"
+                  strokeDasharray="6 4"
                   dot={false}
                   connectNulls={false}
                 />

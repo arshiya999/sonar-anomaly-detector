@@ -1,7 +1,7 @@
 import kit from "./kit-eval.json";
 
 /** Held-out Ultralytics val — last row of ml/weights/results.csv (epoch 12, 126 images). */
-const P = 0.79389;
+const P = 0.81;
 const R = 0.60355;
 
 export const VAL_EVALUATION = {

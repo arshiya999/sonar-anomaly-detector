@@ -1,13 +1,20 @@
-/** Minimal PDF 1.4 writer for operator reports (no extra dependency). */
+/** Minimal PDF 1.4 writer for operator reports (ASCII-only, no extra dependency). */
+
+function toAscii(text: string): string {
+  return Array.from(text)
+    .map((ch) => (ch.charCodeAt(0) < 128 ? ch : "?"))
+    .join("");
+}
 
 function pdfEscape(text: string): string {
-  return text.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+  return toAscii(text).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
 function wrapLine(line: string, width: number): string[] {
-  if (line.length <= width) return [line || " "];
+  const clean = toAscii(line);
+  if (clean.length <= width) return [clean || " "];
   const out: string[] = [];
-  let rest = line;
+  let rest = clean;
   while (rest.length > width) {
     let cut = rest.lastIndexOf(" ", width);
     if (cut < 20) cut = width;
@@ -22,11 +29,12 @@ export function textLinesToPdf(title: string, lines: string[]): Blob {
   const pageWidth = 595;
   const pageHeight = 842;
   const margin = 48;
-  const maxLines = 48;
+  const maxLines = 46;
   const chunks: string[][] = [];
-  let buf: string[] = [title, " "];
-  for (const line of lines) {
-    for (const w of wrapLine(line, 90)) {
+  let buf: string[] = [toAscii(title), " "];
+  const source = lines.length ? lines : ["No contacts in this session yet. Run Analyze, then download again."];
+  for (const line of source) {
+    for (const w of wrapLine(line, 88)) {
       if (buf.length >= maxLines) {
         chunks.push(buf);
         buf = [];
@@ -40,9 +48,10 @@ export function textLinesToPdf(title: string, lines: string[]): Blob {
   objects.push("<< /Type /Catalog /Pages 2 0 R >>");
   const fontObj = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
   const contents = chunks.map((chunk, pageIdx) => {
-    const cmds = ["BT", `${margin} ${pageHeight - margin} Td`, "14 TL"];
+    const cmds = ["BT", "/F1 11 Tf", "14 TL", `${margin} ${pageHeight - margin} Td`];
     chunk.forEach((line, idx) => {
-      cmds.push(pageIdx === 0 && idx === 0 ? "/F1 16 Tf" : "/F1 11 Tf");
+      if (pageIdx === 0 && idx === 0) cmds.push("/F1 16 Tf");
+      else if (pageIdx === 0 && idx === 1) cmds.push("/F1 11 Tf");
       cmds.push(`(${pdfEscape(line)}) Tj`);
       cmds.push("T*");
     });
@@ -79,5 +88,6 @@ export function textLinesToPdf(title: string, lines: string[]): Blob {
   }
   out.push(xref);
   out.push(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF\n`);
-  return new Blob(out, { type: "application/pdf" });
+  const bytes = new Uint8Array(out.join("").split("").map((c) => c.charCodeAt(0) & 0xff));
+  return new Blob([bytes], { type: "application/pdf" });
 }

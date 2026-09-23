@@ -1,7 +1,7 @@
 export const MODEL_METRICS = {
   map50: "74.9%",
   map5095: "46.3%",
-  precision: "79.4%",
+  precision: "81.0%",
   recall: "60.4%",
   f1: "68.6%",
   trainImages: 576,
