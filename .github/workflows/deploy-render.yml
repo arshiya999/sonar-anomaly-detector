@@ -1,0 +1,36 @@
+# Redeploy Render ML + ops when a deploy hook is stored as a GitHub secret.
+name: deploy-render
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ml/**"
+      - "backend/**"
+      - "Dockerfile.ml"
+      - "Dockerfile.api"
+      - "render.yaml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger Render
+        env:
+          RENDER_DEPLOY_HOOK_ML: ${{ secrets.RENDER_DEPLOY_HOOK_ML }}
+          RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+        run: |
+          ok=0
+          if [ -n "$RENDER_DEPLOY_HOOK_ML" ]; then
+            curl -fsS -X POST "$RENDER_DEPLOY_HOOK_ML"
+            ok=1
+          fi
+          if [ -n "$RENDER_DEPLOY_HOOK_API" ]; then
+            curl -fsS -X POST "$RENDER_DEPLOY_HOOK_API"
+            ok=1
+          fi
+          if [ "$ok" -eq 0 ]; then
+            echo "No Render deploy hooks in GitHub secrets. Services stay at aquavision-ml and aquavision-backend-7iuh until a hook is added or Git auto-deploy runs."
+          fi

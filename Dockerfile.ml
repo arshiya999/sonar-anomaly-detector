@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir -r /app/ml/requirements.txt
 COPY ml /app/ml
 WORKDIR /app/ml
 EXPOSE 8765
-CMD ["python", "-m", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8765"]
+CMD ["sh", "-c", "python -m uvicorn server:app --host 0.0.0.0 --port ${PORT:-8765}"]

@@ -8,4 +8,4 @@ COPY backend backend
 COPY ml ml
 ENV PYTHONPATH=/app/backend
 EXPOSE 8766
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8766"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8766}"]

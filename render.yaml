@@ -1,13 +1,34 @@
-# Single public URL on Render: https://your-service.onrender.com
-# Dashboard: New → Blueprint → connect this GitHub repo after you click Create repo.
+# Render: detector + ops API (not the Next.js UI — that stays on Vercel).
+# Dashboard: New → Blueprint → this GitHub repo, branch main.
+# Existing public URLs:
+#   https://aquavision-ml.onrender.com
+#   https://aquavision-backend-7iuh.onrender.com
+
 services:
   - type: web
-    name: abyss
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    healthCheckPath: /
+    name: aquavision-ml
+    runtime: python
+    plan: free
+    buildCommand: pip install -r ml/requirements.txt
+    startCommand: python -m uvicorn --app-dir ml server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
-      - key: PORT
-        value: 10000
-      - key: ML_API_URL
-        value: http://127.0.0.1:8765
+      - key: PYTHON_VERSION
+        value: "3.11.11"
+      - key: CORS_ORIGINS
+        value: "*"
+
+  - type: web
+    name: aquavision-backend-7iuh
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt -r ml/requirements.txt
+    startCommand: PYTHONPATH=backend python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: MODEL_PATH
+        value: ml/weights/sonar-debris-yolo11n.pt
