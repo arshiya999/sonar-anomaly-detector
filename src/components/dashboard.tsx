@@ -1216,9 +1216,57 @@ function UploadPage({
   onRerun: () => void;
 }) {
   const [dragging, setDragging] = useState(false);
+  const manyRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
   const take = (list: FileList | File[] | null) => {
     if (!list) return;
     onStage(Array.from(list));
+  };
+
+  const pickManyWithSystemDialog = async () => {
+    const w = window as Window & {
+      showOpenFilePicker?: (opts: {
+        multiple: boolean;
+        excludeAcceptAllOption?: boolean;
+      }) => Promise<Array<{ getFile: () => Promise<File> }>>;
+      showDirectoryPicker?: () => Promise<{
+        values: () => AsyncIterable<{ kind: string; getFile?: () => Promise<File> }>;
+      }>;
+    };
+    try {
+      if (typeof w.showDirectoryPicker === "function") {
+        const dir = await w.showDirectoryPicker();
+        const out: File[] = [];
+        const walk = async (handle: {
+          values: () => AsyncIterable<{
+            kind: string;
+            getFile?: () => Promise<File>;
+            values?: () => AsyncIterable<unknown>;
+          }>;
+        }) => {
+          for await (const entry of handle.values()) {
+            if (entry.kind === "file" && entry.getFile) out.push(await entry.getFile());
+            else if (entry.kind === "directory" && entry.values) await walk(entry as typeof handle);
+          }
+        };
+        await walk(dir);
+        if (out.length) {
+          take(out);
+          return;
+        }
+      }
+      if (typeof w.showOpenFilePicker === "function") {
+        const handles = await w.showOpenFilePicker({
+          multiple: true,
+          excludeAcceptAllOption: false,
+        });
+        take(await Promise.all(handles.map((h) => h.getFile())));
+        return;
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+    }
+    folderRef.current?.click();
   };
 
   return (
@@ -1227,11 +1275,56 @@ function UploadPage({
         <CardHeader>
           <CardTitle>Batch upload</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Add at least 100 sonar frames, then start. The accuracy graph is built from this run.
+            Do not use the phone Camera or Photos gallery — that only allows one picture. Use a folder or the
+            Files picker so 100 images load together.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <label
+          <input
+            ref={manyRef}
+            type="file"
+            multiple
+            className="sr-only"
+            disabled={busy}
+            onChange={(e) => {
+              take(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={folderRef}
+            type="file"
+            multiple
+            className="sr-only"
+            disabled={busy}
+            {...({ webkitdirectory: true, directory: true } as Record<string, boolean>)}
+            onChange={(e) => {
+              take(e.target.files);
+              e.target.value = "";
+            }}
+          />
+
+          <Button className="h-12 w-full text-base" disabled={busy} onClick={() => void pickManyWithSystemDialog()}>
+            <FolderOpen />
+            Pick a whole folder (100+ images)
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full"
+            disabled={busy}
+            onClick={() => manyRef.current?.click()}
+          >
+            <Images />
+            Pick many files in one list
+          </Button>
+          <p className="text-xs text-slate-600">
+            After “Pick many files”: switch the dialog to <strong>Browse / Files / This PC</strong> — not
+            Camera. Then Ctrl+A (Windows) or Cmd+A (Mac), or Shift+click from first to last. On a phone use
+            the Files app, not the photo gallery.
+          </p>
+
+          <div
             onDragEnter={(e) => {
               e.preventDefault();
               setDragging(true);
@@ -1246,44 +1339,12 @@ function UploadPage({
               setDragging(false);
               take(e.dataTransfer.files);
             }}
-            className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-center ${
-              dragging ? "border-cyan-700 bg-cyan-50" : "border-cyan-300 bg-slate-50"
+            className={`rounded-xl border-2 border-dashed px-4 py-8 text-center text-sm ${
+              dragging ? "border-cyan-700 bg-cyan-50" : "border-cyan-300 bg-slate-50 text-slate-600"
             }`}
           >
-            <Images className="size-8 text-cyan-800" />
-            <span className="text-sm font-semibold text-slate-900">Select many images at once</span>
-            <span className="text-xs text-slate-600">
-              In the file window: click the first file, scroll, Shift+click the last — or Ctrl+A (Cmd+A on Mac).
-              Phone: tap Select / Select items, then pick many photos.
-            </span>
-            <input
-              type="file"
-              accept="image/*,.tif,.tiff"
-              multiple
-              className="mt-1 block w-full max-w-full text-xs file:mr-2 file:rounded-md file:border-0 file:bg-cyan-800 file:px-3 file:py-1.5 file:text-white"
-              disabled={busy}
-              onChange={(e) => {
-                take(e.target.files);
-                e.target.value = "";
-              }}
-            />
-          </label>
-
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-cyan-700 bg-cyan-800 px-3 py-2.5 text-sm font-medium text-white">
-            <FolderOpen className="size-4" />
-            Or choose a whole folder
-            <input
-              type="file"
-              multiple
-              className="sr-only"
-              disabled={busy}
-              {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
-              onChange={(e) => {
-                take(e.target.files);
-                e.target.value = "";
-              }}
-            />
-          </label>
+            Or drag a folder / many files from your desktop and drop them here.
+          </div>
 
           <div
             className={`rounded-lg px-3 py-2 text-sm ${
