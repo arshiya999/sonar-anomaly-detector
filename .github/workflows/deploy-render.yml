@@ -1,4 +1,6 @@
-# Redeploy Render ML + ops when a deploy hook is stored as a GitHub secret.
+# Redeploy ML + ops on Render when backend/ml changes land on main.
+# Uses RENDER_API_KEY (GitHub Actions secret). Git auto-deploy on the
+# Render services also runs from the connected GitHub repo.
 name: deploy-render
 
 on:
@@ -19,18 +21,35 @@ jobs:
     steps:
       - name: Trigger Render
         env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_DEPLOY_HOOK_ML: ${{ secrets.RENDER_DEPLOY_HOOK_ML }}
           RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
         run: |
+          set -euo pipefail
           ok=0
-          if [ -n "$RENDER_DEPLOY_HOOK_ML" ]; then
+          if [ -n "${RENDER_API_KEY:-}" ]; then
+            for sid in srv-daq13hg473hc73e4codg srv-daq13kl9fdbs73egdr50; do
+              code=$(curl -sS -o /tmp/render-deploy.json -w "%{http_code}" \
+                -X POST "https://api.render.com/v1/services/${sid}/deploys" \
+                -H "Authorization: Bearer ${RENDER_API_KEY}" \
+                -H "Accept: application/json" \
+                -H "Content-Type: application/json" \
+                -d '{}')
+              echo "deploy ${sid} HTTP ${code}"
+              cat /tmp/render-deploy.json
+              echo
+              ok=1
+            done
+          fi
+          if [ -n "${RENDER_DEPLOY_HOOK_ML:-}" ]; then
             curl -fsS -X POST "$RENDER_DEPLOY_HOOK_ML"
             ok=1
           fi
-          if [ -n "$RENDER_DEPLOY_HOOK_API" ]; then
+          if [ -n "${RENDER_DEPLOY_HOOK_API:-}" ]; then
             curl -fsS -X POST "$RENDER_DEPLOY_HOOK_API"
             ok=1
           fi
           if [ "$ok" -eq 0 ]; then
-            echo "No Render deploy hooks in GitHub secrets. Services stay at aquavision-ml and aquavision-backend-7iuh until a hook is added or Git auto-deploy runs."
+            echo "RENDER_API_KEY is missing. Git auto-deploy on Render still runs for the connected repo."
+            exit 0
           fi
