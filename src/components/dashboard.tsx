@@ -453,6 +453,9 @@ export function Dashboard() {
         postprocess_ms: 0,
         wall_ms: 0,
         previewUrl: URL.createObjectURL(f),
+        file_kb: Math.max(1, Math.round(f.size / 1024)),
+        check_ms: 0,
+        colour_pct: 0,
       }));
       setBatch({
         uploaded: images.length,
@@ -477,8 +480,9 @@ export function Dashboard() {
       toast.message(`Checking ${images.length} files, then analyzing valid sonar in parallel`);
 
       const checks = await mapPool(images, 6, async (file, i) => {
+        const t0 = Date.now();
         const v = await validateSonarFile(file);
-        return { file, i, v };
+        return { file, i, v, check_ms: Date.now() - t0 };
       });
       if (batchCancel.current) {
         setBusy(false);
@@ -488,12 +492,14 @@ export function Dashboard() {
       const validFiles: { file: File; i: number }[] = [];
       let invalidCount = 0;
       const afterValidate: BatchRow[] = seedRows.map((row) => ({ ...row }));
-      for (const { i, v } of checks) {
+      for (const { i, v, check_ms } of checks) {
+        const colour_pct = Math.round((v.meanSat ?? 0) * 100);
+        afterValidate[i] = { ...afterValidate[i], check_ms, colour_pct };
         if (v.ok) {
           validFiles.push({ file: images[i], i });
         } else {
           invalidCount += 1;
-          afterValidate[i] = { ...afterValidate[i], status: "invalid", reason: v.reason };
+          afterValidate[i] = { ...afterValidate[i], status: "invalid", reason: v.reason, check_ms, colour_pct };
         }
       }
       setBatch((prev) =>

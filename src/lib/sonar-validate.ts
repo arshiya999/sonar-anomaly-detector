@@ -1,5 +1,5 @@
-export type ValidateOk = { ok: true };
-export type ValidateFail = { ok: false; reason: string };
+export type ValidateOk = { ok: true; meanSat: number; highFrac: number };
+export type ValidateFail = { ok: false; reason: string; meanSat: number; highFrac: number };
 export type ValidateResult = ValidateOk | ValidateFail;
 
 const EXT = /\.(png|jpe?g|webp|tif{1,2}|bmp)$/i;
@@ -26,7 +26,7 @@ export function sonarLikelyFromPixels(
   data: Uint8ClampedArray,
 ): ValidateResult {
   const n = Math.floor(data.length / 4);
-  if (n < 16) return { ok: false, reason: "Image has no readable pixels" };
+  if (n < 16) return { ok: false, reason: "Image has no readable pixels", meanSat: 0, highFrac: 0 };
   let satSum = 0;
   let highSat = 0;
   let cx = 0;
@@ -52,33 +52,35 @@ export function sonarLikelyFromPixels(
     return {
       ok: false,
       reason: "Looks like a normal colour photograph, not side-scan sonar (rejected before YOLO)",
+      meanSat,
+      highFrac,
     };
   }
-  return { ok: true };
+  return { ok: true, meanSat, highFrac };
 }
 
 export async function validateSonarFile(file: File): Promise<ValidateResult> {
-  if (file.size < 512) return { ok: false, reason: "File too small to be a sonar ping" };
-  if (file.size > 64 * 1024 * 1024) return { ok: false, reason: "File larger than 64 MB" };
+  if (file.size < 512) return { ok: false, reason: "File too small to be a sonar ping", meanSat: 0, highFrac: 0 };
+  if (file.size > 64 * 1024 * 1024) return { ok: false, reason: "File larger than 64 MB", meanSat: 0, highFrac: 0 };
   if (!EXT.test(file.name) && !/^image\//.test(file.type)) {
-    return { ok: false, reason: "Not a supported image (JPEG, PNG, WebP, or TIFF)" };
+    return { ok: false, reason: "Not a supported image (JPEG, PNG, WebP, or TIFF)", meanSat: 0, highFrac: 0 };
   }
 
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    return { ok: false, reason: "File could not be decoded as an image" };
+    return { ok: false, reason: "File could not be decoded as an image", meanSat: 0, highFrac: 0 };
   }
   try {
     if (bitmap.width < 48 || bitmap.height < 48) {
-      return { ok: false, reason: "Image is too small for side-scan analysis" };
+      return { ok: false, reason: "Image is too small for side-scan analysis", meanSat: 0, highFrac: 0 };
     }
     const canvas = document.createElement("canvas");
     canvas.width = 64;
     canvas.height = 64;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return { ok: true };
+    if (!ctx) return { ok: true, meanSat: 0, highFrac: 0 };
     ctx.drawImage(bitmap, 0, 0, 64, 64);
     return sonarLikelyFromPixels(ctx.getImageData(0, 0, 64, 64).data);
   } finally {

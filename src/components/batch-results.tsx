@@ -26,6 +26,9 @@ export type BatchRow = {
   postprocess_ms: number;
   wall_ms: number;
   previewUrl?: string;
+  check_ms?: number;
+  file_kb?: number;
+  colour_pct?: number;
 };
 
 export type BatchRun = {
@@ -112,36 +115,27 @@ export function summarizeBatch(run: BatchRun | null) {
 
 function validSeries(run: BatchRun | null) {
   const rows = (run?.rows ?? []).filter((r) => r.status !== "invalid");
-  let valid = 0;
-  let identified = 0;
-  let failed = 0;
-  return rows.map((row, idx) => {
-    valid += 1;
-    if (row.status === "analyzed") identified += 1;
-    if (row.status === "failed") failed += 1;
-    return {
-      i: idx + 1,
-      name: row.filename,
-      valid,
-      identified,
-      failed,
-      latency: row.wall_ms || row.inference_ms || 0,
-    };
-  });
+  return rows.map((row, idx) => ({
+    i: idx + 1,
+    name: row.filename,
+    contacts: row.count,
+    identified: row.status === "analyzed" && row.count > 0 ? 1 : 0,
+    failed: row.status === "failed" ? 1 : 0,
+    latency: row.wall_ms || 0,
+    inference: row.inference_ms || 0,
+  }));
 }
 
 function invalidSeries(run: BatchRun | null) {
   const rows = (run?.rows ?? []).filter((r) => r.status === "invalid");
-  let invalid = 0;
-  return rows.map((row, idx) => {
-    invalid += 1;
-    return {
-      i: idx + 1,
-      name: row.filename,
-      invalid,
-      reason: row.reason ?? "Not side-scan sonar",
-    };
-  });
+  return rows.map((row, idx) => ({
+    i: idx + 1,
+    name: row.filename,
+    colour: Math.round(row.colour_pct ?? 0),
+    check: row.check_ms || 0,
+    size: row.file_kb || 0,
+    reason: row.reason ?? "Not side-scan sonar",
+  }));
 }
 
 export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
@@ -170,7 +164,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
     >
       <p className="font-heading text-xl font-bold text-white drop-shadow">Batch results</p>
       <p className="mt-1 text-xs font-medium text-cyan-50">
-        Two graphs. Left: valid sonar (counts + latency). Right: colour photos rejected before YOLO.
+        Two graphs. Left: per-frame contacts and time. Right: rejected photos by colour and check time.
       </p>
 
       {run && !run.finished ? (
@@ -202,7 +196,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
           <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
             <p className="text-sm font-semibold text-cyan-50">Valid sonar</p>
             <p className="mb-2 text-[11px] text-cyan-100">
-              Left axis = valid frames and how many were identified. Right axis = latency (ms) for that frame.
+              Each point is one ping. Lines rise and fall with contacts on that frame and how long it took.
             </p>
             {valid.length === 0 ? (
               <p className="grid h-[320px] place-items-center text-sm text-cyan-100">No valid sonar in this run.</p>
@@ -216,7 +210,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                       yAxisId="left"
                       allowDecimals={false}
                       tick={{ fill: "#90e0ef", fontSize: 11 }}
-                      label={{ value: "Count", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
+                      label={{ value: "Contacts this frame", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
                     />
                     <YAxis
                       yAxisId="right"
@@ -231,27 +225,36 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                         return name ? `Valid ${v} · ${name}` : `Valid ${v}`;
                       }}
                     />
-                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
-                    <Line yAxisId="left" type="monotone" dataKey="valid" name="Valid sonar" stroke="#00f5d4" strokeWidth={3.4} dot={{ r: 4, fill: "#80ffdb" }} />
+                    <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} /> />
+                    <Line yAxisId="left" type="linear" dataKey="contacts" name="Contacts this frame" stroke="#00f5d4" strokeWidth={3.4} dot={{ r: 4, fill: "#80ffdb" }} />
                     <Line
                       yAxisId="left"
-                      type="monotone"
+                      type="linear"
                       dataKey="identified"
-                      name="Successfully identified"
+                      name="Hit this frame (0/1)"
                       stroke="#0096c7"
                       strokeWidth={3}
                       dot={{ r: 4, fill: "#00b4d8" }}
                     />
-                    <Line yAxisId="left" type="monotone" dataKey="failed" name="Failed" stroke="#ffe66d" strokeWidth={2.4} dot={false} />
+                    <Line yAxisId="left" type="linear" dataKey="failed" name="Failed this frame (0/1)" stroke="#ffe66d" strokeWidth={2.4} dot={{ r: 3, fill: "#ffe66d" }} />
                     <Line
                       yAxisId="right"
-                      type="monotone"
+                      type="linear"
                       dataKey="latency"
-                      name="Latency (ms)"
+                      name="Time this frame (ms)"
                       stroke="#48cae4"
                       strokeWidth={2.2}
                       strokeDasharray="6 4"
-                      dot={false}
+                      dot={{ r: 3, fill: "#90e0ef" }}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="linear"
+                      dataKey="inference"
+                      name="YOLO ms"
+                      stroke="#80ffdb"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: "#00f5d4" }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -263,7 +266,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
           <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
             <p className="text-sm font-semibold text-cyan-50">Invalid — not sonar</p>
             <p className="mb-2 text-[11px] text-cyan-100">
-              Tiger, garden, and other colour photos. Counted here and never sent to YOLO.
+              Each rejected file is a point. Colour-ness and check time go up and down file by file.
             </p>
             {invalid.length === 0 ? (
               <p className="grid h-[320px] place-items-center px-4 text-center text-sm text-cyan-100">
@@ -276,9 +279,15 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                     <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.55} />
                     <XAxis dataKey="i" tick={{ fill: "#90e0ef", fontSize: 11 }} axisLine={{ stroke: "#0096c7" }} />
                     <YAxis
-                      allowDecimals={false}
+                      yAxisId="left"
                       tick={{ fill: "#90e0ef", fontSize: 11 }}
-                      label={{ value: "Rejected count", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
+                      label={{ value: "Colour % / check ms", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fill: "#ffe66d", fontSize: 11 }}
+                      label={{ value: "File size (KB)", angle: 90, position: "insideRight", fill: "#ffe66d" }}
                     />
                     <Tooltip
                       contentStyle={TOOLTIP}
@@ -287,14 +296,34 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                         return row?.name ? `Invalid ${v} · ${row.name}` : `Invalid ${v}`;
                       }}
                     />
-                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
+                    <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} /> />
                     <Line
-                      type="monotone"
-                      dataKey="invalid"
-                      name="Invalid (rejected)"
+                      yAxisId="left"
+                      type="linear"
+                      dataKey="colour"
+                      name="Colour-ness (%)"
                       stroke="#00f5d4"
                       strokeWidth={3.4}
                       dot={{ r: 4, fill: "#80ffdb" }}
+                    />
+                    <Line
+                      yAxisId="left"
+                      type="linear"
+                      dataKey="check"
+                      name="Check time (ms)"
+                      stroke="#0096c7"
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: "#00b4d8" }}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="linear"
+                      dataKey="size"
+                      name="File size (KB)"
+                      stroke="#48cae4"
+                      strokeWidth={2.2}
+                      strokeDasharray="6 4"
+                      dot={{ r: 3, fill: "#90e0ef" }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
