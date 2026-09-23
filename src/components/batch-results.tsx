@@ -164,7 +164,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
     >
       <p className="font-heading text-xl font-bold text-white drop-shadow">Batch results</p>
       <p className="mt-1 text-xs font-medium text-cyan-50">
-        Two graphs. Left: per-frame contacts and time. Right: rejected photos by colour and check time.
+        Two graphs, two lines each. Left: contacts and time per ping. Right: colour-ness and check time per rejected file.
       </p>
 
       {run && !run.finished ? (
@@ -196,7 +196,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
           <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
             <p className="text-sm font-semibold text-cyan-50">Valid sonar</p>
             <p className="mb-2 text-[11px] text-cyan-100">
-              Each point is one ping. Lines rise and fall with contacts on that frame and how long it took.
+              Aqua = contacts found on that ping. Cyan dashed = time for that ping (ms).
             </p>
             {valid.length === 0 ? (
               <p className="grid h-[320px] place-items-center text-sm text-cyan-100">No valid sonar in this run.</p>
@@ -225,36 +225,17 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                         return name ? `Valid ${v} · ${name}` : `Valid ${v}`;
                       }}
                     />
-                    <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
+                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
                     <Line yAxisId="left" type="linear" dataKey="contacts" name="Contacts this frame" stroke="#00f5d4" strokeWidth={3.4} dot={{ r: 4, fill: "#80ffdb" }} />
-                    <Line
-                      yAxisId="left"
-                      type="linear"
-                      dataKey="identified"
-                      name="Hit this frame (0/1)"
-                      stroke="#0096c7"
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: "#00b4d8" }}
-                    />
-                    <Line yAxisId="left" type="linear" dataKey="failed" name="Failed this frame (0/1)" stroke="#ffe66d" strokeWidth={2.4} dot={{ r: 3, fill: "#ffe66d" }} />
                     <Line
                       yAxisId="right"
                       type="linear"
                       dataKey="latency"
                       name="Time this frame (ms)"
                       stroke="#48cae4"
-                      strokeWidth={2.2}
+                      strokeWidth={2.4}
                       strokeDasharray="6 4"
                       dot={{ r: 3, fill: "#90e0ef" }}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="linear"
-                      dataKey="inference"
-                      name="YOLO ms"
-                      stroke="#80ffdb"
-                      strokeWidth={2}
-                      dot={{ r: 3, fill: "#00f5d4" }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -266,7 +247,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
           <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
             <p className="text-sm font-semibold text-cyan-50">Invalid — not sonar</p>
             <p className="mb-2 text-[11px] text-cyan-100">
-              Each rejected file is a point. Colour-ness and check time go up and down file by file.
+              Aqua = how colourful the file is. Cyan dashed = how long the sonar check took (ms).
             </p>
             {invalid.length === 0 ? (
               <p className="grid h-[320px] place-items-center px-4 text-center text-sm text-cyan-100">
@@ -281,13 +262,13 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                     <YAxis
                       yAxisId="left"
                       tick={{ fill: "#90e0ef", fontSize: 11 }}
-                      label={{ value: "Colour % / check ms", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
+                      label={{ value: "Colour-ness (%)", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
                       tick={{ fill: "#ffe66d", fontSize: 11 }}
-                      label={{ value: "File size (KB)", angle: 90, position: "insideRight", fill: "#ffe66d" }}
+                      label={{ value: "Check time (ms)", angle: 90, position: "insideRight", fill: "#ffe66d" }}
                     />
                     <Tooltip
                       contentStyle={TOOLTIP}
@@ -296,7 +277,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                         return row?.name ? `Invalid ${v} · ${row.name}` : `Invalid ${v}`;
                       }}
                     />
-                    <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
+                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
                     <Line
                       yAxisId="left"
                       type="linear"
@@ -307,21 +288,12 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                       dot={{ r: 4, fill: "#80ffdb" }}
                     />
                     <Line
-                      yAxisId="left"
+                      yAxisId="right"
                       type="linear"
                       dataKey="check"
                       name="Check time (ms)"
-                      stroke="#0096c7"
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: "#00b4d8" }}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="linear"
-                      dataKey="size"
-                      name="File size (KB)"
                       stroke="#48cae4"
-                      strokeWidth={2.2}
+                      strokeWidth={2.4}
                       strokeDasharray="6 4"
                       dot={{ r: 3, fill: "#90e0ef" }}
                     />
