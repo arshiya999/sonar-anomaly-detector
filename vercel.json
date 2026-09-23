@@ -1,5 +1,15 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "npm run build",
-  "installCommand": "npm install"
+  "services": {
+    "web": {
+      "framework": "nextjs",
+      "buildCommand": "npm run build",
+      "installCommand": "npm install"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": { "service": "web" }
+    }
+  ]
 }

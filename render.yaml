@@ -19,7 +19,7 @@ services:
         value: "*"
 
   - type: web
-    name: aquavision-backend-7iuh
+    name: aquavision-backend
     runtime: python
     plan: free
     buildCommand: pip install -r backend/requirements.txt -r ml/requirements.txt
