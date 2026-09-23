@@ -620,7 +620,7 @@ export function Dashboard() {
       );
       setBusy(false);
       setQueue([]);
-      toast.success("Run complete — see Batch results");
+      toast.success("Run complete — open Telemetry");
     },
     [runDetect],
   );
@@ -1467,7 +1467,7 @@ function UploadPage({
             <div className="space-y-1 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs text-cyan-950">
               <p className="font-medium">
                 {batch.finished
-                  ? "Done — open Batch results"
+                  ? "Done — open Telemetry"
                   : `${batch.done} of ${batch.total} · ${batch.phase === "validate" ? "checking files" : "analyzing"}`}
               </p>
               <div className="h-2 overflow-hidden rounded-full bg-cyan-100">
