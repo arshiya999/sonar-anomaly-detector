@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { KIT_EVALUATION, VAL_EVALUATION } from "@/lib/evaluation";
+import { VAL_EVALUATION } from "@/lib/evaluation";
 
 export type BatchStatus = "queued" | "invalid" | "analyzed" | "failed";
 
@@ -86,6 +86,7 @@ export function summarizeBatch(run: BatchRun | null) {
   const avgPost = analyzedRows.length ? postprocessMs / analyzedRows.length : 0;
   const seconds = wallMs / 1000;
   const throughput = seconds > 0 ? analyzed / seconds : 0;
+  const detections = analyzedRows.reduce((s, r) => s + (r.count || 0), 0);
   return {
     uploaded,
     valid,
@@ -104,6 +105,7 @@ export function summarizeBatch(run: BatchRun | null) {
     avgPre,
     avgPost,
     throughput,
+    detections,
   };
 }
 
@@ -140,34 +142,20 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
   const empty = !run || run.rows.length === 0;
 
   const cards: { k: string; v: string; d: string }[] = [
-    { k: "Uploaded", v: String(stats.uploaded), d: "Files in this batch" },
-    { k: "Valid sonar", v: String(stats.valid), d: "Passed sonar check" },
-    { k: "Invalid", v: String(stats.invalid), d: "Rejected before YOLO" },
-    { k: "Identified", v: String(stats.analyzed), d: "Successfully analyzed" },
-    { k: "Failed", v: String(stats.failed), d: "No detector report" },
-    { k: "Validation rate", v: stats.uploaded ? `${stats.validationRate.toFixed(1)}%` : "—", d: "valid / uploaded × 100" },
-    { k: "Rejection rate", v: stats.uploaded ? `${stats.rejectionRate.toFixed(1)}%` : "—", d: "rejected / uploaded × 100" },
-    { k: "Analysis success", v: stats.valid ? `${stats.analysisSuccessRate.toFixed(1)}%` : "—", d: "analyzed / valid × 100" },
-    { k: "Batch time", v: fmtDuration(stats.wallMs), d: "Wall clock for this run" },
-    { k: "Throughput", v: stats.throughput ? `${stats.throughput.toFixed(2)} img/s` : "—", d: "Analyzed / batch seconds" },
-    { k: "Avg latency", v: fmtDuration(stats.avgWall), d: "Mean wall time per image" },
-    { k: "YOLO time", v: fmtDuration(stats.inferenceMs), d: `avg ${fmtDuration(stats.avgInfer)}` },
-    { k: "Preprocess", v: fmtDuration(stats.preprocessMs), d: `avg ${fmtDuration(stats.avgPre)}` },
-    { k: "Postprocess", v: fmtDuration(stats.postprocessMs), d: `avg ${fmtDuration(stats.avgPost)}` },
-    { k: "Precision (val)", v: fmtScore(VAL_EVALUATION.precision), d: "Held-out val P" },
-    { k: "Recall (val)", v: fmtScore(VAL_EVALUATION.recall), d: "Held-out val R" },
-    { k: "F1 (val)", v: fmtScore(VAL_EVALUATION.f1), d: "2·P·R / (P+R)" },
-    { k: "mAP@50", v: fmtScore(VAL_EVALUATION.map50), d: "Val boxes IoU 0.50" },
-    { k: "mAP@50-95", v: fmtScore(VAL_EVALUATION.map50_95), d: "Val boxes IoU 0.50–0.95" },
-    { k: "Kit match", v: `${KIT_EVALUATION.correct ?? "?"} / ${KIT_EVALUATION.n}`, d: "Labeled kit images" },
+    { k: "Analyzed", v: String(stats.analyzed), d: "Valid sonar scored" },
+    { k: "Detections", v: String(stats.detections), d: "Contacts in this batch" },
+    { k: "Time taken", v: fmtDuration(stats.wallMs), d: "Wall clock" },
+    { k: "Throughput", v: stats.throughput ? `${stats.throughput.toFixed(2)} img/s` : "—", d: "Analyzed per second" },
+    { k: "Precision", v: fmtScore(VAL_EVALUATION.precision), d: "Val set" },
+    { k: "mAP@50", v: fmtScore(VAL_EVALUATION.map50), d: "Val boxes" },
   ];
 
   return (
     <div id="sih-batch-results" className="overflow-hidden rounded-2xl border border-cyan-700 bg-[#082f49] p-5 text-cyan-50">
       <p className="font-heading text-xl font-bold text-white">Batch results</p>
       <p className="mt-1 text-xs text-cyan-200">
-        One X–Y graph for this run: left axis is cumulative counts, right axis is latency. Cards above hold
-        rates, clocks, throughput, and stored val scores.
+        One graph: uploaded, valid, invalid, identified, and latency. Cards are the six numbers a judge needs
+        in one screenshot.
       </p>
 
       {run && !run.finished ? (
@@ -177,7 +165,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
         </p>
       ) : null}
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {cards.map((c) => (
           <div key={c.k} className="rounded-xl border border-cyan-700/80 bg-cyan-950/50 px-3 py-2">
             <p className="text-[10px] tracking-wide text-cyan-300 uppercase">{c.k}</p>
