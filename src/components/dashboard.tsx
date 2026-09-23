@@ -66,8 +66,8 @@ import { BatchResultsPanel, type BatchRun, type BatchRow } from "@/components/ba
 import { validateSonarFile } from "@/lib/sonar-validate";
 import { mapPool } from "@/lib/map-pool";
 
-/** This preview branch must not write to the live Render log or mix in production surveys. */
-const PREVIEW_ISOLATION = true;
+/** Production site writes surveys to the live ops log and uses Render ML + ops. */
+const PREVIEW_ISOLATION = false;
 const MAX_BATCH = 150;
 const DETECT_CONCURRENCY = 4;
 
