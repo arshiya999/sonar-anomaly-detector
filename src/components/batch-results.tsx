@@ -1,10 +1,11 @@
 "use client";
 
 import {
+  Area,
   CartesianGrid,
+  ComposedChart,
   Legend,
   Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -30,6 +31,7 @@ export type BatchRow = {
   file_kb?: number;
   colour_pct?: number;
   colour_busy?: number;
+  sure_pct?: number;
 };
 
 export type BatchRun = {
@@ -114,12 +116,25 @@ export function summarizeBatch(run: BatchRun | null) {
   };
 }
 
+function paddedDomain(values: number[], pad = 0.18): [number, number] {
+  const nums = values.filter((n) => Number.isFinite(n));
+  if (!nums.length) return [0, 1];
+  const lo = Math.min(...nums);
+  const hi = Math.max(...nums);
+  if (hi === lo) {
+    const step = Math.max(2, Math.abs(hi) * 0.15);
+    return [lo - step, hi + step];
+  }
+  const span = hi - lo;
+  return [lo - span * pad, hi + span * pad];
+}
+
 function validSeries(run: BatchRun | null) {
   const rows = (run?.rows ?? []).filter((r) => r.status !== "invalid");
   return rows.map((row, idx) => ({
     i: idx + 1,
     name: row.filename,
-    debris: row.count,
+    sure: row.sure_pct ?? 0,
     tookMs: row.wall_ms || row.inference_ms || 0,
   }));
 }
@@ -135,7 +150,7 @@ function invalidSeries(run: BatchRun | null) {
   return rows.map((row, idx) => ({
     i: idx + 1,
     name: row.filename,
-    cameraLook: Math.max(row.colour_pct ?? 0, row.colour_busy ?? 0),
+    cameraLook: Math.round(((row.colour_pct ?? 0) + (row.colour_busy ?? 0)) / 2),
     rejectMs: Math.max(row.check_ms || 0, 1),
     reason: row.reason ?? "Not side-scan sonar",
   }));
@@ -146,6 +161,10 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
   const valid = validSeries(run);
   const invalid = invalidSeries(run);
   const empty = !run || run.rows.length === 0;
+  const sureDomain = paddedDomain(valid.map((r) => r.sure));
+  const tookDomain = paddedDomain(valid.map((r) => r.tookMs));
+  const camDomain = paddedDomain(invalid.map((r) => r.cameraLook));
+  const rejDomain = paddedDomain(invalid.map((r) => r.rejectMs));
 
   const cards: { k: string; v: string; d: string }[] = [
     { k: "Analyzed", v: String(stats.analyzed), d: "Valid sonar scored" },
@@ -167,7 +186,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
     >
       <p className="font-heading text-xl font-bold text-white drop-shadow">Batch results</p>
       <p className="mt-1 text-xs font-medium text-cyan-50">
-        Two simple graphs. Each has two lines. One line is the result for that picture. The other line is how long that picture took.
+        Two graphs, two traces each. Aqua fill = the result for that picture. Dashed cyan = how long that picture took. The scale zooms in so the wiggles show, like a live instrument.
       </p>
 
       {run && !run.finished ? (
@@ -199,26 +218,27 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
           <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
             <p className="text-sm font-semibold text-cyan-50">Sonar pictures (accepted)</p>
             <p className="mb-2 text-[11px] text-cyan-100">
-              Solid aqua: how many debris pieces the system saw in that picture (0, 1, 2…). Dashed cyan: how many
-              milliseconds that picture took to analyse. Peaks mean a busy wreck field or a slower image.
+              Filled aqua: how sure the system is that it found debris in that picture (higher % = more sure). Dashed
+              cyan: how long that picture took. Both should rise and fall picture by picture, like a live instrument.
             </p>
             {valid.length === 0 ? (
               <p className="grid h-[320px] place-items-center text-sm text-cyan-100">No valid sonar in this run.</p>
             ) : (
               <div className="h-[340px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={valid} margin={{ top: 40, right: 40, left: 8, bottom: 8 }}>
+                  <ComposedChart data={valid} margin={{ top: 40, right: 44, left: 8, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.55} />
                     <XAxis dataKey="i" tick={{ fill: "#90e0ef", fontSize: 11 }} axisLine={{ stroke: "#0096c7" }} />
                     <YAxis
                       yAxisId="left"
-                      allowDecimals={false}
+                      domain={sureDomain}
                       tick={{ fill: "#90e0ef", fontSize: 11 }}
-                      label={{ value: "Debris pieces seen", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
+                      label={{ value: "How sure we are (%)", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
+                      domain={tookDomain}
                       tick={{ fill: "#ffe66d", fontSize: 11 }}
                       label={{ value: "Time this picture took (ms)", angle: 90, position: "insideRight", fill: "#ffe66d" }}
                     />
@@ -226,11 +246,21 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                       contentStyle={TOOLTIP}
                       labelFormatter={(v, pts) => {
                         const name = (pts?.[0]?.payload as { name?: string } | undefined)?.name;
-                        return name ? `Valid ${v} · ${name}` : `Valid ${v}`;
+                        return name ? `Sonar picture ${v} · ${name}` : `Sonar picture ${v}`;
                       }}
                     />
                     <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
-                    <Line yAxisId="left" type="linear" dataKey="debris" name="Debris pieces seen in this picture" stroke="#00f5d4" strokeWidth={3.4} dot={{ r: 4, fill: "#80ffdb" }} />
+                    <Area
+                      yAxisId="left"
+                      type="linear"
+                      dataKey="sure"
+                      name="How sure we are (%)"
+                      stroke="#00f5d4"
+                      fill="#00f5d4"
+                      fillOpacity={0.22}
+                      strokeWidth={2.8}
+                      dot={{ r: 3, fill: "#80ffdb" }}
+                    />
                     <Line
                       yAxisId="right"
                       type="linear"
@@ -241,7 +271,7 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                       strokeDasharray="6 4"
                       dot={{ r: 3, fill: "#90e0ef" }}
                     />
-                  </LineChart>
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -251,9 +281,8 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
           <div className="rounded-2xl border-2 border-cyan-500/70 bg-[#012a4a]/85 p-3 shadow-inner">
             <p className="text-sm font-semibold text-cyan-50">Not sonar (tiger, garden, camera photos)</p>
             <p className="mb-2 text-[11px] text-cyan-100">
-              Solid aqua: how much this file looks like an everyday colour photo (higher = more like a camera snap, so
-              we refuse it). Dashed cyan: how long that quick look took. Empty zeros are hidden so the line does not go
-              flat after the real photos.
+              Filled aqua: how much this file looks like an everyday camera snap (we zoom the axis so small differences
+              show). Dashed cyan: how long the refuse check took. Not a flat line — each photo scores a bit differently.
             </p>
             {invalid.length === 0 ? (
               <p className="grid h-[320px] place-items-center px-4 text-center text-sm text-cyan-100">
@@ -262,17 +291,19 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
             ) : (
               <div className="h-[340px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={invalid} margin={{ top: 40, right: 40, left: 8, bottom: 8 }}>
+                  <ComposedChart data={invalid} margin={{ top: 40, right: 44, left: 8, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 6" stroke="#0077b6" strokeOpacity={0.55} />
                     <XAxis dataKey="i" tick={{ fill: "#90e0ef", fontSize: 11 }} axisLine={{ stroke: "#0096c7" }} />
                     <YAxis
                       yAxisId="left"
+                      domain={camDomain}
                       tick={{ fill: "#90e0ef", fontSize: 11 }}
                       label={{ value: "Looks like a camera photo", angle: -90, position: "insideLeft", fill: "#00f5d4" }}
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
+                      domain={rejDomain}
                       tick={{ fill: "#ffe66d", fontSize: 11 }}
                       label={{ value: "Time to reject (ms)", angle: 90, position: "insideRight", fill: "#ffe66d" }}
                     />
@@ -280,30 +311,32 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
                       contentStyle={TOOLTIP}
                       labelFormatter={(v, pts) => {
                         const row = pts?.[0]?.payload as { name?: string } | undefined;
-                        return row?.name ? `Invalid ${v} · ${row.name}` : `Invalid ${v}`;
+                        return row?.name ? `Rejected ${v} · ${row.name}` : `Rejected ${v}`;
                       }}
                     />
                     <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#e0fbfc" }} />
-                    <Line
+                    <Area
                       yAxisId="left"
                       type="linear"
                       dataKey="cameraLook"
-                      name="Looks like a normal camera photo"
+                      name="Looks like a camera photo"
                       stroke="#00f5d4"
-                      strokeWidth={3.4}
-                      dot={{ r: 4, fill: "#80ffdb" }}
+                      fill="#00f5d4"
+                      fillOpacity={0.22}
+                      strokeWidth={2.8}
+                      dot={{ r: 3, fill: "#80ffdb" }}
                     />
                     <Line
                       yAxisId="right"
                       type="linear"
                       dataKey="rejectMs"
-                      name="Time to reject this file (ms)"
+                      name="Time to reject this file"
                       stroke="#48cae4"
                       strokeWidth={2.4}
                       strokeDasharray="6 4"
                       dot={{ r: 3, fill: "#90e0ef" }}
                     />
-                  </LineChart>
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}

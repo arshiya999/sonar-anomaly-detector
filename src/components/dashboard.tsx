@@ -456,6 +456,8 @@ export function Dashboard() {
         file_kb: Math.max(1, Math.round(f.size / 1024)),
         check_ms: 0,
         colour_pct: 0,
+        colour_busy: 0,
+        sure_pct: 0,
       }));
       setBatch({
         uploaded: images.length,
@@ -564,6 +566,8 @@ export function Dashboard() {
         const wall = Date.now() - t0;
         const detections = result?.geoReport.detections ?? [];
         const top = [...detections].sort((a, b) => b.confidence - a.confidence)[0];
+        const raw = top?.confidence ?? 0;
+        const sure_pct = raw <= 1.5 ? Math.round(raw * 1000) / 10 : Math.round(raw * 10) / 10;
         setBatch((prev) => {
           if (!prev) return prev;
           const rows = prev.rows.map((row) => ({ ...row }));
@@ -573,6 +577,7 @@ export function Dashboard() {
               status: "analyzed",
               predicted: top?.class ?? null,
               count: detections.length,
+              sure_pct,
               inference_ms: result.geoReport.inference_ms ?? 0,
               preprocess_ms: result.geoReport.preprocess_ms ?? 0,
               postprocess_ms: result.geoReport.postprocess_ms ?? 0,
