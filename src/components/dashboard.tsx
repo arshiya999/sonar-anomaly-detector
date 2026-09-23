@@ -59,6 +59,12 @@ import { ClassMixPie } from "@/components/class-mix-pie";
 import { BrandMark } from "@/components/brand-mark";
 import { PipelineStrip } from "@/components/pipeline-strip";
 import { SonarTheater } from "@/components/sonar-theater";
+import { BatchAccuracyPoster, type BatchRun } from "@/components/batch-accuracy";
+import { scoreVerdict, type Verdict } from "@/lib/score-image";
+
+/** This preview branch must not write to the live Render log or mix in production surveys. */
+const PREVIEW_ISOLATION = true;
+const MAX_BATCH = 200;
 
 const SonarMap = dynamic(
   () => import("@/components/sonar-map").then((m) => m.SonarMap),
@@ -202,9 +208,12 @@ export function Dashboard() {
   logRef.current = log;
   const [pipeStep, setPipeStep] = useState(0);
   const [clock, setClock] = useState("");
+  const [batch, setBatch] = useState<BatchRun | null>(null);
+  const batchCancel = useRef(false);
 
-  const refreshLog = useCallback(() =>
-    fetch("/api/log", { cache: "no-store" })
+  const refreshLog = useCallback(() => {
+    if (PREVIEW_ISOLATION) return Promise.resolve();
+    return fetch("/api/log", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (!Array.isArray(data.entries)) return;
@@ -215,8 +224,8 @@ export function Dashboard() {
           setOverlay((prev) => (prev?.startsWith("data:") ? prev : overlayFromDb));
         }
       })
-      .catch(() => undefined),
-  []);
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const tick = () =>
@@ -263,7 +272,7 @@ export function Dashboard() {
   }, [refreshLog]);
 
   const runDetect = useCallback(
-    async (imageFile: File, nextMeta?: MetaForm) => {
+    async (imageFile: File, nextMeta?: MetaForm, opts?: { quiet?: boolean; keepBusy?: boolean }) => {
       setBusy(true);
       setError(null);
       const used = await resolveGps(nextMeta ?? meta);
@@ -349,32 +358,37 @@ export function Dashboard() {
             longitude: m.longitude.trim() || String(placed.lon.toFixed(5)),
           }));
         }
-        toast.success(
-          geoReport.count
-            ? `${geoReport.count} anomal${geoReport.count === 1 ? "y" : "ies"} scored — pin on map`
-            : "Ping processed — pin on map (no class above threshold)",
-        );
-        const persist = await fetch("/api/log", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            filename: imageFile.name,
-            report: geoReport,
-            overlay_jpeg_base64: data.overlay_jpeg_base64,
-          }),
-        });
-        if (persist.ok) {
-          const saved = (await persist.json()) as { entries?: ScanLogEntry[] };
-          if (Array.isArray(saved.entries)) {
-            setLog((prev) => mergeLogs(saved.entries as ScanLogEntry[], prev));
-          }
+        if (!opts?.quiet) {
+          toast.success(
+            geoReport.count
+              ? `${geoReport.count} anomal${geoReport.count === 1 ? "y" : "ies"} scored — pin on map`
+              : "Ping processed — pin on map (no class above threshold)",
+          );
+          toast.message(
+            placed.gnss
+              ? `Pinned at ${placed.lat.toFixed(4)}, ${placed.lon.toFixed(4)}`
+              : `Pinned on survey plot ${placed.lat.toFixed(4)}, ${placed.lon.toFixed(4)} — click the map or type GPS for true position`,
+          );
         }
-        await refreshLog();
-        toast.message(
-          placed.gnss
-            ? `Pinned at ${placed.lat.toFixed(4)}, ${placed.lon.toFixed(4)}`
-            : `Pinned on survey plot ${placed.lat.toFixed(4)}, ${placed.lon.toFixed(4)} — click the map or type GPS for true position`,
-        );
+        if (!PREVIEW_ISOLATION) {
+          const persist = await fetch("/api/log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: imageFile.name,
+              report: geoReport,
+              overlay_jpeg_base64: data.overlay_jpeg_base64,
+            }),
+          });
+          if (persist.ok) {
+            const saved = (await persist.json()) as { entries?: ScanLogEntry[] };
+            if (Array.isArray(saved.entries)) {
+              setLog((prev) => mergeLogs(saved.entries as ScanLogEntry[], prev));
+            }
+          }
+          await refreshLog();
+        }
+        return { geoReport, localEntry };
       } catch (err) {
         const timedOut =
           (err instanceof DOMException && err.name === "TimeoutError") ||
@@ -385,12 +399,100 @@ export function Dashboard() {
             ? err.message
             : "Detection failed";
         setError(message);
-        toast.error(message);
+        if (!opts?.quiet) toast.error(message);
+        return null;
       } finally {
-        setBusy(false);
+        if (!opts?.keepBusy) setBusy(false);
       }
     },
     [meta, threshold, refreshLog, health],
+  );
+
+  const markBatch = useCallback((filename: string, verdict: Verdict) => {
+    setBatch((prev) =>
+      prev
+        ? { ...prev, rows: prev.rows.map((row) => (row.filename === filename ? { ...row, verdict } : row)) }
+        : prev,
+    );
+  }, []);
+
+  const onFiles = useCallback(
+    async (picked: File[]) => {
+      const images = picked
+        .filter((f) => f.type.startsWith("image/") || /\.(png|jpe?g|webp|tif{1,2})$/i.test(f.name))
+        .slice(0, MAX_BATCH);
+      if (!images.length) {
+        toast.error("No sonar images in that selection");
+        return;
+      }
+      batchCancel.current = false;
+      const startedAt = Date.now();
+      setBatch({
+        total: images.length,
+        done: 0,
+        current: images[0].name,
+        startedAt,
+        elapsedMs: 0,
+        finished: false,
+        rows: [],
+      });
+      setBusy(true);
+      setError(null);
+      setPage("analysis");
+      setFile(images[0]);
+      setPreview(URL.createObjectURL(images[0]));
+      toast.message(
+        images.length === 1
+          ? `Scanning ${images[0].name}`
+          : `Scanning ${images.length} images — stay on this page`,
+      );
+
+      for (let i = 0; i < images.length; i++) {
+        if (batchCancel.current) break;
+        const imageFile = images[i];
+        setFile(imageFile);
+        setPreview(URL.createObjectURL(imageFile));
+        setBatch((prev) =>
+          prev
+            ? { ...prev, current: imageFile.name, done: i, elapsedMs: Date.now() - startedAt }
+            : prev,
+        );
+        const result = await runDetect(imageFile, undefined, { quiet: images.length > 1, keepBusy: true });
+        const detections = result?.geoReport.detections ?? [];
+        const scored = scoreVerdict(imageFile.name, detections);
+        const top = [...detections].sort((a, b) => b.confidence - a.confidence)[0];
+        setBatch((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            done: i + 1,
+            elapsedMs: Date.now() - startedAt,
+            rows: [
+              ...prev.rows,
+              {
+                filename: imageFile.name,
+                expected: scored.expected,
+                predicted: scored.predicted,
+                labelled: scored.labelled,
+                verdict: scored.verdict,
+                count: detections.length,
+                inference_ms: result?.geoReport.inference_ms ?? 0,
+                length_m: top?.dimensions.length_m ?? null,
+                width_m: top?.dimensions.width_m ?? null,
+              },
+            ],
+          };
+        });
+      }
+
+      setBatch((prev) =>
+        prev ? { ...prev, finished: true, current: "", elapsedMs: Date.now() - startedAt, done: prev.rows.length } : prev,
+      );
+      setBusy(false);
+      const n = images.length;
+      toast.success(n === 1 ? "Scan complete — open the accuracy graph" : `Batch complete — ${n} images scored`);
+    },
+    [runDetect],
   );
 
   const pickMapOrigin = useCallback((lat: number, lon: number) => {
@@ -406,14 +508,6 @@ export function Dashboard() {
     saveOrigin(next);
     toast.success(`Survey origin set to ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
   }, [meta]);
-
-  const onFile = async (next: File) => {
-    setFile(next);
-    setPreview(URL.createObjectURL(next));
-    setOverlay(null);
-    setPage("analysis");
-    await runDetect(next);
-  };
 
   const downloadJson = () => {
     const blob = new Blob([JSON.stringify({ surveys: log, latest: report }, null, 2)], {
@@ -637,6 +731,8 @@ export function Dashboard() {
               overlay={overlay}
               preview={preview}
               log={log}
+              batch={batch}
+              onMarkBatch={markBatch}
               go={go}
               onPickOrigin={pickMapOrigin}
             />
@@ -650,9 +746,14 @@ export function Dashboard() {
               file={file}
               meta={meta}
               setMeta={setMeta}
+              batch={batch}
               onPick={() => inputRef.current?.click()}
-              onFile={onFile}
-              onRerun={() => file && void runDetect(file)}
+              onFiles={onFiles}
+              onCancelBatch={() => {
+                batchCancel.current = true;
+                toast.message("Stopping after this image");
+              }}
+              onRerun={() => file && void onFiles([file])}
             />
           )}
           {page === "analysis" && (
@@ -662,6 +763,7 @@ export function Dashboard() {
                 complete={Boolean(report) && !busy}
                 hint={busy ? "Processing sonar log" : report ? "Last ping fused and geotagged" : "Standing by"}
               />
+              <BatchAccuracyPoster run={batch} onMark={markBatch} />
               <div className="grid gap-4 xl:grid-cols-2">
                 <SonarTheater
                   preview={preview}
@@ -783,6 +885,8 @@ function HomePage({
   overlay,
   preview,
   log,
+  batch,
+  onMarkBatch,
   go,
   onPickOrigin,
 }: {
@@ -798,6 +902,8 @@ function HomePage({
   overlay: string | null;
   preview: string | null;
   log: ScanLogEntry[];
+  batch: BatchRun | null;
+  onMarkBatch: (filename: string, verdict: Verdict) => void;
   go: (p: PageId) => void;
   onPickOrigin?: (lat: number, lon: number) => void;
 }) {
@@ -936,6 +1042,8 @@ function HomePage({
         </Card>
       </div>
 
+      <BatchAccuracyPoster run={batch} onMark={onMarkBatch} />
+
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Live survey graphs</CardTitle>
@@ -1060,8 +1168,10 @@ function UploadPage({
   file,
   meta,
   setMeta,
+  batch,
   onPick,
-  onFile,
+  onFiles,
+  onCancelBatch,
   onRerun,
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -1071,8 +1181,10 @@ function UploadPage({
   file: File | null;
   meta: MetaForm;
   setMeta: (m: MetaForm) => void;
+  batch: BatchRun | null;
   onPick: () => void;
-  onFile: (f: File) => void;
+  onFiles: (files: File[]) => void;
+  onCancelBatch: () => void;
   onRerun: () => void;
 }) {
   return (
@@ -1086,20 +1198,44 @@ function UploadPage({
             ref={inputRef}
             type="file"
             accept="image/png,image/jpeg,image/webp,.tif,.tiff"
+            multiple
             className="hidden"
             onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void onFile(f);
+              const list = e.target.files;
+              if (!list?.length) return;
+              void onFiles(Array.from(list));
+              e.target.value = "";
             }}
           />
           <p className="text-xs text-slate-600">
-            Each upload is pinned on the map immediately. If the file has no GPS, the pin is placed on the
-            NIOT survey plot (Bay of Bengal). Click the map, type lat/lon, or use device GPS for the true
-            ship position.
+            Select one image or a whole folder of up to {MAX_BATCH} sonar frames at once. The batch accuracy
+            graph (total time, correct vs not correct) is built after the last file. This preview copy does not
+            write to the live judge site.
           </p>
           <Button className="h-10 w-full" onClick={onPick} disabled={busy}>
-            <Upload /> Upload sonar image
+            <Upload /> Upload sonar images
           </Button>
+          {busy && batch ? (
+            <Button type="button" variant="outline" className="w-full" onClick={onCancelBatch}>
+              Stop batch after this image
+            </Button>
+          ) : null}
+          {batch ? (
+            <div className="space-y-1 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs text-cyan-950">
+              <p className="font-medium">
+                {batch.finished ? "Batch complete" : `Scanning ${batch.done} / ${batch.total}`}
+              </p>
+              <div className="h-2 overflow-hidden rounded-full bg-cyan-100">
+                <div
+                  className="h-full bg-cyan-700 transition-all"
+                  style={{ width: `${batch.total ? (100 * batch.done) / batch.total : 0}%` }}
+                />
+              </div>
+              <p className="font-mono text-[11px] text-cyan-800">
+                {batch.current || `${batch.rows.length} scored`} · {(batch.elapsedMs / 1000).toFixed(1)} s
+              </p>
+            </div>
+          ) : null}
           <Button
             type="button"
             variant="outline"
@@ -1167,9 +1303,14 @@ function UploadPage({
           {file ? (
             <p className="text-sm text-slate-700">
               Ready: <span className="font-mono">{file.name}</span>
+              {batch && batch.total > 1 ? (
+                <span className="mt-1 block text-xs text-slate-500">
+                  {batch.done}/{batch.total} in this batch
+                </span>
+              ) : null}
             </p>
           ) : (
-            <p className="text-sm text-slate-500">No sonar file selected yet.</p>
+            <p className="text-sm text-slate-500">No sonar file selected yet. You can pick hundreds at once.</p>
           )}
         </CardContent>
       </Card>
