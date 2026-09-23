@@ -1,6 +1,7 @@
 {
   "services": {
     "web": {
+      "root": ".",
       "framework": "nextjs",
       "buildCommand": "npm run build",
       "installCommand": "npm install"
