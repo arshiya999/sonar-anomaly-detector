@@ -5,6 +5,8 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceArea,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -109,45 +111,40 @@ export function summarizeBatch(run: BatchRun | null) {
   };
 }
 
-function validSeries(run: BatchRun | null) {
-  const rows = (run?.rows ?? []).filter((r) => r.status !== "invalid");
+function dividedSeries(run: BatchRun | null) {
+  const rows = run?.rows ?? [];
+  const validRows = rows.filter((r) => r.status !== "invalid");
+  const invalidRows = rows.filter((r) => r.status === "invalid");
+  const ordered = [...validRows, ...invalidRows];
   let valid = 0;
   let identified = 0;
   let failed = 0;
-  return rows.map((row, idx) => {
-    valid += 1;
+  let invalid = 0;
+  const points = ordered.map((row, idx) => {
+    const isInvalid = row.status === "invalid";
+    if (isInvalid) invalid += 1;
+    else valid += 1;
     if (row.status === "analyzed") identified += 1;
     if (row.status === "failed") failed += 1;
     return {
       i: idx + 1,
       name: row.filename,
+      half: isInvalid ? "invalid" : "valid",
       valid,
       identified,
       failed,
-      latency: row.wall_ms || row.inference_ms || 0,
-    };
-  });
-}
-
-function invalidSeries(run: BatchRun | null) {
-  const rows = (run?.rows ?? []).filter((r) => r.status === "invalid");
-  let invalid = 0;
-  return rows.map((row, idx) => {
-    invalid += 1;
-    return {
-      i: idx + 1,
-      name: row.filename,
       invalid,
-      reason: row.reason ?? "Not side-scan sonar",
+      latency: isInvalid ? null : row.wall_ms || row.inference_ms || 0,
     };
   });
+  return { points, split: validRows.length, invalidN: invalidRows.length, validN: validRows.length };
 }
 
 export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
   const stats = summarizeBatch(run);
-  const valid = validSeries(run);
-  const invalid = invalidSeries(run);
+  const { points, split, invalidN, validN } = dividedSeries(run);
   const empty = !run || run.rows.length === 0;
+  const xMax = Math.max(points.length, 1);
 
   const cards: { k: string; v: string; d: string }[] = [
     { k: "Analyzed", v: String(stats.analyzed), d: "Valid sonar scored" },
@@ -162,8 +159,8 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
     <div id="sih-batch-results" className="overflow-hidden rounded-2xl border border-cyan-700 bg-[#082f49] p-5 text-cyan-50">
       <p className="font-heading text-xl font-bold text-white">Batch results</p>
       <p className="mt-1 text-xs text-cyan-200">
-        Same X–Y graph in two halves: left is valid sonar (counts + latency), right is rejected colour photos
-        that never reach YOLO.
+        One X–Y graph, two halves. Green left = valid sonar. Red right = colour photos (tiger etc.) rejected
+        before YOLO. Latency (ms) uses the right axis because it is not a count.
       </p>
 
       {run && !run.finished ? (
@@ -185,123 +182,110 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
 
       {empty ? (
         <p className="mt-6 rounded-xl bg-cyan-950/50 px-4 py-12 text-center text-sm text-cyan-200">
-          Add files on Upload, then Analyze. Mix sonar with a tiger or garden photo to fill the invalid half.
+          Add files on Upload, then Analyze. Put sonar and a colour photo in the same run to see both halves.
         </p>
       ) : (
-        <div className="mt-5 grid gap-3 lg:grid-cols-2">
-          <div className="rounded-xl bg-cyan-950/30 p-3">
-            <p className="mb-1 text-sm font-semibold text-emerald-200">Valid sonar</p>
-            <p className="mb-2 text-[11px] text-cyan-200">
-              Left axis = how many valid frames (and how many were identified). Right axis = latency in ms for
-              that frame only.
-            </p>
-            {valid.length === 0 ? (
-              <p className="grid h-[320px] place-items-center text-sm text-cyan-200">No valid sonar in this run.</p>
-            ) : (
-              <div className="h-[340px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={valid} margin={{ top: 28, right: 36, left: 8, bottom: 36 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#155e75" />
-                    <XAxis
-                      dataKey="i"
-                      tick={{ fill: "#bae6fd", fontSize: 11 }}
-                      height={40}
-                      label={{ value: "Valid image number", position: "bottom", offset: 12, fill: "#a5f3fc" }}
-                    />
-                    <YAxis
-                      yAxisId="left"
-                      allowDecimals={false}
-                      tick={{ fill: "#bae6fd", fontSize: 11 }}
-                      label={{ value: "Count", angle: -90, position: "insideLeft", fill: "#a5f3fc" }}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      tick={{ fill: "#fde68a", fontSize: 11 }}
-                      label={{ value: "Latency (ms)", angle: 90, position: "insideRight", fill: "#fde68a" }}
-                    />
-                    <Tooltip
-                      contentStyle={TOOLTIP}
-                      labelFormatter={(v, pts) => {
-                        const name = (pts?.[0]?.payload as { name?: string } | undefined)?.name;
-                        return name ? `Valid ${v} · ${name}` : `Valid ${v}`;
-                      }}
-                    />
-                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#ecfeff" }} />
-                    <Line yAxisId="left" type="monotone" dataKey="valid" name="Valid sonar" stroke="#34d399" strokeWidth={2.5} dot={{ r: 3 }} />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="identified"
-                      name="Successfully identified"
-                      stroke="#38bdf8"
-                      strokeWidth={2.5}
-                      dot={{ r: 3 }}
-                    />
-                    <Line yAxisId="left" type="monotone" dataKey="failed" name="Failed" stroke="#fbbf24" strokeWidth={2} dot={false} />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="latency"
-                      name="Latency (ms)"
-                      stroke="#fde68a"
-                      strokeWidth={2}
-                      strokeDasharray="5 4"
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+        <div className="mt-5 rounded-xl bg-cyan-950/30 p-3">
+          <div className="mb-2 flex flex-wrap gap-3 text-xs">
+            <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-emerald-200">
+              Left · valid sonar ({validN})
+            </span>
+            <span className="rounded-full bg-rose-500/20 px-3 py-1 text-rose-200">
+              Right · invalid / not sonar ({invalidN})
+            </span>
           </div>
-
-          <div className="rounded-xl bg-cyan-950/30 p-3">
-            <p className="mb-1 text-sm font-semibold text-rose-200">Invalid — not sonar</p>
-            <p className="mb-2 text-[11px] text-cyan-200">
-              Tiger, garden, and other colour photos. Counted here and never sent to the detector.
-            </p>
-            {invalid.length === 0 ? (
-              <p className="grid h-[320px] place-items-center px-4 text-center text-sm text-cyan-200">
-                No invalid files this run. Add a colour photo with the sonar set to see this half climb.
-              </p>
-            ) : (
-              <div className="h-[340px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={invalid} margin={{ top: 28, right: 16, left: 8, bottom: 36 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#155e75" />
-                    <XAxis
-                      dataKey="i"
-                      tick={{ fill: "#bae6fd", fontSize: 11 }}
-                      height={40}
-                      label={{ value: "Invalid image number", position: "bottom", offset: 12, fill: "#a5f3fc" }}
-                    />
-                    <YAxis
-                      allowDecimals={false}
-                      tick={{ fill: "#fecaca", fontSize: 11 }}
-                      label={{ value: "Rejected count", angle: -90, position: "insideLeft", fill: "#fecaca" }}
-                    />
-                    <Tooltip
-                      contentStyle={TOOLTIP}
-                      labelFormatter={(v, pts) => {
-                        const row = pts?.[0]?.payload as { name?: string; reason?: string } | undefined;
-                        return row?.name ? `Invalid ${v} · ${row.name}` : `Invalid ${v}`;
-                      }}
-                      formatter={(value) => [`${value}`, "Rejected so far"]}
-                    />
-                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#ecfeff" }} />
-                    <Line
-                      type="monotone"
-                      dataKey="invalid"
-                      name="Invalid (rejected)"
-                      stroke="#f87171"
-                      strokeWidth={3}
-                      dot={{ r: 5, fill: "#f87171" }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={points} margin={{ top: 36, right: 44, left: 12, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#155e75" />
+                {split > 0 ? (
+                  <ReferenceArea yAxisId="left" x1={0.5} x2={split + 0.5} fill="#34d399" fillOpacity={0.08} />
+                ) : null}
+                {invalidN > 0 ? (
+                  <ReferenceArea yAxisId="left" x1={split + 0.5} x2={xMax + 0.5} fill="#f87171" fillOpacity={0.12} />
+                ) : null}
+                {split > 0 && invalidN > 0 ? (
+                  <ReferenceLine
+                    yAxisId="left"
+                    x={split + 0.5}
+                    stroke="#fef3c7"
+                    strokeDasharray="4 3"
+                    label={{ value: "valid | invalid", fill: "#fef3c7", fontSize: 11, position: "insideTopRight" }}
+                  />
+                ) : null}
+                <XAxis
+                  dataKey="i"
+                  tick={{ fill: "#bae6fd", fontSize: 11 }}
+                  tickFormatter={(v) => (v <= split ? `V${v}` : `I${v - split}`)}
+                />
+                <YAxis
+                  yAxisId="left"
+                  allowDecimals={false}
+                  tick={{ fill: "#bae6fd", fontSize: 11 }}
+                  label={{ value: "Cumulative count", angle: -90, position: "insideLeft", fill: "#a5f3fc" }}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fill: "#fde68a", fontSize: 11 }}
+                  label={{ value: "Latency (ms)", angle: 90, position: "insideRight", fill: "#fde68a" }}
+                />
+                <Tooltip
+                  contentStyle={TOOLTIP}
+                  labelFormatter={(v, pts) => {
+                    const row = pts?.[0]?.payload as { name?: string; half?: string } | undefined;
+                    const side = row?.half === "invalid" ? "Invalid" : "Valid";
+                    return row?.name ? `${side} · ${row.name}` : `${side} ${v}`;
+                  }}
+                />
+                <Legend
+                  verticalAlign="top"
+                  align="center"
+                  wrapperStyle={{ fontSize: 12, color: "#ecfeff", paddingBottom: 8 }}
+                />
+                <Line yAxisId="left" type="monotone" dataKey="valid" name="Valid sonar" stroke="#34d399" strokeWidth={2.6} dot={{ r: 3 }} />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="identified"
+                  name="Successfully identified"
+                  stroke="#38bdf8"
+                  strokeWidth={2.4}
+                  dot={{ r: 3 }}
+                />
+                <Line yAxisId="left" type="monotone" dataKey="failed" name="Failed" stroke="#fbbf24" strokeWidth={2} dot={false} />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="invalid"
+                  name="Invalid (not sonar)"
+                  stroke="#f87171"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: "#f87171" }}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="latency"
+                  name="Latency (ms)"
+                  stroke="#fde68a"
+                  strokeWidth={2}
+                  strokeDasharray="5 4"
+                  dot={false}
+                  connectNulls={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
+          <div className="mt-1 grid grid-cols-2 text-center text-[11px] text-cyan-200">
+            <p>Valid image number (V1, V2…)</p>
+            <p>Invalid image number (I1, I2…) — tiger / colour photos</p>
+          </div>
+          {invalidN === 0 ? (
+            <p className="mt-2 text-center text-xs text-rose-200">
+              Invalid half is empty this run. Add a colour photo with the sonar files so the red half climbs.
+            </p>
+          ) : null}
         </div>
       )}
     </div>
