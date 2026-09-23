@@ -67,18 +67,18 @@ Copy `.env.example`:
 
 The Next.js operator UI goes on **Vercel**. YOLO (`ml/server.py`) and the ops API (`backend/`) stay on **Render**. Vercel never runs the `.pt` weights.
 
-1. Push this repo to GitHub (`arshiya999/sonar-anomaly-detector`).
-2. In [vercel.com/new](https://vercel.com/new) import that repo. Framework: **Next.js**. Root directory: `.` (not `frontend/`).
-3. Before the first production deploy, add **Environment Variables** (Production):
+**https://aqua-vision-sih.vercel.app only updates when that Vercel project rebuilds from this GitHub repo.** Pushing `main` is not enough if the Vercel project is still linked to an older snapshot (this repo currently has no Vercel GitHub webhook).
 
-| Name | Value |
-| --- | --- |
-| `ML_API_URL` | Render URL of the detector, e.g. `https://aqua-vision-ml.onrender.com` (no trailing slash) |
-| `OPS_API_URL` | Render URL of the ops API, e.g. `https://aqua-vision-api.onrender.com` |
+1. Open the existing project **aqua-vision-sih** at [vercel.com/dashboard](https://vercel.com/dashboard).
+2. Settings → Git → connect `arshiya999/sonar-anomaly-detector`, production branch **main**, root directory **`.`** (not `frontend/`).
+3. Production env: `ML_API_URL=https://aquavision-ml.onrender.com` and `OPS_API_URL=https://aquavision-backend-7iuh.onrender.com` (no trailing slash).
+4. Deployments → **Redeploy** the latest production deployment (or push a commit to `main` after Git is connected).
+5. Hard-refresh the site (Ctrl+Shift+R). Analysis shows **Empirical detection statistics**, the two graphs after Analyze, and **Download → PDF**.
+6. On Render, set `CORS_ORIGINS` to `https://aqua-vision-sih.vercel.app` (or keep `*`).
 
-4. Deploy. The site proxies `/api/detect` → Render ML, `/api/log` and `/media` → Render ops.
-5. On Render, set `CORS_ORIGINS` to your Vercel URL (or keep `*` if that is already allowed).
-6. First upload after Render sleep can take ~30–50s. Wait, then retry.
+Optional: add GitHub Actions secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` so `.github/workflows/deploy-vercel.yml` can ship production on every `main` push.
+
+First upload after Render sleep can take ~30–50s. Wait, then retry.
 
 ## Production (Docker)
 

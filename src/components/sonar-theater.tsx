@@ -61,7 +61,7 @@ export function SonarTheater({
                 <Radar className="size-12 text-[#c9a227]" />
               </div>
               <p className="max-w-sm text-sm text-white/70">
-                Upload a sonar image from the Upload page. The waterfall and map update from that ping only.
+                Upload sonar frames on the Upload page, then Analyze. Empirical graphs, PDF download, and this waterfall all update from that run.
               </p>
             </div>
           ) : (

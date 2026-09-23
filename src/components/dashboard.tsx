@@ -476,7 +476,7 @@ export function Dashboard() {
       });
       setBusy(true);
       setError(null);
-      setPage("results");
+      setPage("analysis");
       setFile(images[0]);
       setPreview(URL.createObjectURL(images[0]));
       toast.message(`Checking ${images.length} files, then analyzing valid sonar in parallel`);
@@ -620,7 +620,7 @@ export function Dashboard() {
       );
       setBusy(false);
       setQueue([]);
-      toast.success("Run complete — open Statistics");
+      toast.success("Run complete — empirical graphs and PDF are on Analysis");
     },
     [runDetect],
   );
@@ -758,7 +758,6 @@ export function Dashboard() {
     return Object.entries(counts).map(([cls, count]) => ({ class: cls, count }));
   }, [allDetections]);
 
-  const chartLog = log;
   const surveyPins: SurveyPin[] = useMemo(() => pinsFromLog(log), [log]);
 
   const latest = useMemo(() => {
@@ -780,7 +779,7 @@ export function Dashboard() {
   const pageTitle: Record<PageId, string> = {
     dashboard: "Operations overview",
     upload: "Upload sonar log",
-    analysis: "Waterfall analysis",
+    analysis: "Analysis · empirical detection statistics",
     results: "Empirical detection statistics",
     detections: "All detections",
     map: "Global detections map",
@@ -928,16 +927,35 @@ export function Dashboard() {
           )}
           {page === "results" && (
             <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <DownloadMenu
+                  disabled={false}
+                  downloadJson={downloadJson}
+                  downloadCsv={downloadCsv}
+                  downloadBriefing={downloadBriefing}
+                  downloadPdf={downloadPdf}
+                />
+              </div>
               <BatchResultsPanel run={batch} />
             </div>
           )}
           {page === "analysis" && (
             <div className="space-y-4">
-              <PipelineStrip
-                active={pipeStep}
-                complete={Boolean(report) && !busy}
-                hint={busy ? "Processing sonar log" : report ? "Last ping fused and geotagged" : "Standing by"}
-              />
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <PipelineStrip
+                  active={pipeStep}
+                  complete={Boolean(report) && !busy}
+                  hint={busy ? "Processing sonar log" : report ? "Last ping fused and geotagged" : "Standing by"}
+                />
+                <DownloadMenu
+                  disabled={false}
+                  downloadJson={downloadJson}
+                  downloadCsv={downloadCsv}
+                  downloadBriefing={downloadBriefing}
+                  downloadPdf={downloadPdf}
+                />
+              </div>
+              <BatchResultsPanel run={batch} />
               <div className="grid gap-4 xl:grid-cols-2">
                 <SonarTheater
                   preview={preview}
@@ -965,21 +983,6 @@ export function Dashboard() {
                   </CardContent>
                 </Card>
               </div>
-              <Card className="shadow-sm">
-                <CardHeader>
-                  <CardTitle>Session analytics</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    These graphs include every image in this session, including the one you just uploaded.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <SurveyCharts
-                    key={`charts-${chartLog.length}-${chartLog[0]?.id ?? "none"}`}
-                    entries={chartLog}
-                    defaultGraphs={["mix", "timeline", "confidence", "speed", "risk"]}
-                  />
-                </CardContent>
-              </Card>
             </div>
           )}
           {page === "detections" && (
@@ -1146,7 +1149,7 @@ function HomePage({
           </CardHeader>
           <CardContent>
             {mixRows.length === 0 ? (
-              <EmptyNote text="No detections yet. Upload a sonar image to run the detector." />
+              <EmptyNote text="No contacts yet. Open Upload, add sonar frames (up to 150), then Analyze." />
             ) : (
               <ClassMixPie rows={mixRows} height={280} />
             )}
@@ -1467,7 +1470,7 @@ function UploadPage({
             <div className="space-y-1 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs text-cyan-950">
               <p className="font-medium">
                 {batch.finished
-                  ? "Done — open Statistics"
+                  ? "Done — empirical graphs and PDF are on Analysis"
                   : `${batch.done} of ${batch.total} · ${batch.phase === "validate" ? "checking files" : "analyzing"}`}
               </p>
               <div className="h-2 overflow-hidden rounded-full bg-cyan-100">
@@ -1789,7 +1792,7 @@ function ReportPage({
         </CardHeader>
         <CardContent>
           {!hasData ? (
-            <EmptyNote text="Upload a sonar image. Each file is appended here immediately." />
+            <EmptyNote text="No frames in this session yet. Open Upload, queue sonar images, then Analyze. CSV / JSON / briefing / PDF are in Download." />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -2129,7 +2132,7 @@ function MapLegend({ count }: { count: number }) {
   return (
     <div className="pointer-events-none absolute right-3 bottom-3 z-[1000] rounded-md bg-white/95 px-2 py-1.5 text-[11px] text-slate-700 shadow">
       <div className="mb-1 font-medium">
-        {count ? `${count} image${count === 1 ? "" : "s"} · 1 pin each` : "Upload a sonar image to plot"}
+        {count ? `${count} image${count === 1 ? "" : "s"} · 1 pin each` : "Pins appear after Analyze"}
       </div>
       <div className="mb-1 flex gap-2">
         <span className="flex items-center gap-1">

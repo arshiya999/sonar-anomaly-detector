@@ -1,0 +1,39 @@
+# Production UI is https://aqua-vision-sih.vercel.app
+# GitHub has no Vercel app webhook on this repo, so pushes do not update that URL
+# unless a VERCEL_TOKEN (and optional project/org ids) exist as Actions secrets.
+name: deploy-vercel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  vercel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Production deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          ML_API_URL: ${{ secrets.ML_API_URL }}
+          OPS_API_URL: ${{ secrets.OPS_API_URL }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN secret is empty — skip. Connect this GitHub repo in the Vercel project aqua-vision-sih, or add the token."
+            exit 0
+          fi
+          ML="${ML_API_URL:-https://aquavision-ml.onrender.com}"
+          OPS="${OPS_API_URL:-https://aquavision-backend-7iuh.onrender.com}"
+          ARGS=(deploy --prod --yes --token "$VERCEL_TOKEN" -e "ML_API_URL=$ML" -e "OPS_API_URL=$OPS" -b "ML_API_URL=$ML" -b "OPS_API_URL=$OPS")
+          if [ -n "$VERCEL_ORG_ID" ]; then
+            mkdir -p .vercel
+            printf '{"orgId":"%s","projectId":"%s"}\n' "$VERCEL_ORG_ID" "$VERCEL_PROJECT_ID" > .vercel/project.json
+          fi
+          npx vercel "${ARGS[@]}"

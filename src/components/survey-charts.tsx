@@ -89,7 +89,7 @@ export function SurveyCharts({
         <Insight
           k="Top class"
           v={stats.topClass ? CLASS_LABEL[stats.topClass] ?? stats.topClass : "—"}
-          d={stats.topClass ? `${stats.byClass[stats.topClass]} detections` : "Upload a sonar image"}
+          d={stats.topClass ? `${stats.byClass[stats.topClass]} detections` : "Run Analyze to fill this chart"}
         />
         <Insight
           k="Mean confidence"
