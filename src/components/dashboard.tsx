@@ -604,8 +604,9 @@ export function Dashboard() {
                 wall_ms: report.pipeline_ms ?? report.inference_ms ?? 0,
                 reason: detections.length ? undefined : "Valid sonar — no contact above the confidence gate",
               };
-              const geoReport = geotagReport(report);
-              const placed = plotPosition(logRef.current, ...coordsFromReport(geoReport));
+              const [glat, glon] = coordsFromReport(report);
+              const geoReport = geotagReport(report, glat, glon);
+              const placed = plotPosition(logRef.current, glat, glon);
               localEntries.push(
                 toLogEntry({
                   id: `batch-${startedAt}-${i}`,
