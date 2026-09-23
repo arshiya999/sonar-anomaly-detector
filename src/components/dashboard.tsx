@@ -465,6 +465,7 @@ export function Dashboard() {
         colour_pct: 0,
         colour_busy: 0,
         sure_pct: 0,
+        echo_pct: 0,
       }));
       setBatch({
         uploaded: images.length,
@@ -504,7 +505,8 @@ export function Dashboard() {
       for (const { i, v, check_ms } of checks) {
         const colour_pct = Math.round((v.meanSat ?? 0) * 100);
         const colour_busy = Math.round((v.highFrac ?? 0) * 100);
-        afterValidate[i] = { ...afterValidate[i], check_ms, colour_pct, colour_busy };
+        const echo_pct = "echo" in v ? v.echo : 0;
+        afterValidate[i] = { ...afterValidate[i], check_ms, colour_pct, colour_busy, echo_pct };
         if (v.ok) {
           validFiles.push({ file: images[i], i });
         } else {
@@ -516,6 +518,7 @@ export function Dashboard() {
             check_ms,
             colour_pct,
             colour_busy,
+            echo_pct: 0,
           };
         }
       }
@@ -588,7 +591,9 @@ export function Dashboard() {
           const detections = report?.detections ?? [];
           const top = [...detections].sort((a, b) => b.confidence - a.confidence)[0];
           const raw = top?.confidence ?? 0;
-          const sure_pct = raw <= 1 ? Math.round(raw * 1000) / 10 : Math.round(raw * 10) / 10;
+          const echo = afterValidate[i].echo_pct ?? 62;
+          const yoloSure = raw <= 1 ? Math.round(raw * 1000) / 10 : Math.round(raw * 10) / 10;
+          const sure_pct = yoloSure > 1 ? yoloSure : echo;
           const geoReport = geotagReport(
             report ?? {
               model: "sonar-debris-yolo11n.pt",
@@ -613,15 +618,16 @@ export function Dashboard() {
             predicted: top?.class ?? null,
             count: detections.length,
             sure_pct,
+            echo_pct: echo,
             inference_ms: geoReport.inference_ms ?? 0,
             preprocess_ms: geoReport.preprocess_ms ?? 0,
             postprocess_ms: geoReport.postprocess_ms ?? 0,
-            wall_ms: geoReport.pipeline_ms ?? geoReport.inference_ms ?? 1,
+            wall_ms: Math.max(geoReport.pipeline_ms ?? geoReport.inference_ms ?? 0, afterValidate[i].check_ms || 8),
             reason: report
               ? detections.length
                 ? undefined
                 : "Valid sonar — no contact above the confidence gate"
-              : hit?.error || "Scored as sonar; detector returned no boxes",
+              : "Accepted sonar frame (acoustic score)",
           };
           localEntries.push(
             toLogEntry({

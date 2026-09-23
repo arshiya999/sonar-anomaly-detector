@@ -32,6 +32,7 @@ export type BatchRow = {
   colour_pct?: number;
   colour_busy?: number;
   sure_pct?: number;
+  echo_pct?: number;
 };
 
 export type BatchRun = {
@@ -140,12 +141,12 @@ function tickInt(v: number): string {
 }
 
 function validSeries(run: BatchRun | null) {
-  const rows = (run?.rows ?? []).filter((r) => r.status !== "invalid");
+  const rows = (run?.rows ?? []).filter((r) => r.status === "analyzed");
   return rows.map((row, idx) => ({
     i: idx + 1,
     name: row.filename,
     sure: row.sure_pct ?? 0,
-    tookMs: row.wall_ms || row.inference_ms || 0,
+    tookMs: Math.max(row.wall_ms || row.inference_ms || 0, 1),
   }));
 }
 

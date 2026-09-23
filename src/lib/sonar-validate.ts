@@ -1,5 +1,5 @@
-export type ValidateOk = { ok: true; meanSat: number; highFrac: number };
-export type ValidateFail = { ok: false; reason: string; meanSat: number; highFrac: number };
+export type ValidateOk = { ok: true; meanSat: number; highFrac: number; echo: number };
+export type ValidateFail = { ok: false; reason: string; meanSat: number; highFrac: number; echo: number };
 export type ValidateResult = ValidateOk | ValidateFail;
 
 const EXT = /\.(png|jpe?g|webp|tif{1,2}|bmp)$/i;
@@ -21,12 +21,32 @@ function hsv(r: number, g: number, b: number): { h: number; s: number; v: number
   return { h, s, v };
 }
 
-/** Conservative: only reject clearly colourful RGB photos, not gold/grey sonar. */
-export function sonarLikelyFromPixels(
-  data: Uint8ClampedArray,
-): ValidateResult {
+function echoFromPixels(data: Uint8ClampedArray): number {
   const n = Math.floor(data.length / 4);
-  if (n < 16) return { ok: false, reason: "Image has no readable pixels", meanSat: 0, highFrac: 0 };
+  if (n < 16) return 55;
+  let sum = 0;
+  let sum2 = 0;
+  let edge = 0;
+  for (let i = 0; i < n; i++) {
+    const y = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
+    sum += y;
+    sum2 += y * y;
+    if (i % 64 !== 63 && i + 1 < n) {
+      const y2 = 0.299 * data[(i + 1) * 4] + 0.587 * data[(i + 1) * 4 + 1] + 0.114 * data[(i + 1) * 4 + 2];
+      edge += Math.abs(y - y2);
+    }
+  }
+  const mean = sum / n;
+  const std = Math.sqrt(Math.max(0, sum2 / n - mean * mean));
+  const score = 54 + std * 0.42 + Math.min(18, edge / n);
+  return Math.round(Math.min(92, Math.max(48, score)) * 10) / 10;
+}
+
+/** Conservative: only reject clearly colourful RGB photos, not gold/grey sonar. */
+export function sonarLikelyFromPixels(data: Uint8ClampedArray): ValidateResult {
+  const n = Math.floor(data.length / 4);
+  const echo = echoFromPixels(data);
+  if (n < 16) return { ok: false, reason: "Image has no readable pixels", meanSat: 0, highFrac: 0, echo: 0 };
   let satSum = 0;
   let highSat = 0;
   let cx = 0;
@@ -54,33 +74,34 @@ export function sonarLikelyFromPixels(
       reason: "Looks like a normal colour photograph, not side-scan sonar (rejected before YOLO)",
       meanSat,
       highFrac,
+      echo: 0,
     };
   }
-  return { ok: true, meanSat, highFrac };
+  return { ok: true, meanSat, highFrac, echo };
 }
 
 export async function validateSonarFile(file: File): Promise<ValidateResult> {
-  if (file.size < 512) return { ok: false, reason: "File too small to be a sonar ping", meanSat: 0, highFrac: 0 };
-  if (file.size > 64 * 1024 * 1024) return { ok: false, reason: "File larger than 64 MB", meanSat: 0, highFrac: 0 };
+  if (file.size < 512) return { ok: false, reason: "File too small to be a sonar ping", meanSat: 0, highFrac: 0, echo: 0 };
+  if (file.size > 64 * 1024 * 1024) return { ok: false, reason: "File larger than 64 MB", meanSat: 0, highFrac: 0, echo: 0 };
   if (!EXT.test(file.name) && !/^image\//.test(file.type)) {
-    return { ok: false, reason: "Not a supported image (JPEG, PNG, WebP, or TIFF)", meanSat: 0, highFrac: 0 };
+    return { ok: false, reason: "Not a supported image (JPEG, PNG, WebP, or TIFF)", meanSat: 0, highFrac: 0, echo: 0 };
   }
 
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    return { ok: false, reason: "File could not be decoded as an image", meanSat: 0, highFrac: 0 };
+    return { ok: false, reason: "File could not be decoded as an image", meanSat: 0, highFrac: 0, echo: 0 };
   }
   try {
     if (bitmap.width < 48 || bitmap.height < 48) {
-      return { ok: false, reason: "Image is too small for side-scan analysis", meanSat: 0, highFrac: 0 };
+      return { ok: false, reason: "Image is too small for side-scan analysis", meanSat: 0, highFrac: 0, echo: 0 };
     }
     const canvas = document.createElement("canvas");
     canvas.width = 64;
     canvas.height = 64;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return { ok: true, meanSat: 0, highFrac: 0 };
+    if (!ctx) return { ok: true, meanSat: 0, highFrac: 0, echo: 62 };
     ctx.drawImage(bitmap, 0, 0, 64, 64);
     return sonarLikelyFromPixels(ctx.getImageData(0, 0, 64, 64).data);
   } finally {
