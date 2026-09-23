@@ -93,11 +93,15 @@ export function toLogEntry(opts: {
     count: opts.report.count,
     inference_ms: opts.report.inference_ms,
     threshold: opts.report.threshold,
-    detections: opts.report.detections,
+    detections: opts.report.detections.map((d) => ({
+      ...d,
+      overlay_url: d.overlay_url ?? photo,
+      image_url: d.image_url ?? opts.imageUrl ?? photo,
+    })),
     latitude: opts.lat,
     longitude: opts.lon,
     overlay_url: photo,
-    image_url: photo,
+    image_url: opts.imageUrl ?? photo,
   };
 }
 

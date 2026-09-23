@@ -359,6 +359,7 @@ export function Dashboard() {
           lon ?? reportLon,
         );
         const geoReport = geotagReport(data.report, placed.lat, placed.lon);
+        const filePhoto = opts?.previewUrl || URL.createObjectURL(imageFile);
         const localEntry = toLogEntry({
           id: `local-${Date.now()}-${imageFile.name}`,
           filename: imageFile.name,
@@ -366,10 +367,11 @@ export function Dashboard() {
           lat: placed.lat,
           lon: placed.lon,
           overlay: overlayData,
-          imageUrl: opts?.previewUrl ?? null,
+          imageUrl: filePhoto,
         });
         setReport(geoReport);
-        setOverlay(overlayData);
+        if (overlayData) setOverlay(overlayData);
+        setPreview(filePhoto);
         setLog((prev) => mergeLogs(prev, [localEntry]));
         if (placed.gnss) {
           setMeta((m) => ({
@@ -1283,9 +1285,15 @@ function HomePage({
                     onClick={() => go("analysis")}
                     className="overflow-hidden rounded-xl border border-cyan-200 bg-white text-left hover:border-cyan-600"
                   >
-                    {d.overlay_url || d.image_url || thumb ? (
+                    {d.overlay_url || d.image_url ? (
+                      <ContactThumb
+                        src={d.overlay_url || d.image_url}
+                        bbox={d.bbox_xyxy}
+                        className="h-20 w-full object-cover"
+                      />
+                    ) : thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={d.overlay_url || d.image_url || thumb || ""} alt="" className="h-20 w-full object-cover" />
+                      <img src={thumb} alt="" className="h-20 w-full object-cover" />
                     ) : (
                       <div className="h-20 bg-slate-100" />
                     )}
@@ -1536,6 +1544,61 @@ function UploadPage({
   );
 }
 
+function ContactThumb({
+  src,
+  bbox,
+  className,
+}: {
+  src?: string | null;
+  bbox?: number[] | null;
+  className?: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [failed, setFailed] = useState(false);
+  const boxKey = bbox?.slice(0, 4).join(",") ?? "";
+
+  useEffect(() => {
+    if (!src) {
+      setFailed(true);
+      return;
+    }
+    setFailed(false);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const size = 80;
+      canvas.width = size;
+      canvas.height = size;
+      let sx = 0;
+      let sy = 0;
+      let sw = img.width;
+      let sh = img.height;
+      if (bbox && bbox.length >= 4) {
+        const pad = Math.max(12, (bbox[2] - bbox[0]) * 0.3);
+        sx = Math.max(0, bbox[0] - pad);
+        sy = Math.max(0, bbox[1] - pad);
+        sw = Math.min(img.width - sx, bbox[2] - bbox[0] + pad * 2);
+        sh = Math.min(img.height - sy, bbox[3] - bbox[1] + pad * 2);
+        if (sw < 8 || sh < 8) {
+          sx = 0;
+          sy = 0;
+          sw = img.width;
+          sh = img.height;
+        }
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, size, size);
+    };
+    img.onerror = () => setFailed(true);
+    img.src = src;
+  }, [src, bbox, boxKey]);
+
+  if (!src || failed) return null;
+  return <canvas ref={canvasRef} className={className ?? "size-10 rounded object-cover bg-slate-800"} />;
+}
+
 function DetectionsPage({
   detections,
   overlay,
@@ -1547,7 +1610,6 @@ function DetectionsPage({
   preview: string | null;
   go: (p: PageId) => void;
 }) {
-  const thumb = overlay ?? preview;
   return (
     <Card className="shadow-sm">
       <CardHeader>
@@ -1572,12 +1634,13 @@ function DetectionsPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {detections.map((d) => (
-                  <TableRow key={d.id}>
+                {detections.map((d, i) => {
+                  const src = d.overlay_url || d.image_url || overlay || preview;
+                  return (
+                  <TableRow key={`${d.id}-${d.source ?? ""}-${i}`}>
                     <TableCell>
-                      {thumb ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={thumb} alt="" className="size-10 rounded object-cover" />
+                      {src ? (
+                        <ContactThumb src={src} bbox={d.bbox_xyxy} className="size-10 rounded object-cover" />
                       ) : (
                         <span
                           className="inline-block size-3 rounded-full"
@@ -1600,7 +1663,8 @@ function DetectionsPage({
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
