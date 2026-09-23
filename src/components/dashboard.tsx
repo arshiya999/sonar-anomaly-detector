@@ -1337,8 +1337,8 @@ function HomePage({
         </CardHeader>
         <CardContent>
           <SurveyCharts
-            key={`home-charts-${chartLog.length}-${chartLog[0]?.id ?? "none"}`}
-            entries={chartLog}
+            key={`home-charts-${log.length}-${log[0]?.id ?? "none"}`}
+            entries={log}
             defaultGraphs={["mix", "timeline", "confidence", "speed", "risk"]}
           />
         </CardContent>
