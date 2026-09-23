@@ -31,8 +31,14 @@ jobs:
           fi
           ML="${ML_API_URL:-https://aquavision-ml-h8vr.onrender.com}"
           OPS="${OPS_API_URL:-https://aquavision-backend-5g8u.onrender.com}"
-          ARGS=(deploy --prod --yes --token "$VERCEL_TOKEN" -e "ML_API_URL=$ML" -e "OPS_API_URL=$OPS" -b "ML_API_URL=$ML" -b "OPS_API_URL=$OPS")
-          if [ -n "$VERCEL_ORG_ID" ]; then
+          ARGS=(
+            deploy --prod --yes --token "$VERCEL_TOKEN"
+            -e "ML_API_URL=$ML" -e "OPS_API_URL=$OPS"
+            -e "NEXT_PUBLIC_ML_API_URL=$ML" -e "NEXT_PUBLIC_OPS_API_URL=$OPS"
+            -b "ML_API_URL=$ML" -b "OPS_API_URL=$OPS"
+            -b "NEXT_PUBLIC_ML_API_URL=$ML" -b "NEXT_PUBLIC_OPS_API_URL=$OPS"
+          )
+          if [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
             mkdir -p .vercel
             printf '{"orgId":"%s","projectId":"%s"}\n' "$VERCEL_ORG_ID" "$VERCEL_PROJECT_ID" > .vercel/project.json
           fi
