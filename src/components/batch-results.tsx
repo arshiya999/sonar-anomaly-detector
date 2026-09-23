@@ -109,36 +109,44 @@ export function summarizeBatch(run: BatchRun | null) {
   };
 }
 
-function seriesFromRun(run: BatchRun | null) {
-  const rows = run?.rows ?? [];
-  let uploaded = 0;
+function validSeries(run: BatchRun | null) {
+  const rows = (run?.rows ?? []).filter((r) => r.status !== "invalid");
   let valid = 0;
-  let invalid = 0;
   let identified = 0;
   let failed = 0;
   return rows.map((row, idx) => {
-    uploaded += 1;
-    if (row.status === "invalid") invalid += 1;
-    else valid += 1;
+    valid += 1;
     if (row.status === "analyzed") identified += 1;
     if (row.status === "failed") failed += 1;
-    const latency = row.status === "invalid" ? 0 : row.wall_ms || row.inference_ms || 0;
     return {
       i: idx + 1,
       name: row.filename,
-      uploaded,
       valid,
-      invalid,
       identified,
       failed,
-      latency,
+      latency: row.wall_ms || row.inference_ms || 0,
+    };
+  });
+}
+
+function invalidSeries(run: BatchRun | null) {
+  const rows = (run?.rows ?? []).filter((r) => r.status === "invalid");
+  let invalid = 0;
+  return rows.map((row, idx) => {
+    invalid += 1;
+    return {
+      i: idx + 1,
+      name: row.filename,
+      invalid,
+      reason: row.reason ?? "Not side-scan sonar",
     };
   });
 }
 
 export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
   const stats = summarizeBatch(run);
-  const series = seriesFromRun(run);
+  const valid = validSeries(run);
+  const invalid = invalidSeries(run);
   const empty = !run || run.rows.length === 0;
 
   const cards: { k: string; v: string; d: string }[] = [
@@ -154,8 +162,8 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
     <div id="sih-batch-results" className="overflow-hidden rounded-2xl border border-cyan-700 bg-[#082f49] p-5 text-cyan-50">
       <p className="font-heading text-xl font-bold text-white">Batch results</p>
       <p className="mt-1 text-xs text-cyan-200">
-        One graph: uploaded, valid, invalid, identified, and latency. Cards are the six numbers a judge needs
-        in one screenshot.
+        Same X–Y graph in two halves: left is valid sonar (counts + latency), right is rejected colour photos
+        that never reach YOLO.
       </p>
 
       {run && !run.finished ? (
@@ -177,64 +185,123 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
 
       {empty ? (
         <p className="mt-6 rounded-xl bg-cyan-950/50 px-4 py-12 text-center text-sm text-cyan-200">
-          Add files on Upload, then Analyze. The graph plots uploaded, valid, invalid, and identified vs image
-          number, with latency on the right axis.
+          Add files on Upload, then Analyze. Mix sonar with a tiger or garden photo to fill the invalid half.
         </p>
       ) : (
-        <div className="mt-5 h-[420px] rounded-xl bg-cyan-950/30 p-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={series} margin={{ top: 16, right: 28, left: 8, bottom: 28 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#155e75" />
-              <XAxis
-                dataKey="i"
-                tick={{ fill: "#bae6fd", fontSize: 11 }}
-                label={{ value: "Image in this batch", position: "insideBottom", offset: -16, fill: "#a5f3fc" }}
-              />
-              <YAxis
-                yAxisId="left"
-                allowDecimals={false}
-                tick={{ fill: "#bae6fd", fontSize: 11 }}
-                label={{ value: "Cumulative count", angle: -90, position: "insideLeft", fill: "#a5f3fc" }}
-              />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                tick={{ fill: "#fde68a", fontSize: 11 }}
-                label={{ value: "Latency (ms)", angle: 90, position: "insideRight", fill: "#fde68a" }}
-              />
-              <Tooltip
-                contentStyle={TOOLTIP}
-                labelFormatter={(v, pts) => {
-                  const name = (pts?.[0]?.payload as { name?: string } | undefined)?.name;
-                  return name ? `Image ${v} · ${name}` : `Image ${v}`;
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: 12, color: "#ecfeff" }} />
-              <Line yAxisId="left" type="monotone" dataKey="uploaded" name="Uploaded" stroke="#67e8f9" strokeWidth={2.4} dot={false} />
-              <Line yAxisId="left" type="monotone" dataKey="valid" name="Valid sonar" stroke="#34d399" strokeWidth={2.4} dot={false} />
-              <Line yAxisId="left" type="monotone" dataKey="invalid" name="Invalid" stroke="#f87171" strokeWidth={2.4} dot={false} />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="identified"
-                name="Successfully identified"
-                stroke="#38bdf8"
-                strokeWidth={2.4}
-                dot={false}
-              />
-              <Line yAxisId="left" type="monotone" dataKey="failed" name="Failed" stroke="#fbbf24" strokeWidth={2} dot={false} />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="latency"
-                name="Latency (ms)"
-                stroke="#fde68a"
-                strokeWidth={2}
-                strokeDasharray="5 4"
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="mt-5 grid gap-3 lg:grid-cols-2">
+          <div className="rounded-xl bg-cyan-950/30 p-3">
+            <p className="mb-1 text-sm font-semibold text-emerald-200">Valid sonar</p>
+            <p className="mb-2 text-[11px] text-cyan-200">
+              Left axis = how many valid frames (and how many were identified). Right axis = latency in ms for
+              that frame only.
+            </p>
+            {valid.length === 0 ? (
+              <p className="grid h-[320px] place-items-center text-sm text-cyan-200">No valid sonar in this run.</p>
+            ) : (
+              <div className="h-[340px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={valid} margin={{ top: 28, right: 36, left: 8, bottom: 36 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#155e75" />
+                    <XAxis
+                      dataKey="i"
+                      tick={{ fill: "#bae6fd", fontSize: 11 }}
+                      height={40}
+                      label={{ value: "Valid image number", position: "bottom", offset: 12, fill: "#a5f3fc" }}
+                    />
+                    <YAxis
+                      yAxisId="left"
+                      allowDecimals={false}
+                      tick={{ fill: "#bae6fd", fontSize: 11 }}
+                      label={{ value: "Count", angle: -90, position: "insideLeft", fill: "#a5f3fc" }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fill: "#fde68a", fontSize: 11 }}
+                      label={{ value: "Latency (ms)", angle: 90, position: "insideRight", fill: "#fde68a" }}
+                    />
+                    <Tooltip
+                      contentStyle={TOOLTIP}
+                      labelFormatter={(v, pts) => {
+                        const name = (pts?.[0]?.payload as { name?: string } | undefined)?.name;
+                        return name ? `Valid ${v} · ${name}` : `Valid ${v}`;
+                      }}
+                    />
+                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#ecfeff" }} />
+                    <Line yAxisId="left" type="monotone" dataKey="valid" name="Valid sonar" stroke="#34d399" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="identified"
+                      name="Successfully identified"
+                      stroke="#38bdf8"
+                      strokeWidth={2.5}
+                      dot={{ r: 3 }}
+                    />
+                    <Line yAxisId="left" type="monotone" dataKey="failed" name="Failed" stroke="#fbbf24" strokeWidth={2} dot={false} />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="latency"
+                      name="Latency (ms)"
+                      stroke="#fde68a"
+                      strokeWidth={2}
+                      strokeDasharray="5 4"
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl bg-cyan-950/30 p-3">
+            <p className="mb-1 text-sm font-semibold text-rose-200">Invalid — not sonar</p>
+            <p className="mb-2 text-[11px] text-cyan-200">
+              Tiger, garden, and other colour photos. Counted here and never sent to the detector.
+            </p>
+            {invalid.length === 0 ? (
+              <p className="grid h-[320px] place-items-center px-4 text-center text-sm text-cyan-200">
+                No invalid files this run. Add a colour photo with the sonar set to see this half climb.
+              </p>
+            ) : (
+              <div className="h-[340px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={invalid} margin={{ top: 28, right: 16, left: 8, bottom: 36 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#155e75" />
+                    <XAxis
+                      dataKey="i"
+                      tick={{ fill: "#bae6fd", fontSize: 11 }}
+                      height={40}
+                      label={{ value: "Invalid image number", position: "bottom", offset: 12, fill: "#a5f3fc" }}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fill: "#fecaca", fontSize: 11 }}
+                      label={{ value: "Rejected count", angle: -90, position: "insideLeft", fill: "#fecaca" }}
+                    />
+                    <Tooltip
+                      contentStyle={TOOLTIP}
+                      labelFormatter={(v, pts) => {
+                        const row = pts?.[0]?.payload as { name?: string; reason?: string } | undefined;
+                        return row?.name ? `Invalid ${v} · ${row.name}` : `Invalid ${v}`;
+                      }}
+                      formatter={(value) => [`${value}`, "Rejected so far"]}
+                    />
+                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 11, color: "#ecfeff" }} />
+                    <Line
+                      type="monotone"
+                      dataKey="invalid"
+                      name="Invalid (rejected)"
+                      stroke="#f87171"
+                      strokeWidth={3}
+                      dot={{ r: 5, fill: "#f87171" }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
