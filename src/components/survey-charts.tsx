@@ -67,12 +67,14 @@ const CONF_BAR: Record<string, string> = {
 export function SurveyCharts({
   entries,
   defaultGraphs = ["mix", "timeline", "confidence"],
+  showLogTable = true,
 }: {
   entries: ScanLogEntry[];
   defaultGraphs?: GraphId[];
+  showLogTable?: boolean;
 }) {
   const [on, setOn] = useState<GraphId[]>(defaultGraphs);
-  const [showLog, setShowLog] = useState(true);
+  const [showLog, setShowLog] = useState(showLogTable);
   const stats = useMemo(() => buildStats(entries), [entries]);
 
   const toggle = (id: GraphId) => {

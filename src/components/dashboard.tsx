@@ -848,10 +848,27 @@ export function Dashboard() {
           {page === "results" && (
             <div className="space-y-4">
               <p className="text-sm text-slate-600">
-                One page for the whole run. Invalid colour photos never reach the detector. Times are measured,
-                not estimated.
+                Column charts and pies for this batch, plus the same hazard / confidence / class mix graphs used
+                on the dashboard. Invalid colour photos never reach the detector.
               </p>
               <BatchResultsPanel run={batch} />
+              <Card className="shadow-sm">
+                <CardHeader>
+                  <CardTitle>Hazard, pie, confidence, latency</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    These are the same live graphs as Home and Analysis. They fill from every valid sonar frame
+                    in this batch (and earlier pings this session).
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <SurveyCharts
+                    key={`results-charts-${chartLog.length}-${chartLog[0]?.id ?? "none"}`}
+                    entries={chartLog}
+                    defaultGraphs={["mix", "timeline", "confidence", "speed", "risk"]}
+                    showLogTable={false}
+                  />
+                </CardContent>
+              </Card>
             </div>
           )}
           {page === "analysis" && (
@@ -896,7 +913,11 @@ export function Dashboard() {
                   </p>
                 </CardHeader>
                 <CardContent>
-                  <SurveyCharts key={`charts-${chartLog.length}-${chartLog[0]?.id ?? "none"}`} entries={chartLog} />
+                  <SurveyCharts
+                    key={`charts-${chartLog.length}-${chartLog[0]?.id ?? "none"}`}
+                    entries={chartLog}
+                    defaultGraphs={["mix", "timeline", "confidence", "speed", "risk"]}
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -1146,7 +1167,7 @@ function HomePage({
           <SurveyCharts
             key={`home-charts-${log.length}-${log[0]?.id ?? "none"}`}
             entries={log}
-            defaultGraphs={["timeline", "confidence", "risk"]}
+            defaultGraphs={["mix", "timeline", "confidence", "speed", "risk"]}
           />
         </CardContent>
       </Card>

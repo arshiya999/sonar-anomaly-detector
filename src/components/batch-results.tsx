@@ -5,13 +5,16 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { CLASS_LABEL } from "@/lib/labels";
-import { KIT_EVALUATION, VAL_EVALUATION } from "@/lib/evaluation";
+import { CLASS_COLOR, CLASS_LABEL } from "@/lib/labels";
+import { EVAL_CLASSES, KIT_EVALUATION, VAL_EVALUATION } from "@/lib/evaluation";
 
 export type BatchStatus = "queued" | "invalid" | "analyzed" | "failed";
 
@@ -51,6 +54,9 @@ const TOOLTIP = {
   fontSize: 12,
   color: "#ecfeff",
 };
+
+const TICK = { fill: "#bae6fd", fontSize: 11 };
+const GRID = "#155e75";
 
 export function fmtDuration(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return "—";
@@ -102,15 +108,22 @@ export function summarizeBatch(run: BatchRun | null) {
   };
 }
 
-type BarRow = { name: string; value: number; fill: string; detail: string };
-
-function bar(name: string, value: number | null, fill: string, detail: string): BarRow {
-  return {
-    name,
-    value: value == null || !Number.isFinite(value) ? 0 : Number(value.toFixed(1)),
-    fill,
-    detail: value == null || !Number.isFinite(value) ? `no score · ${detail}` : detail,
-  };
+function OceanCard({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-cyan-700 bg-[#082f49] p-4 text-cyan-50">
+      <p className="font-heading text-base font-bold text-white">{title}</p>
+      <p className="mb-3 text-xs text-cyan-200">{note}</p>
+      {children}
+    </div>
+  );
 }
 
 export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
@@ -121,83 +134,253 @@ export function BatchResultsPanel({ run }: { run: BatchRun | null }) {
       ? (100 * KIT_EVALUATION.correct) / KIT_EVALUATION.n
       : 0;
 
-  const bars: BarRow[] = [
-    bar("Validation rate", stats.validationRate, "#34d399", `${stats.valid} valid / ${stats.uploaded} uploaded × 100`),
-    bar("Rejection rate", stats.rejectionRate, "#f87171", `${stats.invalid} rejected / ${stats.uploaded} uploaded × 100`),
-    bar("Analysis success", stats.analysisSuccessRate, "#38bdf8", `${stats.analyzed} analyzed / ${stats.valid} valid × 100`),
-    bar("Precision (val)", VAL_EVALUATION.precision * 100, "#67e8f9", VAL_EVALUATION.source),
-    bar("Recall (val)", VAL_EVALUATION.recall * 100, "#22d3ee", "126 held-out images, epoch 12"),
-    bar("F1 (val)", VAL_EVALUATION.f1 * 100, "#a5f3fc", "2·P·R / (P+R) from val P and R"),
-    bar("mAP@50", VAL_EVALUATION.map50 * 100, "#fbbf24", "Val boxes, IoU 0.50"),
-    bar("mAP@50-95", VAL_EVALUATION.map50_95 * 100, "#f59e0b", "Val boxes, IoU 0.50–0.95"),
-    bar("Kit match", kitMatch, "#86efac", `${KIT_EVALUATION.correct ?? "?"} / ${KIT_EVALUATION.n} image-level`),
-    bar("Precision (kit)", KIT_EVALUATION.precision * 100, "#c4b5fd", KIT_EVALUATION.source),
-    bar("Recall (kit)", KIT_EVALUATION.recall * 100, "#a78bfa", `n=${KIT_EVALUATION.n}`),
-    bar("F1 (kit)", KIT_EVALUATION.f1 * 100, "#818cf8", "Macro F1 on labeled kit"),
-    ...KIT_EVALUATION.perClass.flatMap((row) => {
-      const label = CLASS_LABEL[row.classId] ?? row.classId;
-      const n = `n=${row.support}`;
-      return [
-        bar(`P ${label}`, row.precision == null ? null : row.precision * 100, "#99f6e4", `kit precision · ${n}`),
-        bar(`R ${label}`, row.recall == null ? null : row.recall * 100, "#5eead4", `kit recall · ${n}`),
-        bar(`F1 ${label}`, row.f1 == null ? null : row.f1 * 100, "#2dd4bf", `kit F1 · ${n}`),
-      ];
-    }),
+  const countBars = [
+    { name: "Uploaded", value: stats.uploaded, fill: "#67e8f9" },
+    { name: "Valid sonar", value: stats.valid, fill: "#34d399" },
+    { name: "Rejected", value: stats.invalid, fill: "#f87171" },
+    { name: "Analyzed", value: stats.analyzed, fill: "#38bdf8" },
+    { name: "Failed", value: stats.failed, fill: "#fbbf24" },
   ];
-
-  const height = Math.max(480, bars.length * 28);
+  const rateBars = [
+    { name: "Validation %", value: Number(stats.validationRate.toFixed(1)), fill: "#34d399" },
+    { name: "Rejection %", value: Number(stats.rejectionRate.toFixed(1)), fill: "#f87171" },
+    { name: "Analysis success %", value: Number(stats.analysisSuccessRate.toFixed(1)), fill: "#38bdf8" },
+  ];
+  const pieSlice = [
+    { name: "Valid analyzed", value: stats.analyzed, fill: "#34d399" },
+    { name: "Rejected", value: stats.invalid, fill: "#f87171" },
+    { name: "Failed", value: stats.failed, fill: "#fbbf24" },
+    { name: "Queued", value: Math.max(0, stats.uploaded - stats.analyzed - stats.invalid - stats.failed), fill: "#64748b" },
+  ].filter((s) => s.value > 0);
+  const timeBars = [
+    { name: "Batch wall", value: Math.round(stats.wallMs), fill: "#22d3ee" },
+    { name: "Avg wall / img", value: Math.round(stats.avgWall), fill: "#67e8f9" },
+    { name: "YOLO sum", value: Math.round(stats.inferenceMs), fill: "#fbbf24" },
+    { name: "Avg YOLO", value: Math.round(stats.avgInfer), fill: "#f59e0b" },
+    { name: "Preprocess sum", value: Math.round(stats.preprocessMs), fill: "#a5f3fc" },
+    { name: "Avg preprocess", value: Math.round(stats.avgPre), fill: "#67e8f9" },
+    { name: "Postprocess sum", value: Math.round(stats.postprocessMs), fill: "#c4b5fd" },
+    { name: "Avg postprocess", value: Math.round(stats.avgPost), fill: "#a78bfa" },
+  ];
+  const throughputBars = [
+    { name: "Throughput img/s", value: Number(stats.throughput.toFixed(3)), fill: "#86efac" },
+  ];
+  const valBars = [
+    { name: "Precision", value: Number((VAL_EVALUATION.precision * 100).toFixed(1)), fill: "#67e8f9" },
+    { name: "Recall", value: Number((VAL_EVALUATION.recall * 100).toFixed(1)), fill: "#22d3ee" },
+    { name: "F1", value: Number((VAL_EVALUATION.f1 * 100).toFixed(1)), fill: "#a5f3fc" },
+    { name: "mAP@50", value: Number((VAL_EVALUATION.map50 * 100).toFixed(1)), fill: "#fbbf24" },
+    { name: "mAP@50-95", value: Number((VAL_EVALUATION.map50_95 * 100).toFixed(1)), fill: "#f59e0b" },
+    { name: "Kit match", value: Number(kitMatch.toFixed(1)), fill: "#86efac" },
+    { name: "Kit P", value: Number((KIT_EVALUATION.precision * 100).toFixed(1)), fill: "#c4b5fd" },
+    { name: "Kit R", value: Number((KIT_EVALUATION.recall * 100).toFixed(1)), fill: "#a78bfa" },
+    { name: "Kit F1", value: Number((KIT_EVALUATION.f1 * 100).toFixed(1)), fill: "#818cf8" },
+  ];
+  const classBars = KIT_EVALUATION.perClass.map((row) => ({
+    name: (CLASS_LABEL[row.classId] ?? row.classId).split(" ")[0],
+    Precision: row.precision == null ? 0 : Number((row.precision * 100).toFixed(1)),
+    Recall: row.recall == null ? 0 : Number((row.recall * 100).toFixed(1)),
+    F1: row.f1 == null ? 0 : Number((row.f1 * 100).toFixed(1)),
+  }));
+  const confusionBars = EVAL_CLASSES.map((gt, i) => {
+    const row: Record<string, string | number> = {
+      name: (CLASS_LABEL[gt] ?? gt).split(" ")[0],
+    };
+    EVAL_CLASSES.forEach((pred, j) => {
+      row[CLASS_LABEL[pred] ?? pred] = KIT_EVALUATION.confusion[i]?.[j] ?? 0;
+    });
+    return row;
+  });
 
   return (
-    <div
-      id="sih-batch-results"
-      className="overflow-hidden rounded-2xl border border-cyan-700 bg-[#082f49] p-5 text-cyan-50"
-    >
-      <p className="font-heading text-lg font-bold text-white">Aqua Vision — batch results</p>
-      <p className="mt-1 text-xs leading-relaxed text-cyan-200">
-        Counts: {stats.uploaded} uploaded · {stats.valid} valid sonar · {stats.invalid} rejected ·{" "}
-        {stats.analyzed} analyzed · {stats.failed} failed. Measured times: batch {fmtDuration(stats.wallMs)} ·
-        avg wall {fmtDuration(stats.avgWall)} · avg YOLO {fmtDuration(stats.avgInfer)} · avg preprocess{" "}
-        {fmtDuration(stats.avgPre)} · avg postprocess {fmtDuration(stats.avgPost)} ·{" "}
-        {stats.throughput ? `${stats.throughput.toFixed(2)} img/s` : "—"} · preprocess sum{" "}
-        {fmtDuration(stats.preprocessMs)} · YOLO sum {fmtDuration(stats.inferenceMs)} · postprocess sum{" "}
-        {fmtDuration(stats.postprocessMs)}. Graph is 0–100% only: this-run rates, val P/R/F1/mAP, kit P/R/F1,
-        per-class kit P/R/F1. Screenshot this card.
-      </p>
-
+    <div id="sih-batch-results" className="space-y-4">
       {run && !run.finished ? (
-        <p className="mt-3 font-mono text-sm text-amber-200">
+        <p className="font-mono text-sm text-amber-700">
           {run.phase === "validate" ? "Checking files" : "Analyzing"} · {run.done} of {run.total}
           {run.current ? ` · ${run.current}` : ""}
         </p>
       ) : null}
 
-      {empty ? (
-        <p className="mt-6 rounded-xl bg-cyan-950/50 px-4 py-10 text-center text-sm text-cyan-200">
-          Add files on Upload, then Analyze. This single graph fills from that run plus the stored val/kit scores.
-        </p>
-      ) : (
-        <div className="mt-4" style={{ height }}>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <OceanCard
+          title="This run — counts"
+          note="Uploaded, valid sonar, rejected, successfully analyzed, failed. Validation rate = valid/uploaded × 100."
+        >
+          {empty ? (
+            <EmptyChart />
+          ) : (
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={countBars} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                  <XAxis dataKey="name" tick={TICK} interval={0} angle={-12} textAnchor="end" height={48} />
+                  <YAxis allowDecimals={false} tick={TICK} />
+                  <Tooltip contentStyle={TOOLTIP} />
+                  <Bar dataKey="value" name="Images" radius={[8, 8, 0, 0]} maxBarSize={56}>
+                    {countBars.map((row) => (
+                      <Cell key={row.name} fill={row.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </OceanCard>
+
+        <OceanCard
+          title="This run — rates"
+          note="Validation rate, rejection rate, analysis success (analyzed / valid × 100)."
+        >
+          {empty ? (
+            <EmptyChart />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={rateBars} margin={{ top: 8, right: 8, left: 0, bottom: 24 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                    <XAxis dataKey="name" tick={TICK} interval={0} angle={-18} textAnchor="end" height={56} />
+                    <YAxis domain={[0, 100]} tick={TICK} unit="%" />
+                    <Tooltip contentStyle={TOOLTIP} />
+                    <Bar dataKey="value" name="%" radius={[8, 8, 0, 0]} maxBarSize={48}>
+                      {rateBars.map((row) => (
+                        <Cell key={row.name} fill={row.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieSlice} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={88} stroke="#082f49">
+                      {pieSlice.map((row) => (
+                        <Cell key={row.name} fill={row.fill} />
+                      ))}
+                    </Pie>
+                    <Legend wrapperStyle={{ fontSize: 11, color: "#ecfeff" }} />
+                    <Tooltip contentStyle={TOOLTIP} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </OceanCard>
+
+        <OceanCard
+          title="Performance (measured clocks)"
+          note={`Wall ${fmtDuration(stats.wallMs)} · throughput ${stats.throughput ? `${stats.throughput.toFixed(2)} img/s` : "—"} · YOLO ${fmtDuration(stats.inferenceMs)} · preprocess ${fmtDuration(stats.preprocessMs)} · postprocess ${fmtDuration(stats.postprocessMs)}.`}
+        >
+          {empty ? (
+            <EmptyChart />
+          ) : (
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={timeBars} margin={{ top: 8, right: 8, left: 0, bottom: 28 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                  <XAxis dataKey="name" tick={TICK} interval={0} angle={-22} textAnchor="end" height={64} />
+                  <YAxis tick={TICK} unit=" ms" />
+                  <Tooltip contentStyle={TOOLTIP} formatter={(v) => [`${v} ms`, "Time"]} />
+                  <Bar dataKey="value" name="ms" radius={[8, 8, 0, 0]} maxBarSize={40}>
+                    {timeBars.map((row) => (
+                      <Cell key={row.name} fill={row.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </OceanCard>
+
+        <OceanCard title="Throughput" note="Successfully analyzed images per second of wall-clock batch time.">
+          {empty ? (
+            <EmptyChart />
+          ) : (
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={throughputBars} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                  <XAxis dataKey="name" tick={TICK} />
+                  <YAxis tick={TICK} />
+                  <Tooltip contentStyle={TOOLTIP} />
+                  <Bar dataKey="value" name="img/s" fill="#86efac" radius={[8, 8, 0, 0]} maxBarSize={80} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </OceanCard>
+      </div>
+
+      <OceanCard
+        title="Ground-truth evaluation"
+        note={`${VAL_EVALUATION.source}. Kit n=${KIT_EVALUATION.n}, ${KIT_EVALUATION.correct ?? "?"} matched. F1 = 2·P·R/(P+R).`}
+      >
+        <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={bars} layout="vertical" margin={{ top: 8, right: 28, left: 4, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#155e75" />
-              <XAxis type="number" domain={[0, 100]} tick={{ fill: "#bae6fd", fontSize: 11 }} unit="%" />
-              <YAxis type="category" dataKey="name" width={132} tick={{ fill: "#ecfeff", fontSize: 10 }} />
-              <Tooltip
-                contentStyle={TOOLTIP}
-                formatter={(value, _n, item) => {
-                  const row = item?.payload as BarRow | undefined;
-                  return [`${value}% · ${row?.detail ?? ""}`, "Score"];
-                }}
-              />
-              <Bar dataKey="value" name="%" radius={[0, 6, 6, 0]} maxBarSize={18}>
-                {bars.map((row) => (
+            <BarChart data={valBars} margin={{ top: 8, right: 8, left: 0, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis dataKey="name" tick={TICK} interval={0} angle={-16} textAnchor="end" height={52} />
+              <YAxis domain={[0, 100]} tick={TICK} unit="%" />
+              <Tooltip contentStyle={TOOLTIP} formatter={(v) => [`${v}%`, "Score"]} />
+              <Bar dataKey="value" name="%" radius={[8, 8, 0, 0]} maxBarSize={44}>
+                {valBars.map((row) => (
                   <Cell key={row.name} fill={row.fill} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
-      )}
+      </OceanCard>
+
+      <OceanCard title="Per-class precision / recall / F1 (kit)" note="Image-level vs example_class. Missing F1 plots as 0 (no score for that class).">
+        <div className="h-[320px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={classBars} margin={{ top: 8, right: 8, left: 0, bottom: 24 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis dataKey="name" tick={TICK} interval={0} angle={-16} textAnchor="end" height={52} />
+              <YAxis domain={[0, 100]} tick={TICK} unit="%" />
+              <Tooltip contentStyle={TOOLTIP} />
+              <Legend wrapperStyle={{ fontSize: 12, color: "#ecfeff" }} />
+              <Bar dataKey="Precision" fill="#67e8f9" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Recall" fill="#34d399" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="F1" fill="#fbbf24" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </OceanCard>
+
+      <OceanCard
+        title="Confusion (kit) — stacked graph"
+        note="Each column is ground truth. Coloured stacks are what the detector predicted. Not a table."
+      >
+        <div className="h-[340px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={confusionBars} margin={{ top: 8, right: 8, left: 0, bottom: 24 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis dataKey="name" tick={TICK} interval={0} angle={-16} textAnchor="end" height={52} />
+              <YAxis allowDecimals={false} tick={TICK} />
+              <Tooltip contentStyle={TOOLTIP} />
+              <Legend wrapperStyle={{ fontSize: 11, color: "#ecfeff" }} />
+              {EVAL_CLASSES.map((c) => (
+                <Bar
+                  key={c}
+                  dataKey={CLASS_LABEL[c] ?? c}
+                  stackId="conf"
+                  fill={CLASS_COLOR[c] ?? "#22d3ee"}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </OceanCard>
     </div>
+  );
+}
+
+function EmptyChart() {
+  return (
+    <p className="grid h-[220px] place-items-center rounded-xl bg-cyan-950/50 px-4 text-center text-sm text-cyan-200">
+      Add files on Upload, then Analyze. These columns fill from that run.
+    </p>
   );
 }
