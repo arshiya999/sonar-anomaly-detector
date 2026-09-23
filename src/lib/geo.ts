@@ -27,14 +27,73 @@ export function lastMappedPosition(entries: ScanLogEntry[]): [number, number] | 
   return null;
 }
 
+export function isPlausibleGnss(lat?: number | null, lon?: number | null): boolean {
+  if (lat == null || lon == null) return false;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+  if (Math.abs(lat) < 0.05 && Math.abs(lon) < 0.05) return false;
+  if (Math.abs(lat) > 85) return false;
+  return true;
+}
+
+/** Spread pins on a readable grid so a 30-file run does not stack. */
+export function gridLatLon(index: number): { lat: number; lon: number } {
+  const col = index % 8;
+  const row = Math.floor(index / 8);
+  return {
+    lat: SURVEY_PLOT_ORIGIN[0] + 0.016 * (2 - row),
+    lon: SURVEY_PLOT_ORIGIN[1] + 0.02 * (col - 3.5),
+  };
+}
+
+export type ImagePinInput = {
+  id: string;
+  filename: string;
+  previewUrl?: string | null;
+  status: string;
+  predicted?: string | null;
+  count?: number;
+  sure_pct?: number | null;
+  echo_pct?: number | null;
+};
+
+/** One map pin per Analyze row — accepted sonar and rejected RGB. */
+export function pinsFromImageRows(rows: ImagePinInput[], runId = "run"): SurveyPin[] {
+  const ready = rows.filter((r) => {
+    if (r.status === "invalid" || r.status === "analyzed" || r.status === "failed") return true;
+    return (r.echo_pct ?? 0) > 0;
+  });
+  return ready.map((r, index) => {
+    const spot = gridLatLon(index);
+    const rejected = r.status === "invalid";
+    return {
+      id: `${runId}-${r.id}`,
+      filename: r.filename,
+      latitude: spot.lat,
+      longitude: spot.lon,
+      overlay_url: r.previewUrl || null,
+      material: rejected
+        ? "Rejected"
+        : r.predicted
+          ? CLASS_LABEL[r.predicted] ?? r.predicted
+          : "Sonar",
+      classId: r.predicted ?? undefined,
+      confidence: r.sure_pct ?? null,
+      latest: index === ready.length - 1,
+      ageLabel: rejected ? "Rejected RGB" : "Accepted sonar",
+      hitCount: r.count ?? 0,
+      contactSummary: rejected ? "Rejected" : "Sonar",
+    } satisfies SurveyPin;
+  });
+}
+
 /** Always returns a pin location. GNSS if known; otherwise next point on the survey plot. */
 export function plotPosition(
   entries: ScanLogEntry[],
   lat?: number | null,
   lon?: number | null,
 ): { lat: number; lon: number; gnss: boolean } {
-  if (lat != null && lon != null && Number.isFinite(lat) && Number.isFinite(lon)) {
-    return { lat, lon, gnss: true };
+  if (isPlausibleGnss(lat, lon)) {
+    return { lat: lat as number, lon: lon as number, gnss: true };
   }
   const last = lastMappedPosition(entries);
   if (last) {
@@ -147,72 +206,37 @@ function photoOf(e: ScanLogEntry): string | null {
     || e.detections.find((d) => d.image_url)?.image_url || null;
 }
 
-function pinRows(entries: ScanLogEntry[]): ScanLogEntry[] {
-  const byFile = new Map<string, ScanLogEntry>();
-  const newestFirst = [...entries].sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || ""));
-  for (const e of newestFirst) {
-    const prev = byFile.get(e.filename);
-    if (!prev) {
-      byFile.set(e.filename, e);
-      continue;
-    }
-    const prevPhoto = photoOf(prev);
-    const nextPhoto = photoOf(e);
-    if (!prevPhoto && nextPhoto) byFile.set(e.filename, e);
-  }
-  return [...byFile.values()].sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || ""));
-}
-
 export function pinsFromLog(entries: ScanLogEntry[]): SurveyPin[] {
-  const unique = pinRows(entries);
-  const pins = unique.flatMap((e, index) => {
+  const unique = [...entries].sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || ""));
+  return unique.map((e, index) => {
     const top = [...e.detections].sort((a, b) => b.confidence - a.confidence)[0];
+    const spot = gridLatLon(index);
     const rawLat = asCoord(e.latitude) ?? asCoord(top?.latitude);
     const rawLon = asCoord(e.longitude) ?? asCoord(top?.longitude);
-    const placed = plotPosition(unique.slice(0, index), rawLat, rawLon);
-    const lat = placed.lat;
-    const lon = placed.lon;
+    const placed = isPlausibleGnss(rawLat, rawLon) ? { lat: rawLat as number, lon: rawLon as number } : spot;
     const latest = index === 0;
     const rejected = e.survey.startsWith("Rejected") || e.id.includes("rejected");
-    return [
-      {
-        id: e.id,
-        filename: e.filename,
-        latitude: lat,
-        longitude: lon,
-        overlay_url: photoOf(e),
-        material: top
-          ? CLASS_LABEL[top.class] ?? top.class
-          : rejected
-            ? "Rejected"
-            : "Sonar",
-        classId: top?.class,
-        confidence: top?.confidence != null ? presentConfidencePct(top.confidence) : null,
-        confidenceYolo: top?.confidence_parts?.yolo != null ? top.confidence_parts.yolo * 100 : null,
-        confidenceContrast: top?.confidence_parts?.contrast != null ? top.confidence_parts.contrast * 100 : null,
-        confidenceShadow: top?.confidence_parts?.shadow != null ? top.confidence_parts.shadow * 100 : null,
-        latest,
-        ageLabel: latest ? "Latest ping" : "Earlier ping",
-        hitCount: e.count,
-        contactSummary: [...new Set(e.detections.map((d) => CLASS_LABEL[d.class] ?? d.class))].join(", "),
-      } satisfies SurveyPin,
-    ];
-  });
-  const groups = new Map<string, SurveyPin[]>();
-  for (const p of pins) {
-    const key = `${p.latitude.toFixed(4)},${p.longitude.toFixed(4)}`;
-    const list = groups.get(key) ?? [];
-    list.push(p);
-    groups.set(key, list);
-  }
-  return pins.map((p) => {
-    const key = `${p.latitude.toFixed(4)},${p.longitude.toFixed(4)}`;
-    const list = groups.get(key) ?? [p];
-    if (list.length < 2 || p.latest) return p;
-    const slot = list.filter((x) => !x.latest).findIndex((x) => x.id === p.id) + 1;
-    const dlat = 0.0045 * slot;
-    const dlon = 0.0055 * ((slot % 2 === 0 ? 1 : -1) * Math.ceil(slot / 2));
-    return { ...p, latitude: p.latitude + dlat, longitude: p.longitude + dlon };
+    return {
+      id: e.id,
+      filename: e.filename,
+      latitude: placed.lat,
+      longitude: placed.lon,
+      overlay_url: photoOf(e),
+      material: top
+        ? CLASS_LABEL[top.class] ?? top.class
+        : rejected
+          ? "Rejected"
+          : "Sonar",
+      classId: top?.class,
+      confidence: top?.confidence != null ? presentConfidencePct(top.confidence) : null,
+      confidenceYolo: top?.confidence_parts?.yolo != null ? top.confidence_parts.yolo * 100 : null,
+      confidenceContrast: top?.confidence_parts?.contrast != null ? top.confidence_parts.contrast * 100 : null,
+      confidenceShadow: top?.confidence_parts?.shadow != null ? top.confidence_parts.shadow * 100 : null,
+      latest,
+      ageLabel: rejected ? "Rejected RGB" : latest ? "Latest sonar" : "Accepted sonar",
+      hitCount: e.count,
+      contactSummary: [...new Set(e.detections.map((d) => CLASS_LABEL[d.class] ?? d.class))].join(", "),
+    } satisfies SurveyPin;
   });
 }
 

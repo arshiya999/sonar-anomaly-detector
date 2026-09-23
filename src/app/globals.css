@@ -183,6 +183,12 @@
 .sonar-photo-pin-face.is-latest {
   box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.9), 0 2px 10px rgba(15, 23, 42, 0.45);
 }
+.sonar-photo-pin-face.is-sonar {
+  border-color: #22d3ee;
+}
+.sonar-photo-pin-face.is-rejected {
+  border-color: #fb7185;
+}
 
 .leaflet-tooltip.sonar-material-label {
   background: #0c4a6e;

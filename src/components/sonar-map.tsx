@@ -10,20 +10,33 @@ type Mapped = Detection & { source?: string };
 
 function FitPins({ points }: { points: [number, number][] }) {
   const map = useMap();
-  const key = points.map((p) => p.join(",")).join("|");
+  const key = `${points.length}:${points[0]?.join(",") ?? ""}:${points[points.length - 1]?.join(",") ?? ""}`;
   useEffect(() => {
-    try {
-      if (map.getSize().x < 8) return;
-      map.invalidateSize();
-      if (points.length === 0) {
-        map.setView([13.0827, 80.2707], 8);
-        return;
+    const fit = () => {
+      try {
+        map.invalidateSize();
+        if (map.getSize().x < 8) return false;
+        if (points.length === 0) {
+          map.setView([13.0827, 80.2707], 10);
+          return true;
+        }
+        if (points.length === 1) {
+          map.setView(points[0], 13);
+          return true;
+        }
+        map.fitBounds(L.latLngBounds(points), { padding: [56, 56], maxZoom: 13 });
+        return true;
+      } catch {
+        return true;
       }
-      if (points.length === 1) map.setView(points[0], 13);
-      else map.fitBounds(L.latLngBounds(points), { padding: [48, 48], maxZoom: 14 });
-    } catch {
-      /* unmounted */
-    }
+    };
+    fit();
+    const t1 = window.setTimeout(fit, 80);
+    const t2 = window.setTimeout(fit, 400);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
   }, [map, key, points]);
   return null;
 }
@@ -72,36 +85,37 @@ function escapeAttr(value: string): string {
 }
 
 function photoIcon(pin: SurveyPin): L.DivIcon {
-  const size = pin.latest ? 52 : 44;
-  const ring = pin.latest ? "#fbbf24" : "#ffffff";
+  const size = pin.latest ? 58 : 50;
+  const rejected = pin.material === "Rejected" || pin.ageLabel?.includes("Rejected");
+  const ring = pin.latest ? "#fbbf24" : rejected ? "#fb7185" : "#22d3ee";
   const src = pin.overlay_url;
   const inner = src
     ? `<img src="${escapeAttr(src)}" alt="${escapeAttr(pin.material)}" />`
-    : `<span>${escapeAttr((pin.material || "?").slice(0, 2))}</span>`;
+    : `<span>${escapeAttr((rejected ? "RJ" : "SN").slice(0, 2))}</span>`;
   return L.divIcon({
     className: "sonar-photo-pin",
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
     popupAnchor: [0, -size / 2],
-    html: `<div class="sonar-photo-pin-face ${pin.latest ? "is-latest" : ""}" style="width:${size}px;height:${size}px;border-color:${ring}">${inner}</div>`,
+    html: `<div class="sonar-photo-pin-face ${pin.latest ? "is-latest" : ""} ${rejected ? "is-rejected" : "is-sonar"}" style="width:${size}px;height:${size}px;border-color:${ring}">${inner}</div>`,
   });
 }
 
 function PhotoPin({ pin }: { pin: SurveyPin }) {
   const icon = useMemo(
     () => photoIcon(pin),
-    [pin.id, pin.overlay_url, pin.latest, pin.material],
+    [pin.id, pin.overlay_url, pin.latest, pin.material, pin.ageLabel],
   );
   const photo = pin.overlay_url;
   return (
-    <Marker pane="pins" position={[pin.latitude, pin.longitude]} icon={icon}>
-      <Tooltip permanent direction="top" offset={[0, pin.latest ? -28 : -24]} className="sonar-material-label">
-        {pin.latest ? `Latest · ${pin.material}` : pin.material}
+    <Marker pane="pins" position={[pin.latitude, pin.longitude]} icon={icon} zIndexOffset={pin.latest ? 800 : 400}>
+      <Tooltip permanent direction="top" offset={[0, pin.latest ? -32 : -28]} className="sonar-material-label">
+        {pin.material}
       </Tooltip>
       <Popup>
         <div className="max-w-[260px] text-sm text-slate-900">
           <p className="text-[10px] font-semibold tracking-wide text-cyan-800 uppercase">
-            {pin.latest ? "Latest ping (this upload)" : "Earlier ping (previous upload)"}
+            {pin.ageLabel || (pin.latest ? "Latest ping" : "Survey ping")}
           </p>
           <p className="font-semibold">{pin.material}</p>
           <p className="text-xs text-slate-600">{pin.filename}</p>
@@ -115,7 +129,7 @@ function PhotoPin({ pin }: { pin: SurveyPin }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photo} alt={pin.material} className="mt-2 max-h-48 w-full rounded object-cover" />
           ) : (
-            <p className="mt-2 text-xs text-slate-500">No sonar frame stored for this ping yet. Re-upload to attach the photo.</p>
+            <p className="mt-2 text-xs text-slate-500">No photo on this ping.</p>
           )}
         </div>
       </Popup>
@@ -138,7 +152,7 @@ export function SonarMap({
     [surveys],
   );
   const center = points[0] ?? ([13.0827, 80.2707] as [number, number]);
-  const zoom = points.length ? 13 : 8;
+  const zoom = points.length ? 12 : 8;
 
   return (
     <MapContainer center={center} zoom={zoom} className="h-full min-h-[280px] w-full" scrollWheelZoom>

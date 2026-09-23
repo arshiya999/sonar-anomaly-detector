@@ -52,6 +52,7 @@ import {
   detectionsFromLog,
   geotagReport,
   mergeLogs,
+  pinsFromImageRows,
   pinsFromLog,
   plotPosition,
   rejectedLogEntry,
@@ -816,7 +817,20 @@ export function Dashboard() {
     return Object.entries(counts).map(([cls, count]) => ({ class: cls, count }));
   }, [allDetections]);
 
-  const surveyPins: SurveyPin[] = useMemo(() => pinsFromLog(log), [log]);
+  const surveyPins: SurveyPin[] = useMemo(() => {
+    const live = pinsFromImageRows(batch?.rows ?? [], String(batch?.startedAt ?? "run"));
+    const names = new Set(live.map((p) => p.filename));
+    const older = pinsFromLog(log)
+      .filter((p) => !names.has(p.filename))
+      .map((p, i) => {
+        const spot = {
+          lat: 13.0827 + 0.016 * (2 - Math.floor((live.length + i) / 8)),
+          lon: 80.2707 + 0.02 * (((live.length + i) % 8) - 3.5),
+        };
+        return { ...p, latest: false, latitude: spot.lat, longitude: spot.lon };
+      });
+    return [...live, ...older];
+  }, [batch, log]);
 
   const latest = useMemo(() => {
     if (report?.detections.length) {
