@@ -1,4 +1,4 @@
-Aqua Vision check kit (preview amendments)
+Aqua Vision check kit
 
 01-valid-sonar/
   30 side-scan frames. Each was run through the local detector and returned
@@ -10,9 +10,9 @@ Aqua Vision check kit (preview amendments)
   (invalid), not treated as ocean debris.
 
 How to test
-1. Open the preview site, not https://aqua-vision-sih.vercel.app
+1. Open the site (local `npm run dev` or the Vercel URL)
 2. Upload → Add files → select all 35 (Ctrl/Shift), or add 30 then add 5
 3. Tap Analyze once
-4. Batch results should show about 30 valid / 5 rejected, one graph
+4. Batch results should show about 30 valid / 5 rejected, plus the two graphs
 
 These are sonar *images* for the SIH demo, not raw XTF/JSF waterfalls.

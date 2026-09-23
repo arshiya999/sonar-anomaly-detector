@@ -1,5 +1,5 @@
 # Keep Aqua Vision reachable for SIH judges through 31 Dec 2026.
-# This runs on GitHub, not on the Cursor VM — closing the agent does not stop it.
+# Scheduled on GitHub Actions so the public site and Render services stay warm.
 name: keep-alive
 
 on:

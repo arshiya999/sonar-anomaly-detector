@@ -22,16 +22,11 @@ Open http://127.0.0.1:47281 on this machine.
 
 **Share this URL:** https://aqua-vision-sih.vercel.app
 
-That site runs on **Vercel**, not on this Cursor machine. Closing the Cloud Agent, laptop, or tunnel does **not** take the website down. It stays online for judges through **31 December 2026** (and after, as long as the Vercel project exists).
+That site runs on **Vercel**. Closing a laptop does not take it down. It stays online for judges through **31 December 2026** (and after, as long as the Vercel project exists).
 
-Detection uses Render (`aquavision-ml` + `aquavision-backend-7iuh`). Free Render can nap after idle time. Two keep-alives run **without this VM**:
-
-1. GitHub Action `keep-alive` — every 10 minutes, on GitHub’s servers
-2. Optional Vercel Cron on `/api/keep-alive` (the GitHub Action already pings the site)
+Detection uses Render (`aquavision-ml` + `aquavision-backend-7iuh`). Free Render can nap after idle time. A GitHub Action pings the services every 10 minutes.
 
 First open after a Render nap can take ~30–50s while YOLO wakes, then Evaluate works. The dashboard still loads even if the detector is waking.
-
-Do **not** share `trycloudflare.com` links — those die when a local tunnel stops.
 
 `dev:all` starts:
 
