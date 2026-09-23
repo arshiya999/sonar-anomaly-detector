@@ -26,7 +26,7 @@ import {
   User,
   Waves,
   Images,
-  FolderOpen,
+  ListChecks,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,12 +61,14 @@ import { ClassMixPie } from "@/components/class-mix-pie";
 import { BrandMark } from "@/components/brand-mark";
 import { PipelineStrip } from "@/components/pipeline-strip";
 import { SonarTheater } from "@/components/sonar-theater";
-import { BatchAccuracyPoster, type BatchRun } from "@/components/batch-accuracy";
-import { scoreVerdict, type Verdict } from "@/lib/score-image";
+import { BatchResultsPanel, type BatchRun, type BatchRow } from "@/components/batch-results";
+import { validateSonarFile } from "@/lib/sonar-validate";
+import { mapPool } from "@/lib/map-pool";
 
 /** This preview branch must not write to the live Render log or mix in production surveys. */
 const PREVIEW_ISOLATION = true;
 const MAX_BATCH = 200;
+const DETECT_CONCURRENCY = 4;
 
 const SonarMap = dynamic(
   () => import("@/components/sonar-map").then((m) => m.SonarMap),
@@ -80,6 +82,7 @@ type PageId =
   | "detections"
   | "map"
   | "report"
+  | "results"
   | "history"
   | "settings"
   | "about";
@@ -88,6 +91,7 @@ const NAV: { id: PageId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "upload", label: "Upload", icon: Upload },
   { id: "analysis", label: "Analysis", icon: ScanLine },
+  { id: "results", label: "Batch results", icon: ListChecks },
   { id: "detections", label: "Detections", icon: Target },
   { id: "map", label: "Map", icon: MapIcon },
   { id: "report", label: "Report", icon: FileSpreadsheet },
@@ -301,10 +305,16 @@ export function Dashboard() {
       if (mppx != null) metadata.meters_per_pixel_x = mppx;
       if (mppy != null) metadata.meters_per_pixel_y = mppy;
       try {
-        const hosts = [PUBLIC_ML_URL, PUBLIC_OPS_URL, health?.ml || ""]
-          .map((h) => (h || "").replace(/\/+$/, ""))
-          .filter((h, i, arr) => h.startsWith("http") && arr.indexOf(h) === i);
-        const detectUrls = hosts.length ? hosts.map((h) => `${h}/detect`) : ["/api/detect"];
+        const hosts = PREVIEW_ISOLATION
+          ? [PUBLIC_ML_URL, ""]
+          : [PUBLIC_OPS_URL, PUBLIC_ML_URL, health?.ml || ""];
+        const detectUrls = [
+          ...hosts
+            .map((h) => (h || "").replace(/\/+$/, ""))
+            .filter((h, i, arr) => h.startsWith("http") && arr.indexOf(h) === i)
+            .map((h) => `${h}/detect`),
+          "/api/detect",
+        ].filter((u, i, arr) => arr.indexOf(u) === i);
         let data: DetectResponse | null = null;
         let lastError = "Detection failed";
         for (const detectUrl of detectUrls) {
@@ -312,6 +322,7 @@ export function Dashboard() {
           formTry.append("image", imageFile);
           formTry.append("conf_threshold", String(threshold / 100));
           formTry.append("metadata", JSON.stringify(metadata));
+          formTry.append("return_overlay", opts?.skipOverlay ? "false" : "true");
           try {
             const res = await fetch(detectUrl, {
               method: "POST",
@@ -415,92 +426,147 @@ export function Dashboard() {
     [meta, threshold, refreshLog, health],
   );
 
-  const markBatch = useCallback((id: string, verdict: Verdict) => {
-    setBatch((prev) =>
-      prev ? { ...prev, rows: prev.rows.map((row) => (row.id === id ? { ...row, verdict } : row)) } : prev,
-    );
-  }, []);
-
   const onFiles = useCallback(
     async (picked: File[]) => {
-      const images = picked
-        .filter((f) => f.type.startsWith("image/") || /\.(png|jpe?g|webp|tif{1,2})$/i.test(f.name))
-        .slice(0, MAX_BATCH);
+      const images = picked.slice(0, MAX_BATCH);
       if (!images.length) {
-        toast.error("No sonar images in that selection");
+        toast.error("No files in that selection");
         return;
       }
       batchCancel.current = false;
       const startedAt = Date.now();
+      const seedRows: BatchRow[] = images.map((f, i) => ({
+        id: `${startedAt}-${i}-${f.name}`,
+        filename: f.name,
+        status: "queued",
+        predicted: null,
+        count: 0,
+        inference_ms: 0,
+        wall_ms: 0,
+      }));
       setBatch({
-        total: images.length,
+        uploaded: images.length,
+        valid: 0,
+        invalid: 0,
+        analyzed: 0,
+        failed: 0,
         done: 0,
-        current: images[0].name,
+        total: images.length,
+        phase: "validate",
+        current: "Checking files…",
         startedAt,
         elapsedMs: 0,
         finished: false,
-        rows: [],
+        rows: seedRows,
       });
       setBusy(true);
       setError(null);
-      setPage("analysis");
+      setPage("results");
       setFile(images[0]);
       setPreview(URL.createObjectURL(images[0]));
-      toast.message(
-        images.length === 1
-          ? `Scanning ${images[0].name}`
-          : `Scanning ${images.length} images — stay on this page`,
+      toast.message(`Checking ${images.length} files, then analyzing valid sonar in parallel`);
+
+      const checks = await mapPool(images, 6, async (file, i) => {
+        const v = await validateSonarFile(file);
+        return { file, i, v };
+      });
+      if (batchCancel.current) {
+        setBusy(false);
+        return;
+      }
+
+      const validFiles: { file: File; i: number }[] = [];
+      let invalidCount = 0;
+      const afterValidate: BatchRow[] = seedRows.map((row) => ({ ...row }));
+      for (const { i, v } of checks) {
+        if (v.ok) {
+          validFiles.push({ file: images[i], i });
+        } else {
+          invalidCount += 1;
+          afterValidate[i] = { ...afterValidate[i], status: "invalid", reason: v.reason };
+        }
+      }
+      setBatch((prev) =>
+        prev
+          ? {
+              ...prev,
+              phase: "analyze",
+              valid: images.length - invalidCount,
+              invalid: invalidCount,
+              done: invalidCount,
+              current: "Starting detector…",
+              elapsedMs: Date.now() - startedAt,
+              rows: afterValidate,
+            }
+          : prev,
       );
 
-      for (let i = 0; i < images.length; i++) {
-        if (batchCancel.current) break;
-        const imageFile = images[i];
-        setFile(imageFile);
-        setPreview(URL.createObjectURL(imageFile));
+      await mapPool(validFiles, DETECT_CONCURRENCY, async ({ file, i }) => {
+        if (batchCancel.current) return;
         setBatch((prev) =>
           prev
-            ? { ...prev, current: imageFile.name, done: i, elapsedMs: Date.now() - startedAt }
+            ? { ...prev, current: file.name, elapsedMs: Date.now() - startedAt }
             : prev,
         );
-        const result = await runDetect(imageFile, undefined, {
-          quiet: images.length > 1,
+        const t0 = Date.now();
+        const result = await runDetect(file, undefined, {
+          quiet: true,
           keepBusy: true,
-          skipOverlay: images.length > 1 && i < images.length - 1,
+          skipOverlay: true,
         });
+        const wall = Date.now() - t0;
         const detections = result?.geoReport.detections ?? [];
-        const scored = scoreVerdict(imageFile.name, detections);
         const top = [...detections].sort((a, b) => b.confidence - a.confidence)[0];
         setBatch((prev) => {
           if (!prev) return prev;
+          const rows = prev.rows.map((row) => ({ ...row }));
+          if (result?.geoReport) {
+            rows[i] = {
+              ...rows[i],
+              status: "analyzed",
+              predicted: top?.class ?? null,
+              count: detections.length,
+              inference_ms: result.geoReport.inference_ms ?? 0,
+              wall_ms: wall,
+              reason: detections.length ? undefined : "Valid sonar — no contact above the confidence gate",
+            };
+          } else {
+            rows[i] = {
+              ...rows[i],
+              status: "failed",
+              reason: "Detector did not return a report",
+              wall_ms: wall,
+            };
+          }
+          const analyzed = rows.filter((r) => r.status === "analyzed").length;
+          const failed = rows.filter((r) => r.status === "failed").length;
+          const invalid = rows.filter((r) => r.status === "invalid").length;
           return {
             ...prev,
-            done: i + 1,
+            analyzed,
+            failed,
+            done: analyzed + failed + invalid,
             elapsedMs: Date.now() - startedAt,
-            rows: [
-              ...prev.rows,
-              {
-                id: `${i}-${imageFile.name}`,
-                filename: imageFile.name,
-                expected: scored.expected,
-                predicted: scored.predicted,
-                labelled: scored.labelled,
-                verdict: scored.verdict,
-                count: detections.length,
-                inference_ms: result?.geoReport.inference_ms ?? 0,
-                length_m: top?.dimensions.length_m ?? null,
-                width_m: top?.dimensions.width_m ?? null,
-              },
-            ],
+            rows,
           };
         });
-      }
+      });
 
       setBatch((prev) =>
-        prev ? { ...prev, finished: true, current: "", elapsedMs: Date.now() - startedAt, done: prev.rows.length } : prev,
+        prev
+          ? {
+              ...prev,
+              phase: "done",
+              finished: true,
+              current: "",
+              elapsedMs: Date.now() - startedAt,
+              done: prev.total,
+            }
+          : prev,
       );
       setBusy(false);
-      const n = images.length;
-      toast.success(n === 1 ? "Scan complete — open the accuracy graph" : `Batch complete — ${n} images scored`);
+      setQueue([]);
+      toast.success("Run complete — see Batch results");
     },
     [runDetect],
   );
@@ -634,6 +700,7 @@ export function Dashboard() {
     dashboard: "Operations overview",
     upload: "Upload sonar log",
     analysis: "Waterfall analysis",
+    results: "Batch results",
     detections: "All detections",
     map: "Global detections map",
     report: "Cleanup report",
@@ -742,7 +809,6 @@ export function Dashboard() {
               preview={preview}
               log={log}
               batch={batch}
-              onMarkBatch={markBatch}
               go={go}
               onPickOrigin={pickMapOrigin}
             />
@@ -758,18 +824,12 @@ export function Dashboard() {
               batch={batch}
               queue={queue}
               onStage={(files) => {
-                const images = files.filter(
-                  (f) => f.type.startsWith("image/") || /\.(png|jpe?g|webp|tif{1,2})$/i.test(f.name),
-                );
-                if (!images.length) {
-                  toast.error("No image files in that selection");
-                  return;
-                }
+                if (!files.length) return;
                 setQueue((prev) => {
                   const map = new Map(prev.map((f) => [`${f.name}-${f.size}-${f.lastModified}`, f]));
-                  for (const f of images) map.set(`${f.name}-${f.size}-${f.lastModified}`, f);
+                  for (const f of files) map.set(`${f.name}-${f.size}-${f.lastModified}`, f);
                   const next = Array.from(map.values()).slice(0, MAX_BATCH);
-                  toast.message(`${next.length} image${next.length === 1 ? "" : "s"} ready — tap Start batch`);
+                  toast.message(`${next.length} file${next.length === 1 ? "" : "s"} ready — add more or tap Analyze`);
                   return next;
                 });
               }}
@@ -782,6 +842,15 @@ export function Dashboard() {
               onRerun={() => file && void onFiles([file])}
             />
           )}
+          {page === "results" && (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">
+                One page for the whole run. Invalid colour photos never reach the detector. Times are measured,
+                not estimated.
+              </p>
+              <BatchResultsPanel run={batch} />
+            </div>
+          )}
           {page === "analysis" && (
             <div className="space-y-4">
               <PipelineStrip
@@ -789,7 +858,7 @@ export function Dashboard() {
                 complete={Boolean(report) && !busy}
                 hint={busy ? "Processing sonar log" : report ? "Last ping fused and geotagged" : "Standing by"}
               />
-              <BatchAccuracyPoster run={batch} onMark={markBatch} />
+              <BatchResultsPanel run={batch} />
               <div className="grid gap-4 xl:grid-cols-2">
                 <SonarTheater
                   preview={preview}
@@ -912,7 +981,6 @@ function HomePage({
   preview,
   log,
   batch,
-  onMarkBatch,
   go,
   onPickOrigin,
 }: {
@@ -929,7 +997,6 @@ function HomePage({
   preview: string | null;
   log: ScanLogEntry[];
   batch: BatchRun | null;
-  onMarkBatch: (id: string, verdict: Verdict) => void;
   go: (p: PageId) => void;
   onPickOrigin?: (lat: number, lon: number) => void;
 }) {
@@ -1068,7 +1135,7 @@ function HomePage({
         </Card>
       </div>
 
-      <BatchAccuracyPoster run={batch} onMark={onMarkBatch} />
+      <BatchResultsPanel run={batch} />
 
       <Card className="shadow-sm">
         <CardHeader>
@@ -1217,7 +1284,6 @@ function UploadPage({
 }) {
   const [dragging, setDragging] = useState(false);
   const manyRef = useRef<HTMLInputElement>(null);
-  const folderRef = useRef<HTMLInputElement>(null);
   const take = (list: FileList | File[] | null) => {
     if (!list) return;
     onStage(Array.from(list));
@@ -1228,37 +1294,25 @@ function UploadPage({
       showOpenFilePicker?: (opts: {
         multiple: boolean;
         excludeAcceptAllOption?: boolean;
+        types?: { description: string; accept: Record<string, string[]> }[];
       }) => Promise<Array<{ getFile: () => Promise<File> }>>;
-      showDirectoryPicker?: () => Promise<{
-        values: () => AsyncIterable<{ kind: string; getFile?: () => Promise<File> }>;
-      }>;
     };
     try {
-      if (typeof w.showDirectoryPicker === "function") {
-        const dir = await w.showDirectoryPicker();
-        const out: File[] = [];
-        const walk = async (handle: {
-          values: () => AsyncIterable<{
-            kind: string;
-            getFile?: () => Promise<File>;
-            values?: () => AsyncIterable<unknown>;
-          }>;
-        }) => {
-          for await (const entry of handle.values()) {
-            if (entry.kind === "file" && entry.getFile) out.push(await entry.getFile());
-            else if (entry.kind === "directory" && entry.values) await walk(entry as typeof handle);
-          }
-        };
-        await walk(dir);
-        if (out.length) {
-          take(out);
-          return;
-        }
-      }
       if (typeof w.showOpenFilePicker === "function") {
         const handles = await w.showOpenFilePicker({
           multiple: true,
           excludeAcceptAllOption: false,
+          types: [
+            {
+              description: "Sonar / image files",
+              accept: {
+                "image/jpeg": [".jpg", ".jpeg"],
+                "image/png": [".png"],
+                "image/webp": [".webp"],
+                "image/tiff": [".tif", ".tiff"],
+              },
+            },
+          ],
         });
         take(await Promise.all(handles.map((h) => h.getFile())));
         return;
@@ -1266,17 +1320,17 @@ function UploadPage({
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
     }
-    folderRef.current?.click();
+    manyRef.current?.click();
   };
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(280px,380px)_1fr]">
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Batch upload</CardTitle>
+          <CardTitle>Add sonar files</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Do not use the phone Camera or Photos gallery — that only allows one picture. Use a folder or the
-            Files picker so 100 images load together.
+            One file window, many files: Ctrl+click or Shift+click only the sonar frames you want. You can tap
+            Add files again to append 20, then 30, then 50. Analyze runs once for the whole list.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1284,20 +1338,8 @@ function UploadPage({
             ref={manyRef}
             type="file"
             multiple
-            className="sr-only"
+            className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-cyan-800 file:px-3 file:py-2 file:text-white"
             disabled={busy}
-            onChange={(e) => {
-              take(e.target.files);
-              e.target.value = "";
-            }}
-          />
-          <input
-            ref={folderRef}
-            type="file"
-            multiple
-            className="sr-only"
-            disabled={busy}
-            {...({ webkitdirectory: true, directory: true } as Record<string, boolean>)}
             onChange={(e) => {
               take(e.target.files);
               e.target.value = "";
@@ -1305,23 +1347,13 @@ function UploadPage({
           />
 
           <Button className="h-12 w-full text-base" disabled={busy} onClick={() => void pickManyWithSystemDialog()}>
-            <FolderOpen />
-            Pick a whole folder (100+ images)
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 w-full"
-            disabled={busy}
-            onClick={() => manyRef.current?.click()}
-          >
             <Images />
-            Pick many files in one list
+            Add files (select many)
           </Button>
           <p className="text-xs text-slate-600">
-            After “Pick many files”: switch the dialog to <strong>Browse / Files / This PC</strong> — not
-            Camera. Then Ctrl+A (Windows) or Cmd+A (Mac), or Shift+click from first to last. On a phone use
-            the Files app, not the photo gallery.
+            In the file window hold <strong>Ctrl</strong> (Windows) or <strong>Cmd</strong> (Mac) and click each
+            sonar image, or click the first then <strong>Shift+click</strong> the last. Do not use the phone
+            Camera roll. Drop files below also works. Then tap Analyze once.
           </p>
 
           <div
@@ -1343,7 +1375,7 @@ function UploadPage({
               dragging ? "border-cyan-700 bg-cyan-50" : "border-cyan-300 bg-slate-50 text-slate-600"
             }`}
           >
-            Or drag a folder / many files from your desktop and drop them here.
+            Or drop several image files here (not a mixed dump of every file on the disk).
           </div>
 
           <div
@@ -1353,11 +1385,9 @@ function UploadPage({
                 : "border border-amber-300 bg-amber-50 text-amber-950"
             }`}
           >
-            <p className="font-semibold">{queue.length} images queued</p>
+            <p className="font-semibold">{queue.length} files ready</p>
             <p className="text-xs">
-              {queue.length >= 100
-                ? "Enough for the PPT batch. Tap Start batch."
-                : `Add ${Math.max(0, 100 - queue.length)} more to reach 100. You can still start with fewer.`}
+              Add files as many times as you want. Nothing is analyzed until you tap Analyze.
             </p>
           </div>
 
@@ -1367,20 +1397,22 @@ function UploadPage({
             onClick={onStartQueue}
           >
             {busy ? <Loader2 className="animate-spin" /> : <Upload />}
-            Start batch ({queue.length})
+            Analyze ({queue.length})
           </Button>
           <Button type="button" variant="outline" className="w-full" disabled={busy || queue.length === 0} onClick={onClearQueue}>
             Clear queue
           </Button>
           {busy && batch ? (
             <Button type="button" variant="outline" className="w-full" onClick={onCancelBatch}>
-              Stop batch after this image
+              Stop after in-flight images
             </Button>
           ) : null}
           {batch ? (
             <div className="space-y-1 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs text-cyan-950">
               <p className="font-medium">
-                {batch.finished ? "Batch complete — screenshot the graph on Analysis" : `Scanning ${batch.done} / ${batch.total}`}
+                {batch.finished
+                  ? "Done — open Batch results"
+                  : `${batch.done} of ${batch.total} · ${batch.phase === "validate" ? "checking files" : "analyzing"}`}
               </p>
               <div className="h-2 overflow-hidden rounded-full bg-cyan-100">
                 <div
@@ -1458,7 +1490,7 @@ function UploadPage({
         <CardContent>
           {queue.length === 0 ? (
             <p className="text-sm text-slate-500">
-              No files yet. Use “Select many images” or “Choose a whole folder”. Then Start batch.
+              No files yet. Tap Add files, Ctrl+click the sonar images you want, Open, then Analyze.
             </p>
           ) : (
             <ul className="max-h-[480px] space-y-1 overflow-auto text-xs">
