@@ -66,7 +66,7 @@ import { SonarTheater } from "@/components/sonar-theater";
 import { BatchResultsPanel, type BatchRun, type BatchRow } from "@/components/batch-results";
 import { validateSonarFile } from "@/lib/sonar-validate";
 import { detectFolder } from "@/lib/batch-detect";
-import { chartEntriesFromRun } from "@/lib/chart-entries";
+import { chartEntriesFromRun, debrisPieRows } from "@/lib/chart-entries";
 import { mapPool } from "@/lib/map-pool";
 
 /** Production site writes surveys to the live ops log and uses Render ML + ops. */
@@ -814,11 +814,7 @@ export function Dashboard() {
 
   const allDetections: Mapped[] = useMemo(() => detectionsFromLog(chartLog), [chartLog]);
 
-  const mixRows = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const d of allDetections) counts[d.class] = (counts[d.class] ?? 0) + 1;
-    return Object.entries(counts).map(([cls, count]) => ({ class: cls, count }));
-  }, [allDetections]);
+  const mixRows = useMemo(() => debrisPieRows(chartLog), [chartLog]);
 
   const surveyPins: SurveyPin[] = useMemo(() => {
     const live = pinsFromImageRows(batch?.rows ?? [], String(batch?.startedAt ?? "run"));
@@ -1258,7 +1254,7 @@ function HomePage({
           </CardHeader>
           <CardContent>
             {mixRows.length === 0 ? (
-              <EmptyNote text="Pie slices appear after Analyze — sonar classes plus rejected RGB." />
+              <EmptyNote text="Pie slices list debris types on accepted sonar — propeller, tire, wreck, valve, chain, bottle, diver." />
             ) : (
               <ClassMixPie rows={mixRows} height={280} />
             )}

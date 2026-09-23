@@ -6,6 +6,9 @@ export const CLASS_LABEL: Record<string, string> = {
   propeller: "Propeller",
   tire: "Tire",
   cylinder: "Cylinder / pipe",
+  valve: "Valve",
+  chain: "Chain / cable",
+  bottle: "Bottle / container",
   diver: "Diver / human",
   rejected: "Rejected RGB",
 };
@@ -18,6 +21,9 @@ export const CLASS_COLOR: Record<string, string> = {
   propeller: "#fbbf24",
   tire: "#34d399",
   cylinder: "#facc15",
+  valve: "#fb923c",
+  chain: "#67e8f9",
+  bottle: "#a3e635",
   diver: "#fb7185",
   rejected: "#94a3b8",
 };

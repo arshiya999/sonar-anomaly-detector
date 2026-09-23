@@ -24,7 +24,7 @@ export function ClassMixPie({
   if (live.length === 0) {
     return (
       <div className="grid h-full min-h-[180px] place-items-center px-4 text-center text-sm text-muted-foreground">
-        Pie slices appear as soon as a sonar image is classified.
+                    Pie slices appear as soon as accepted sonar is classified by debris type.
       </div>
     );
   }

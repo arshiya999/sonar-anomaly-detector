@@ -25,6 +25,7 @@ import {
 import { CLASS_COLOR, CLASS_LABEL } from "@/lib/labels";
 import { formatIst } from "@/lib/format";
 import type { ScanLogEntry } from "@/lib/types";
+import { debrisPieRows } from "@/lib/chart-entries";
 import { Toggle } from "@/components/ui/toggle";
 import { ClassMixPie } from "@/components/class-mix-pie";
 import {
@@ -142,8 +143,8 @@ export function SurveyCharts({
               title="Debris pie chart"
               subtitle={
                 stats.classRows.length
-                  ? "Each slice is a detected class across all uploaded images"
-                  : "Upload sonar files — slices appear for each class (pipe, wreck, debris, …)"
+                  ? "Each slice is a debris type on accepted sonar — propeller, tire, wreck, valve, chain, bottle, diver"
+                  : "Upload sonar files — slices appear for propeller, tire, wreck, valve, chain, bottle, and other contacts"
               }
             >
               <ClassMixPie rows={stats.classRows} height={280} />
@@ -397,13 +398,7 @@ function buildStats(entries: ScanLogEntry[]) {
     }
   }
 
-  const classRows = Object.entries(byClass)
-    .sort((a, b) => b[1] - a[1])
-    .map(([cls, count]) => ({
-      class: cls,
-      label: CLASS_LABEL[cls] ?? cls,
-      count,
-    }));
+  const classRows = debrisPieRows(entries);
   const topClass = classRows[0]?.class ?? "";
   let runningHits = 0;
   const timeline = chronological.map((e, i) => {
