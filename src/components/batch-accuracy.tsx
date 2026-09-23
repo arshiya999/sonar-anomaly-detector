@@ -5,6 +5,7 @@ import { CLASS_LABEL } from "@/lib/labels";
 import type { Verdict } from "@/lib/score-image";
 
 export type BatchRow = {
+  id: string;
   filename: string;
   expected: string | null;
   predicted: string | null;
@@ -76,7 +77,7 @@ export function BatchAccuracyPoster({
   onMark,
 }: {
   run: BatchRun | null;
-  onMark?: (filename: string, verdict: Verdict) => void;
+  onMark?: (id: string, verdict: Verdict) => void;
 }) {
   const stats = summarizeBatch(run);
   const bars = [
@@ -156,7 +157,7 @@ export function BatchAccuracyPoster({
             </thead>
             <tbody>
               {run.rows.map((row) => (
-                <tr key={row.filename} className="border-t border-cyan-900/80">
+                <tr key={row.id} className="border-t border-cyan-900/80">
                   <td className="max-w-[180px] truncate px-3 py-1.5 font-mono">{row.filename}</td>
                   <td className="px-3 py-1.5">{row.expected ? CLASS_LABEL[row.expected] ?? row.expected : "—"}</td>
                   <td className="px-3 py-1.5">{row.predicted ? CLASS_LABEL[row.predicted] ?? row.predicted : "none"}</td>
@@ -167,7 +168,7 @@ export function BatchAccuracyPoster({
                         row.verdict === "correct" ? "bg-emerald-500/20 text-emerald-200" : "bg-rose-500/20 text-rose-200"
                       }`}
                       onClick={() =>
-                        onMark?.(row.filename, row.verdict === "correct" ? "incorrect" : "correct")
+                        onMark?.(row.id, row.verdict === "correct" ? "incorrect" : "correct")
                       }
                       title="Tap to override for the PPT count"
                     >

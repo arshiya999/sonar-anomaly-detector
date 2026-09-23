@@ -25,6 +25,8 @@ import {
   Upload,
   User,
   Waves,
+  Images,
+  FolderOpen,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -184,7 +186,6 @@ function applyDeviceGps(setMeta: (m: MetaForm) => void, meta: MetaForm) {
 type Mapped = Detection & { source?: string };
 
 export function Dashboard() {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState<PageId>("dashboard");
   const [navOpen, setNavOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -209,6 +210,7 @@ export function Dashboard() {
   const [pipeStep, setPipeStep] = useState(0);
   const [clock, setClock] = useState("");
   const [batch, setBatch] = useState<BatchRun | null>(null);
+  const [queue, setQueue] = useState<File[]>([]);
   const batchCancel = useRef(false);
 
   const refreshLog = useCallback(() => {
@@ -272,7 +274,11 @@ export function Dashboard() {
   }, [refreshLog]);
 
   const runDetect = useCallback(
-    async (imageFile: File, nextMeta?: MetaForm, opts?: { quiet?: boolean; keepBusy?: boolean }) => {
+    async (
+      imageFile: File,
+      nextMeta?: MetaForm,
+      opts?: { quiet?: boolean; keepBusy?: boolean; skipOverlay?: boolean },
+    ) => {
       setBusy(true);
       setError(null);
       const used = await resolveGps(nextMeta ?? meta);
@@ -330,9 +336,10 @@ export function Dashboard() {
         if (!data?.report) {
           throw new Error(lastError);
         }
-        const overlayData = data.overlay_jpeg_base64
-          ? `data:image/jpeg;base64,${data.overlay_jpeg_base64}`
-          : null;
+        const overlayData =
+          opts?.skipOverlay || !data.overlay_jpeg_base64
+            ? null
+            : `data:image/jpeg;base64,${data.overlay_jpeg_base64}`;
         const [reportLat, reportLon] = coordsFromReport(data.report);
         const placed = plotPosition(
           logRef.current,
@@ -408,11 +415,9 @@ export function Dashboard() {
     [meta, threshold, refreshLog, health],
   );
 
-  const markBatch = useCallback((filename: string, verdict: Verdict) => {
+  const markBatch = useCallback((id: string, verdict: Verdict) => {
     setBatch((prev) =>
-      prev
-        ? { ...prev, rows: prev.rows.map((row) => (row.filename === filename ? { ...row, verdict } : row)) }
-        : prev,
+      prev ? { ...prev, rows: prev.rows.map((row) => (row.id === id ? { ...row, verdict } : row)) } : prev,
     );
   }, []);
 
@@ -457,7 +462,11 @@ export function Dashboard() {
             ? { ...prev, current: imageFile.name, done: i, elapsedMs: Date.now() - startedAt }
             : prev,
         );
-        const result = await runDetect(imageFile, undefined, { quiet: images.length > 1, keepBusy: true });
+        const result = await runDetect(imageFile, undefined, {
+          quiet: images.length > 1,
+          keepBusy: true,
+          skipOverlay: images.length > 1 && i < images.length - 1,
+        });
         const detections = result?.geoReport.detections ?? [];
         const scored = scoreVerdict(imageFile.name, detections);
         const top = [...detections].sort((a, b) => b.confidence - a.confidence)[0];
@@ -470,6 +479,7 @@ export function Dashboard() {
             rows: [
               ...prev.rows,
               {
+                id: `${i}-${imageFile.name}`,
                 filename: imageFile.name,
                 expected: scored.expected,
                 predicted: scored.predicted,
@@ -739,7 +749,6 @@ export function Dashboard() {
           )}
           {page === "upload" && (
             <UploadPage
-              inputRef={inputRef}
               threshold={threshold}
               setThreshold={setThreshold}
               busy={busy}
@@ -747,8 +756,25 @@ export function Dashboard() {
               meta={meta}
               setMeta={setMeta}
               batch={batch}
-              onPick={() => inputRef.current?.click()}
-              onFiles={onFiles}
+              queue={queue}
+              onStage={(files) => {
+                const images = files.filter(
+                  (f) => f.type.startsWith("image/") || /\.(png|jpe?g|webp|tif{1,2})$/i.test(f.name),
+                );
+                if (!images.length) {
+                  toast.error("No image files in that selection");
+                  return;
+                }
+                setQueue((prev) => {
+                  const map = new Map(prev.map((f) => [`${f.name}-${f.size}-${f.lastModified}`, f]));
+                  for (const f of images) map.set(`${f.name}-${f.size}-${f.lastModified}`, f);
+                  const next = Array.from(map.values()).slice(0, MAX_BATCH);
+                  toast.message(`${next.length} image${next.length === 1 ? "" : "s"} ready — tap Start batch`);
+                  return next;
+                });
+              }}
+              onClearQueue={() => setQueue([])}
+              onStartQueue={() => void onFiles(queue)}
               onCancelBatch={() => {
                 batchCancel.current = true;
                 toast.message("Stopping after this image");
@@ -903,7 +929,7 @@ function HomePage({
   preview: string | null;
   log: ScanLogEntry[];
   batch: BatchRun | null;
-  onMarkBatch: (filename: string, verdict: Verdict) => void;
+  onMarkBatch: (id: string, verdict: Verdict) => void;
   go: (p: PageId) => void;
   onPickOrigin?: (lat: number, lon: number) => void;
 }) {
@@ -1161,7 +1187,6 @@ function HomePage({
 }
 
 function UploadPage({
-  inputRef,
   threshold,
   setThreshold,
   busy,
@@ -1169,12 +1194,13 @@ function UploadPage({
   meta,
   setMeta,
   batch,
-  onPick,
-  onFiles,
+  queue,
+  onStage,
+  onClearQueue,
+  onStartQueue,
   onCancelBatch,
   onRerun,
 }: {
-  inputRef: React.RefObject<HTMLInputElement | null>;
   threshold: number;
   setThreshold: (n: number) => void;
   busy: boolean;
@@ -1182,38 +1208,108 @@ function UploadPage({
   meta: MetaForm;
   setMeta: (m: MetaForm) => void;
   batch: BatchRun | null;
-  onPick: () => void;
-  onFiles: (files: File[]) => void;
+  queue: File[];
+  onStage: (files: File[]) => void;
+  onClearQueue: () => void;
+  onStartQueue: () => void;
   onCancelBatch: () => void;
   onRerun: () => void;
 }) {
+  const [dragging, setDragging] = useState(false);
+  const take = (list: FileList | File[] | null) => {
+    if (!list) return;
+    onStage(Array.from(list));
+  };
+
   return (
-    <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
+    <div className="grid gap-4 xl:grid-cols-[minmax(280px,380px)_1fr]">
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Acquire log</CardTitle>
+          <CardTitle>Batch upload</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Add at least 100 sonar frames, then start. The accuracy graph is built from this run.
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,.tif,.tiff"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              const list = e.target.files;
-              if (!list?.length) return;
-              void onFiles(Array.from(list));
-              e.target.value = "";
+          <label
+            onDragEnter={(e) => {
+              e.preventDefault();
+              setDragging(true);
             }}
-          />
-          <p className="text-xs text-slate-600">
-            Select one image or a whole folder of up to {MAX_BATCH} sonar frames at once. The batch accuracy
-            graph (total time, correct vs not correct) is built after the last file. This preview copy does not
-            write to the live judge site.
-          </p>
-          <Button className="h-10 w-full" onClick={onPick} disabled={busy}>
-            <Upload /> Upload sonar images
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              take(e.dataTransfer.files);
+            }}
+            className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-center ${
+              dragging ? "border-cyan-700 bg-cyan-50" : "border-cyan-300 bg-slate-50"
+            }`}
+          >
+            <Images className="size-8 text-cyan-800" />
+            <span className="text-sm font-semibold text-slate-900">Select many images at once</span>
+            <span className="text-xs text-slate-600">
+              In the file window: click the first file, scroll, Shift+click the last — or Ctrl+A (Cmd+A on Mac).
+              Phone: tap Select / Select items, then pick many photos.
+            </span>
+            <input
+              type="file"
+              accept="image/*,.tif,.tiff"
+              multiple
+              className="mt-1 block w-full max-w-full text-xs file:mr-2 file:rounded-md file:border-0 file:bg-cyan-800 file:px-3 file:py-1.5 file:text-white"
+              disabled={busy}
+              onChange={(e) => {
+                take(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </label>
+
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-cyan-700 bg-cyan-800 px-3 py-2.5 text-sm font-medium text-white">
+            <FolderOpen className="size-4" />
+            Or choose a whole folder
+            <input
+              type="file"
+              multiple
+              className="sr-only"
+              disabled={busy}
+              {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+              onChange={(e) => {
+                take(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </label>
+
+          <div
+            className={`rounded-lg px-3 py-2 text-sm ${
+              queue.length >= 100
+                ? "border border-emerald-300 bg-emerald-50 text-emerald-950"
+                : "border border-amber-300 bg-amber-50 text-amber-950"
+            }`}
+          >
+            <p className="font-semibold">{queue.length} images queued</p>
+            <p className="text-xs">
+              {queue.length >= 100
+                ? "Enough for the PPT batch. Tap Start batch."
+                : `Add ${Math.max(0, 100 - queue.length)} more to reach 100. You can still start with fewer.`}
+            </p>
+          </div>
+
+          <Button
+            className="h-11 w-full text-base"
+            disabled={busy || queue.length === 0}
+            onClick={onStartQueue}
+          >
+            {busy ? <Loader2 className="animate-spin" /> : <Upload />}
+            Start batch ({queue.length})
+          </Button>
+          <Button type="button" variant="outline" className="w-full" disabled={busy || queue.length === 0} onClick={onClearQueue}>
+            Clear queue
           </Button>
           {busy && batch ? (
             <Button type="button" variant="outline" className="w-full" onClick={onCancelBatch}>
@@ -1223,7 +1319,7 @@ function UploadPage({
           {batch ? (
             <div className="space-y-1 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs text-cyan-950">
               <p className="font-medium">
-                {batch.finished ? "Batch complete" : `Scanning ${batch.done} / ${batch.total}`}
+                {batch.finished ? "Batch complete — screenshot the graph on Analysis" : `Scanning ${batch.done} / ${batch.total}`}
               </p>
               <div className="h-2 overflow-hidden rounded-full bg-cyan-100">
                 <div
@@ -1262,7 +1358,7 @@ function UploadPage({
           </div>
           <Button variant="outline" className="w-full" disabled={!file || busy} onClick={onRerun}>
             {busy ? <Loader2 className="animate-spin" /> : <Waves />}
-            Re-run at {threshold}%
+            Re-run last image at {threshold}%
           </Button>
           <div className="grid grid-cols-2 gap-2">
             {(
@@ -1293,24 +1389,27 @@ function UploadPage({
       </Card>
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Map position</CardTitle>
+          <CardTitle>Queued sonar frames</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Detection always runs. Pins always appear. Without file GPS they sit on the NIOT survey plot until
-            you click the map, type coordinates, or use device GPS.
+            These files are held on this preview copy only. Nothing is written to the live judge website.
           </p>
         </CardHeader>
         <CardContent>
-          {file ? (
-            <p className="text-sm text-slate-700">
-              Ready: <span className="font-mono">{file.name}</span>
-              {batch && batch.total > 1 ? (
-                <span className="mt-1 block text-xs text-slate-500">
-                  {batch.done}/{batch.total} in this batch
-                </span>
-              ) : null}
+          {queue.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              No files yet. Use “Select many images” or “Choose a whole folder”. Then Start batch.
             </p>
           ) : (
-            <p className="text-sm text-slate-500">No sonar file selected yet. You can pick hundreds at once.</p>
+            <ul className="max-h-[480px] space-y-1 overflow-auto text-xs">
+              {queue.slice(0, 120).map((f, i) => (
+                <li key={`${f.name}-${f.size}-${i}`} className="truncate font-mono text-slate-700">
+                  {i + 1}. {f.name}
+                </li>
+              ))}
+              {queue.length > 120 ? (
+                <li className="text-slate-500">…and {queue.length - 120} more</li>
+              ) : null}
+            </ul>
           )}
         </CardContent>
       </Card>
