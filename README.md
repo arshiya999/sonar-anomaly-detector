@@ -60,7 +60,8 @@ Copy `.env.example`:
 
 ## Friend deploy (Vercel frontend)
 
-**GitHub (send this):** https://github.com/arshiya999/sonar-anomaly-detector
+**Send your teammate:** https://github.com/arshiya999/sonar-anomaly-detector  
+or the zip: `public/aqua-vision-frontend.zip` (steps in **DEPLOY-FRONTEND.txt**).
 
 That repo **is** the frontend. Branch: **`main`**. Framework: **Next.js**. Root directory: **`.`** (repo root). Do **not** set the root to `frontend/` — that folder is an old Vite app, not the operator console.
 
@@ -78,7 +79,7 @@ That repo **is** the frontend. Branch: **`main`**. Framework: **Next.js**. Root 
 4. Deploy. Hard-refresh **https://aqua-vision-sih.vercel.app** (or the new `*.vercel.app` URL).
 5. After Analyze, **Analysis** must show Empirical detection statistics, both graphs, and Download → PDF.
 
-Zip alternative: GitHub → **Code** → **Download ZIP**. Unzip and import that folder (root must contain `package.json` with `"name": "aqua-vision"`).
+Zip: repo file `public/aqua-vision-frontend.zip`, or GitHub → **Code** → **Download ZIP**. Root must contain `package.json` with `"name": "aqua-vision"`. See **DEPLOY-FRONTEND.txt**.
 
 YOLO stays on Render. Vercel only hosts the Next.js UI.
 

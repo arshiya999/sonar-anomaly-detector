@@ -1,0 +1,29 @@
+Aqua Vision — frontend only (send this folder/zip to a teammate)
+
+GitHub (same code): https://github.com/arshiya999/sonar-anomaly-detector
+Zip on GitHub: public/aqua-vision-frontend.zip
+
+This package is the Next.js operator UI only. Detection stays on Render.
+Do not use the old `frontend/` Vite folder.
+
+Vercel
+1. Unzip. The folder must contain package.json (name: aqua-vision).
+2. vercel.com/new → Import GitHub repo  OR  drag this unzipped folder.
+3. Framework: Next.js. Root directory: . (this folder).
+4. To keep https://aqua-vision-sih.vercel.app: open project aqua-vision-sih →
+   Settings → Git → this repo, branch main → Redeploy.
+5. Production environment variables (no trailing slash):
+
+   ML_API_URL=https://aquavision-ml.onrender.com
+   OPS_API_URL=https://aquavision-backend-7iuh.onrender.com
+   NEXT_PUBLIC_ML_API_URL=https://aquavision-ml.onrender.com
+   NEXT_PUBLIC_OPS_API_URL=https://aquavision-backend-7iuh.onrender.com
+
+6. Deploy. Hard-refresh the site.
+7. Upload sonar images → Analyze. Analysis should show empirical graphs
+   and Download (PDF / CSV / JSON / briefing).
+
+Local check
+  npm install
+  npm run dev
+  Open http://127.0.0.1:47281
